@@ -1,144 +1,116 @@
 <?php
 
-class modqontosync extends DolibarrModules
+/**
+ * Module descriptor for QontoSync.
+ */
+class modQontoSync extends DolibarrModules
 {
+    /**
+     * Constructor
+     *
+     * @param DoliDB $db Database connector
+     */
     public function __construct($db)
     {
         global $langs;
 
         $this->db = $db;
 
-        $this->numero = 104500;
-
-        $this->rights_class = 'qontosync';
-
-        $this->family = "financial";
-        $this->module_position = '90';
-
-        $this->name = preg_replace('/^mod/i', '', get_class($this));
-
-        $this->description = $langs->trans("qontosyncDescription");
-
+        // Module Id
+        $this->numero = 527000;
+        // Module Name
+        $this->name = 'QontoSync';
+        // Module description
+        $this->description = "Synchronisation intelligente entre Qonto et Dolibarr";
+        // Editor name
+        $this->editor_name = 'Custom Developer';
+        // Editor url
+        $this->editor_url = '';
+        // Module version
         $this->version = '1.0.0';
+        // Module family
+        $this->family = "financial";
+        // Module position
+        $this->module_position = 500;
 
+        // Key used for configuration constants
         $this->const_name = 'MAIN_MODULE_QONTOSYNC';
 
+        // Module picto
         $this->picto = 'bank';
 
-        $this->module_parts = array(
-            'triggers' => 1,
-            'cronjobs' => 1
-        );
-
+        // Data directories to create when module is enabled
         $this->dirs = array();
 
-        $this->config_page_url = array(
-            "setup.php@qontosync"
-        );
+        // Config page url
+        $this->config_page_url = array("setup.php@qontosync");
 
-        $this->depends = array(
-            'modBanque'
-        );
+        // Dependencies
+        $this->depends = array('modBanque');
 
-        $this->langfiles = array(
-            "qontosync@qontosync"
-        );
+        // Language files
+        $this->langfiles = array("qontosync@qontosync");
 
+        // Constants
+        $this->const = array();
+
+        // Permissions
         $this->rights = array();
+        $this->rights_class = 'qontosync';
 
         $r = 0;
-
-        $this->rights[$r][0] = 104501;
-        $this->rights[$r][1] = $langs->trans('Readqontosync');
+        $this->rights[$r][0] = 527001;
+        $this->rights[$r][1] = 'Read transactions';
+        $this->rights[$r][2] = 'read';
+        $this->rights[$r][3] = 1;
         $this->rights[$r][4] = 'read';
-
         $r++;
 
-        $this->rights[$r][0] = 104502;
-        $this->rights[$r][1] = $langs->trans('Manageqontosync');
-        $this->rights[$r][4] = 'write';
+        $this->rights[$r][0] = 527002;
+        $this->rights[$r][1] = 'Setup module';
+        $this->rights[$r][2] = 'config';
+        $this->rights[$r][3] = 0;
+        $this->rights[$r][4] = 'setup';
 
+        // Menus
         $this->menu = array();
-
         $this->menu[] = array(
             'fk_menu' => 'fk_mainmenu=bank',
             'type' => 'left',
-            'titre' => 'qontosyncDashboard',
+            'titre' => 'QontoSync',
             'mainmenu' => 'bank',
             'leftmenu' => 'qontosync',
             'url' => '/custom/qontosync/dashboard.php',
             'langs' => 'qontosync@qontosync',
-            'position' => 100,
+            'position' => 1000,
             'enabled' => '$conf->qontosync->enabled',
             'perms' => '$user->hasRight("qontosync", "read")',
             'target' => '',
             'user' => 2
         );
-
-        // Cron jobs
-        $this->cronjobs = array();
-        $this->cronjobs[] = array(
-            'label' => 'qontosyncFetchTransactions',
-            'jobtype' => 'method',
-            'class' => '/qontosync/class/cron.class.php',
-            'objectname' => 'qontosyncCron',
-            'method' => 'fetchTransactions',
-            'methodname' => 'fetchTransactions',
-            'parameters' => '',
-            'comment' => $langs->trans('qontosyncFetchTransactionsDesc'),
-            'frequency' => 1,
-            'unitfrequency' => 3600,
-            'status' => 0,
-            'test' => '$conf->qontosync->enabled',
-            'priority' => 50
-        );
     }
 
     /**
-     *  Function called when module is enabled.
-     *  The init function add constants, menus, permissions and exports defined in constructor.
-     *  It also creates tables and extrafields.
+     * Function called when module is enabled.
      *
-     *  @param      string      $options    Options for setup
-     *  @return     int                     1 if OK, 0 if KO
+     * @param string $options Options for setup
+     * @return int 1 if OK, 0 if KO
      */
     public function init($options = '')
     {
         $sql = array();
-
-        // Add extrafields
-        include_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
-        $extrafields = new ExtraFields($this->db);
-
-        // Champ pour l'ID de transaction Qonto sur les écritures bancaires
-        $extrafields->addExtraField(
-            'qonto_txn_id',
-            'QontoTransactionID',
-            'varchar',
-            255,
-            'bank',
-            0, 0, '', '', '', 1, '', '', 0, 'qontosync@qontosync'
-        );
-
         return $this->_init($sql, $options);
     }
 
     /**
-     *  Function called when module is disabled.
-     *  Remove of extrafields.
+     * Function called when module is disabled.
      *
-     *  @param      string      $options    Options for setup
-     *  @return     int                     1 if OK, 0 if KO
+     * @param string $options Options for setup
+     * @return int 1 if OK, 0 if KO
      */
     public function remove($options = '')
     {
         $sql = array();
-
-        // On ne supprime PAS l'extrafield lors de la désactivation pour conserver les données de liaison
-        // include_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
-        // $extrafields = new ExtraFields($this->db);
-        // $extrafields->delete('qonto_txn_id', 'bank');
-
         return $this->_remove($sql, $options);
     }
 }
