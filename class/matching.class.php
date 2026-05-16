@@ -5,28 +5,18 @@
  */
 class Matching
 {
-	/** @var DoliDB Database handler */
 	public $db;
-	/** @var string Erreur */
 	public $error;
 
-	/**
-	 * @param DoliDB $db Database handler
-	 */
 	public function __construct($db)
 	{
 		$this->db = $db;
 	}
 
-	/**
-	 * Lie une transaction Qonto à une écriture bancaire Dolibarr via l'extrafield
-	 *
-	 * @param int    $bank_line_id  ID de l'écriture (rowid dans llx_bank)
-	 * @param string $qonto_id      ID unique de la transaction Qonto
-	 * @return int                  1 si OK, -1 si KO
-	 */
 	public function linkTransaction($bank_line_id, $qonto_id)
 	{
+		dol_syslog("QontoSync: Tentative de liaison - bank_line_id=" . $bank_line_id . " / qonto_id=" . $qonto_id, LOG_DEBUG);
+		
 		$this->db->begin();
 
 		$sql = "UPDATE " . MAIN_DB_PREFIX . "bank_extrafields";
@@ -37,10 +27,12 @@ class Matching
 
 		if ($resql) {
 			$this->db->commit();
+			dol_syslog("QontoSync: Liaison réussie en base de données.", LOG_DEBUG);
 			return 1;
 		} else {
 			$this->error = $this->db->lasterror();
 			$this->db->rollback();
+			dol_syslog("QontoSync: Erreur SQL lors de la liaison - " . $this->error, LOG_ERR);
 			return -1;
 		}
 	}
