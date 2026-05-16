@@ -6,7 +6,7 @@ require '../../main.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
 require_once './class/qonto.class.php';
-require_once './class/matching.class.php'; // Inclusion de la nouvelle classe
+require_once './class/matching.class.php';
 require_once './lib/qontosync.lib.php';
 
 $langs->loadLangs(array("qontosync@qontosync", "banks"));
@@ -28,7 +28,6 @@ if ($action == 'link') {
 	$bank_line_id = GETPOST('bank_line_id', 'int');
 	
 	if ($bank_line_id > 0 && !empty($qonto_id)) {
-		// Instanciation de la classe Matching
 		$matching = new Matching($db);
 		$res = $matching->linkTransaction($bank_line_id, $qonto_id);
 		
@@ -38,7 +37,7 @@ if ($action == 'link') {
 			setEventMessages($matching->error, null, 'errors');
 		}
 	}
-	$action = 'search'; // On repasse en mode recherche pour réafficher le tableau
+	$action = 'search'; 
 }
 
 // -----------------------------------------
@@ -50,12 +49,17 @@ $error = 0;
 if ($action == 'search' && $bank_id > 0) {
 	if (!checkToken()) accessforbidden();
 
+	dol_syslog("QontoSync: Début de l'action 'search' pour le compte ID " . $bank_id, LOG_DEBUG);
+
 	$account = new Account($db);
 	$account->fetch($bank_id);
-	$iban = $account->iban;
+	
+	// Nettoyage de l'IBAN récupéré
+	$iban = strtoupper(str_replace(array(' ', '-'), '', $account->iban));
 
 	if (empty($iban)) {
 		setEventMessages($langs->trans("QontoSyncErrorNoIbanOnAccount"), null, 'errors');
+		dol_syslog("QontoSync: Action avortée - Aucun IBAN sur le compte ID " . $bank_id, LOG_WARNING);
 		$error++;
 	} else {
 		$qonto = new Qonto($db);
