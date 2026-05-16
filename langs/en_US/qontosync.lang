@@ -9,3 +9,6 @@ QontoSyncPeriod = Period
 QontoSyncMonth = Month
 QontoSyncYear = Year
 QontoSyncLink = Link
+QontoSyncSetup = QontoSync Setup
+QontoSyncApiKey = Qonto API Secret Key
+QontoSyncSlug = Organization Login / Slug
