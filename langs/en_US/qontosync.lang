@@ -1,14 +1,30 @@
 # QontoSync - en_US
 Module542900Name = QontoSync
-QontoSyncModuleDescription = Manual synchronization and reconciliation via Qonto API without third-party data storage.
+QontoSyncModuleDescription = Manual bank reconciliation via Qonto API, without third-party data storage.
 QontoSyncPermissionRead = Read and reconcile Qonto transactions
 QontoSyncMenuTitle = Qonto Reconciliation
 QontoTransactionID = Qonto Transaction ID
+
+# Setup
+QontoSyncSetup = QontoSync Setup
+QontoSyncApiKey = Qonto API Secret Key
+QontoSyncSlug = Organization Login / Slug
+
+# Interface & Table
 QontoSyncSearch = Search
 QontoSyncPeriod = Period
 QontoSyncMonth = Month
 QontoSyncYear = Year
 QontoSyncLink = Link
-QontoSyncSetup = QontoSync Setup
-QontoSyncApiKey = Qonto API Secret Key
-QontoSyncSlug = Organization Login / Slug
+AlreadyLinked = Already linked
+NoExactAmountMatch = No exact amount match found
+SelectTransaction = Select transaction
+DolibarrTransaction = Dolibarr Transaction
+
+# Messages & Errors
+QontoSyncLinkSuccess = Transaction successfully linked!
+QontoSyncErrorSetupMissing = Qonto credentials missing. Please configure the module.
+QontoSyncErrorInvalidDate = Search dates are invalid.
+QontoSyncErrorCurl = Connection error (cURL) to the Qonto API.
+QontoSyncErrorAPI = Error returned by the Qonto API.
+QontoSyncErrorNoIbanOnAccount = No IBAN is set on the selected Dolibarr bank account.
