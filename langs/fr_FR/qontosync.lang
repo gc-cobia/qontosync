@@ -9,3 +9,6 @@ QontoSyncPeriod = Période
 QontoSyncMonth = Mois
 QontoSyncYear = Année
 QontoSyncLink = Lier
+QontoSyncSetup = Configuration de QontoSync
+QontoSyncApiKey = Clé Secrète API Qonto
+QontoSyncSlug = Login / Slug de l'organisation
