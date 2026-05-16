@@ -1,20 +1,11 @@
-# French language file for QontoSync
-ModuleQontoSyncName=QontoSync
-ModuleQontoSyncDesc=Synchronisation intelligente entre Qonto et Dolibarr
-QontoSyncDashboard=Tableau de bord Qonto
-QontoSyncSetup=Configuration QontoSync
-QontoSyncApiLogin=Login Organisation / Slug
-QontoSyncApiKey=Clé secrète API
-QontoSyncMockMode=Mode Simulation (Mock)
-QontoSyncMockModeHelp=Utilise des données fictives depuis un fichier JSON au lieu de l'API réelle.
-QontoSyncTestConnection=Tester la connexion
-QontoSyncSelectAccount=Sélectionnez un compte (IBAN)
-QontoSyncNoIbanHelp=Veuillez renseigner un IBAN pour vos comptes bancaires dans Dolibarr.
-QontoSyncTransactionsFor=Transactions pour %s/%s
-QontoSyncNoTransactions=Aucune transaction trouvée.
-QontoSyncDate=Date
-QontoSyncLabel=Libellé
-QontoSyncAmount=Montant
-QontoSyncStatus=Statut
-QontoSyncConnectionSuccess=Connexion à l'API réussie !
-QontoSyncConnectionError=Échec de la connexion.
+# QontoSync - fr_FR
+Module542900Name = QontoSync
+QontoSyncModuleDescription = Synchronisation et rapprochement manuel via l'API Qonto sans stockage de données tiers.
+QontoSyncPermissionRead = Lire et rapprocher les transactions Qonto
+QontoSyncMenuTitle = Rapprochement Qonto
+QontoTransactionID = ID Transaction Qonto
+QontoSyncSearch = Rechercher
+QontoSyncPeriod = Période
+QontoSyncMonth = Mois
+QontoSyncYear = Année
+QontoSyncLink = Lier
