@@ -1,40 +1,40 @@
 # qontosync for Dolibarr
 
-Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionnant sans stockage de données tiers.
+Manual bank reconciliation module between Qonto API and Dolibarr, operating without any third-party data storage.
 
-## Fonctionnalités
+## Features
 
-- **Interface de sélection** : Sélection de la période (Mois/Année) et du compte bancaire Dolibarr via des listes déroulantes natives.
-- **Récupération à la volée** : Appel en temps réel de l'API Qonto pour afficher les transactions du compte (IBAN) sur la période choisie.
-- **Tableau de réconciliation** :
-    - Affichage des données Qonto (Date, Libellé avec vignette de référence, ID de transaction).
-    - Suggestion dynamique dans une liste déroulante des écritures bancaires Dolibarr ayant le **montant exact**.
-- **Liaison manuelle** : Bouton permettant de lier une transaction Qonto à une écriture Dolibarr existante via l'injection de l'ID Qonto dans un `extrafield`.
-- **Gestion des erreurs** : Traitement exhaustif des retours d'erreurs API et des cas d'absence de correspondance.
+- **Selection Interface**: Choose the period (Month/Year) and the Dolibarr bank account via native dropdown lists.
+- **On-the-fly Retrieval**: Real-time Qonto API calls to fetch transactions for the selected account (IBAN) and period.
+- **Reconciliation Table**:
+    - Display of Qonto data (Date, Label with reference badge, Transaction ID).
+    - Dynamic suggestion in a dropdown list of Dolibarr bank entries with the **exact matching amount**.
+- **Manual Linking**: Button to link a Qonto transaction to an existing Dolibarr entry by injecting the Qonto ID into an `extrafield`.
+- **Error Handling**: Comprehensive processing of API error returns and cases with no matches.
 
-## Spécifications Techniques
+## Technical Specifications
 
-- **Zéro table SQL supplémentaire** : Utilisation exclusive des tables natives et d'un `extrafield` sur la table `llx_bank`.
-- **Stockage sécurisé** : Identifiants API (Clé secrète, Login/Slug) stockés dans les constantes de configuration de Dolibarr (`llx_const`).
-- **Architecture MVC / Clean Code** :
-    - **Orchestrateur** : Page principale à la racine du module gérant le flux.
-    - **Logique métier** : Classes situées dans `/class/`.
-    - **Affichage** : Fonctions de rendu centralisées dans `/lib/qontosync.lib.php`.
-- **Intégration Visuelle** : Utilisation exclusive du CSS natif de Dolibarr pour garantir la compatibilité avec tous les thèmes.
+- **Zero Additional SQL Tables**: Uses only native tables and one `extrafield` on the `llx_bank` table.
+- **Secure Storage**: API credentials (Secret Key, Login/Slug) stored in Dolibarr configuration constants (`llx_const`).
+- **MVC Architecture / Clean Code**:
+    - **Orchestrator**: Main page at the module root managing the flow.
+    - **Business Logic**: Classes located in `/class/`.
+    - **Display**: Rendering functions centralized in `/lib/qontosync.lib.php`.
+- **Visual Integration**: Exclusive use of native Dolibarr CSS to ensure compatibility with all themes.
 
 ## Installation
 
-1. Copiez le dossier `qontosync` dans votre répertoire `custom`.
-2. Activez le module dans **Configuration > Modules**.
-3. Renseignez la clé d'API et le Login/Slug dans la configuration du module.
-4. Le module crée automatiquement l'extrafield `qonto_id` sur l'objet Écriture Bancaire (`bank`) lors de son activation.
+1. Copy the `qontosync` folder into your `custom` directory.
+2. Enable the module in **Configuration > Modules**.
+3. Enter your API Key and Login/Slug in the module setup.
+4. The module automatically creates the `qonto_id` extrafield on the Bank Entry object (`bank`) upon activation.
 
-## Utilisation
+## Usage
 
-1. Accédez au menu **Banque > qontosync**.
-2. Sélectionnez le Mois, l'Année et le Compte Bancaire concerné.
-3. Cliquez sur le bouton de recherche pour interroger l'API Qonto.
-4. Pour chaque ligne Qonto, sélectionnez l'écriture Dolibarr correspondante dans la liste et cliquez sur "Lier".
+1. Go to the **Bank > qontosync** menu.
+2. Select the Month, Year, and the relevant Bank Account.
+3. Click the search button to query the Qonto API.
+4. For each Qonto line, select the corresponding Dolibarr entry from the list and click "Link".
 
 ---
-Développé pour Dolibarr.
+Developed for Dolibarr.
