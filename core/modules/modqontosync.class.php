@@ -1,116 +1,129 @@
 <?php
 
 /**
- * Module descriptor for QontoSync.
+ * Description du module QontoSync
  */
 class modQontoSync extends DolibarrModules
 {
-    /**
-     * Constructor
-     *
-     * @param DoliDB $db Database connector
-     */
-    public function __construct($db)
-    {
-        global $langs;
+	/**
+	 * Constructor.
+	 *
+	 * @param DoliDB $db Database handler
+	 */
+	public function __construct($db)
+	{
+		$this->db = $db;
 
-        $this->db = $db;
+		$this->numero = 542900;
+		$this->name = preg_replace('/^mod/i', '', get_class($this));
+        $this->description = "QontoSyncModuleDescription";
+        $this->editor_name = 'COBIA';
+		$this->editor_url = 'https://www.cobia.fr';
+		$this->version = '0.1';
+		$this->family = 'financial';
+		$this->flags = 'module';
+		$this->picto = 'accountancy';
+		$this->dirs = array('/qontosync');
+		$this->config_page_url = array("setup.php@qontosync");
 
-        // Module Id
-        $this->numero = 527000;
-        // Module Name
-        $this->name = 'QontoSync';
-        // Module description
-        $this->description = "Synchronisation intelligente entre Qonto et Dolibarr";
-        // Editor name
-        $this->editor_name = 'Custom Developer';
-        // Editor url
-        $this->editor_url = '';
-        // Module version
-        $this->version = '1.0.0';
-        // Module family
-        $this->family = "financial";
-        // Module position
-        $this->module_position = 500;
+		$this->depends = array("modBanque");
 
-        // Key used for configuration constants
-        $this->const_name = 'MAIN_MODULE_QONTOSYNC';
+		// Droits (Permissions)
+		$this->rights = array();
+		$r = 0;
 
-        // Module picto
-        $this->picto = 'bank';
+		$r++;
+		$this->rights[$r][0] = 542901; 
+		$this->rights[$r][1] = 'QontoSyncPermissionRead';
+		$this->rights[$r][2] = 'r'; 
+		$this->rights[$r][3] = 1; 
+		$this->rights[$r][4] = 'read';
 
-        // Data directories to create when module is enabled
-        $this->dirs = array();
+		// Menus
+		$this->menu = array();
+		$r = 0;
 
-        // Config page url
-        $this->config_page_url = array("setup.php@qontosync");
-
-        // Dependencies
-        $this->depends = array('modBanque');
-
-        // Language files
-        $this->langfiles = array("qontosync@qontosync");
-
-        // Constants
-        $this->const = array();
-
-        // Permissions
-        $this->rights = array();
-        $this->rights_class = 'qontosync';
-
-        $r = 0;
-        $this->rights[$r][0] = 527001;
-        $this->rights[$r][1] = 'Read transactions';
-        $this->rights[$r][2] = 'read';
-        $this->rights[$r][3] = 1;
-        $this->rights[$r][4] = 'read';
-        $r++;
-
-        $this->rights[$r][0] = 527002;
-        $this->rights[$r][1] = 'Setup module';
-        $this->rights[$r][2] = 'config';
-        $this->rights[$r][3] = 0;
-        $this->rights[$r][4] = 'setup';
-
-        // Menus
-        $this->menu = array();
-        $this->menu[] = array(
-            'fk_menu' => 'fk_mainmenu=bank',
-            'type' => 'left',
-            'titre' => 'QontoSync',
-            'mainmenu' => 'bank',
-            'leftmenu' => 'qontosync',
-            'url' => '/custom/qontosync/dashboard.php',
-            'langs' => 'qontosync@qontosync',
-            'position' => 1000,
-            'enabled' => '$conf->qontosync->enabled',
-            'perms' => '$user->hasRight("qontosync", "read")',
-            'target' => '',
-            'user' => 2
-        );
-    }
+		$this->menu[$r++] = array(
+			'fk_menu'   => 'fk_mainmenu=bank,fk_leftmenu=bank_entries', // Sous-menu de l'onglet Banque
+			'type'      => 'left',
+			'titre'     => 'QontoSyncMenuTitle',
+			'mainmenu'  => 'bank',
+			'leftmenu'  => 'qontosync',
+			'url'       => '/qontosync/index.php',
+			'langs'     => 'qontosync@qontosync',
+			'position'  => 1000,
+			'enabled'   => '$conf->qontosync->enabled',
+			'perms'     => '$user->rights->qontosync->read',
+			'target'    => '',
+			'user'      => 0
+		);
+	}
 
     /**
-     * Function called when module is enabled.
-     *
-     * @param string $options Options for setup
-     * @return int 1 if OK, 0 if KO
-     */
-    public function init($options = '')
-    {
-        $sql = array();
-        return $this->_init($sql, $options);
-    }
+	* Fonction d'installation du module
+	* * @param string $options Options d'installation
+	* @return int 1 si OK, 0 si KO
+	*/
+	public function init($options = '')
+	{		
+		$res = $this->_insert_extrafield();
+		if ($res < 0) {
+			return 0;
+		}
 
-    /**
-     * Function called when module is disabled.
-     *
-     * @param string $options Options for setup
-     * @return int 1 if OK, 0 if KO
-     */
-    public function remove($options = '')
-    {
-        $sql = array();
-        return $this->_remove($sql, $options);
-    }
+		return 1;
+	}
+
+	/**
+	 * Fonction de désactivation (ne supprime pas les données par sécurité)
+	 */
+	public function remove($options = '')
+	{
+		return 1;
+	}
+
+	/**
+	* Crée l'extrafield qonto_id sur la table bank de manière programmatique
+	* * @return int 1 if OK, -1 if KO
+	*/
+	private function _insert_extrafield()
+	{
+		global $langs;
+		include_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+
+		$attrname = 'qonto_id';
+		$label = 'QontoTransactionID';
+		$type = 'varchar';
+		$size = '255';
+		$elementtype = 'bank'; // Rattaché aux écritures bancaires
+
+		// On vérifie si l'extrafield existe déjà pour ne pas lever d'erreur
+		if (!isset($extrafields->attributes[$elementtype]['label'][$attrname])) {
+			$res = $extrafields->addExtraField(
+				$attrname,
+				$label,
+				$type,
+				0,    // Position
+				$size,
+				$elementtype,
+				0,    // Unique
+				1,    // Required
+				'',   // Default value
+				array('options' => array()), // Paramètres
+				1,    // Enabled
+				'',   // Visible
+				1,    // Printable
+				0,    // Totalizable
+				''    // Help text
+			);
+
+			if ($res < 0) {
+				$this->error = $extrafields->error;
+				return -1;
+			}
+		}
+
+		return 1;
+	}
 }
