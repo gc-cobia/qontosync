@@ -5,39 +5,15 @@
  */
 class Qonto
 {
-	/**
-	 * @var DoliDB Database handler
-	 */
 	public $db;
-
-	/**
-	 * @var string Libellé de l'erreur (clé de traduction)
-	 */
 	public $error;
-
-	/**
-	 * @var array Détails des erreurs renvoyées par l'API
-	 */
 	public $errors = array();
 
-	/**
-	 * Constructeur
-	 *
-	 * @param DoliDB $db Database handler
-	 */
 	public function __construct($db)
 	{
 		$this->db = $db;
 	}
 
-	/**
-	 * Récupère les transactions brutes depuis l'API Qonto
-	 *
-	 * @param string $iban         IBAN du compte
-	 * @param int    $month        Mois (1-12)
-	 * @param int    $year         Année (YYYY)
-	 * @return array|int           Tableau de transactions ou -1 en cas d'échec
-	 */
 	public function fetchTransactions($iban, $month, $year)
 	{
 		global $conf;
@@ -47,23 +23,28 @@ class Qonto
 
 		if (empty($apiKey) || empty($slug)) {
 			$this->error = "QontoSyncErrorSetupMissing";
+			dol_syslog("QontoSync: Échec - Identifiants API manquants dans la configuration", LOG_WARNING);
 			return -1;
 		}
 
-		// Préparation de la plage temporelle (ISO 8601)
 		try {
 			$startDate = new DateTime("$year-$month-01T00:00:00Z");
 			$endDate   = clone $startDate;
 			$endDate->modify('last day of this month')->setTime(23, 59, 59);
 		} catch (Exception $e) {
 			$this->error = "QontoSyncErrorInvalidDate";
+			dol_syslog("QontoSync: Échec - Format de date invalide pour $month/$year", LOG_ERR);
 			return -1;
 		}
+
+		// Nettoyage strict de l'IBAN (espaces, tirets, mise en majuscules)
+		$iban_clean = strtoupper(str_replace(array(' ', '-'), '', $iban));
+		dol_syslog("QontoSync: Lancement de la requête API pour l'IBAN " . $iban_clean . " sur la période " . $startDate->format('Y-m'), LOG_DEBUG);
 
 		$url = "https://thirdparty.qonto.com/v2/transactions";
 		$queryParams = http_build_query(array(
 			'slug'            => $slug,
-			'iban'            => str_replace(' ', '', $iban),
+			'iban'            => $iban_clean,
 			'settled_at_from' => $startDate->format('Y-m-d\TH:i:s\Z'),
 			'settled_at_to'   => $endDate->format('Y-m-d\TH:i:s\Z'),
 			'status[]'        => 'completed'
@@ -71,6 +52,7 @@ class Qonto
 
 		$ch = curl_init($url . '?' . $queryParams);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 20); // Timeout de 20 secondes max
 		curl_setopt($ch, CURLOPT_HTTPHEADER, array(
 			'Authorization: ' . $slug . ':' . $apiKey,
 			'Accept: application/json'
@@ -84,6 +66,7 @@ class Qonto
 		if ($response === false) {
 			$this->error = "QontoSyncErrorCurl";
 			$this->errors = array($curlErr);
+			dol_syslog("QontoSync: Erreur de connexion cURL : " . $curlErr, LOG_ERR);
 			return -1;
 		}
 
@@ -92,8 +75,12 @@ class Qonto
 		if ($httpCode !== 200) {
 			$this->error = "QontoSyncErrorAPI";
 			$this->errors = isset($data['errors']) ? $data['errors'] : array("HTTP Code $httpCode");
+			dol_syslog("QontoSync: Erreur API (Code " . $httpCode . ") - " . json_encode($this->errors), LOG_ERR);
 			return -1;
 		}
+
+		$count = isset($data['transactions']) ? count($data['transactions']) : 0;
+		dol_syslog("QontoSync: Succès de l'API. " . $count . " transactions récupérées.", LOG_DEBUG);
 
 		return isset($data['transactions']) ? $data['transactions'] : array();
 	}
