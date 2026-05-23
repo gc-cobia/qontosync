@@ -1,0 +1,46 @@
+# QontoSync pour Dolibarr
+
+Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionnant sans aucun stockage de données tiers.
+
+## Fonctionnalités
+
+- **Interface de sélection** : Sélection de la période (Mois/Année) et du compte bancaire Dolibarr via des listes déroulantes natives.
+- **Récupération à la volée** : Appel en temps réel de l'API Qonto pour afficher les transactions du compte (IBAN) sur la période choisie.
+- **Tableau de réconciliation** :
+    - Affichage des données Qonto (Date, Libellé avec vignette de référence, ID de transaction).
+    - Suggestion dynamique dans une liste déroulante des écritures bancaires ou factures Dolibarr ayant le **montant exact**.
+- **Correspondance des modes de paiement** : Associez les types d'opérations Qonto (Virements, Cartes, Prélèvements, Chèques) à vos modes de paiement Dolibarr.
+- **Liaison manuelle** : Bouton permettant de lier une transaction Qonto à une écriture Dolibarr existante via l'injection de l'ID Qonto dans un `extrafield`.
+- **Mode Sandbox** : Testez vos intégrations en toute sécurité grâce au support du mode Sandbox de Qonto.
+
+## Spécifications Techniques et Sécurité
+
+- **Zéro table SQL supplémentaire** : Utilisation exclusive des tables natives et d'un `extrafield` sur la table `llx_bank`.
+- **Stockage sécurisé** : Identifiants API (Clé secrète, Login/Slug) stockés dans les constantes de configuration de Dolibarr (`llx_const`).
+- **Intégrité des données (Rollback)** : Gestion stricte des transactions SQL. En cas d'erreur pendant la création d'un paiement ou d'une liaison, toute l'opération est annulée pour éviter les données corrompues.
+- **Protection Anti-Doublon** : Sécurité intégrée empêchant la double soumission d'une transaction (ex: lors d'un rafraîchissement de page).
+- **Intégration Visuelle** : Utilisation exclusive du CSS natif de Dolibarr pour garantir la compatibilité avec tous les thèmes.
+
+## Prérequis
+
+Les modules natifs suivants de Dolibarr doivent être activés :
+- **Banques et Caisses** (`modBanque`)
+- **Factures clients** (`modFacture`)
+- **Factures fournisseurs** (`modFournisseur`)
+
+## Liens utiles & Ressources
+
+Pour utiliser ce module, vous devez posséder des identifiants API Qonto. Vous pouvez les gérer sur les plateformes officielles :
+- **Portail Développeur Qonto** : [https://developer.qonto.com/](https://developer.qonto.com/) (Pour créer vos clés API et votre Identifiant/Slug).
+- **Documentation API** : [https://api-doc.qonto.com/](https://api-doc.qonto.com/) (Détails techniques sur les points de terminaison et le mode Sandbox).
+- **Centre d'aide Qonto** : Pour toute question relative aux permissions de votre compte professionnel.
+
+## Installation et Utilisation
+
+1. Copiez le dossier `qontosync` dans votre répertoire `custom` de Dolibarr.
+2. Activez le module dans **Accueil > Configuration > Modules/Applications**.
+3. Renseignez la clé d'API et configurez les correspondances dans la configuration du module.
+4. Accédez au menu **Banques/Caisses > QontoSync** pour commencer le rapprochement.
+
+---
+Développé pour Dolibarr.
