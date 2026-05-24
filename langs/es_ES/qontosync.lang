@@ -1,0 +1,55 @@
+QontoSync=QontoSync
+QontoSyncSetup=Configuración de QontoSync
+
+# Parameters
+QontoAPIKey=Clave API de Qonto (Secret Key)
+QontoSlug=Usuario de Qonto (Slug)
+QontoSandboxMode=Modo Sandbox (Pruebas)
+QontoSandboxToken=Token de Sandbox (Staging Token)
+QontoSyncPMTransfer=Modo de pago para Transferencias (Entrantes / Salientes)
+QontoSyncPMCard=Modo de pago para Tarjetas
+QontoSyncPMDD=Modo de pago para Domiciliaciones (Direct Debit)
+QontoSyncPMCheck=Modo de pago para Cheques
+
+# Messages
+SetupSaved=La configuración se ha guardado.
+NoParameters=Por favor, introduzca su Clave API y Usuario (Slug) de Qonto.
+ConnectionError=Error al conectar con la API de Qonto. Verifique sus credenciales.
+Connected=Conectado con éxito a la API de Qonto.
+
+# Actions & Results
+InvalidToken=Token de seguridad no válido
+TransactionSuccessfullyLinked=Transacción vinculada con éxito
+FailedToLinkTransaction=Error al vincular la transacción
+TransactionNotFound=Transacción no encontrada
+ErrorFetchingTransactions=Error al recuperar las transacciones de Qonto
+NoTransactionToLink=No se seleccionó ninguna transacción para vincular
+NoTransactionsFound=No se encontraron transacciones para este período
+NoBankSelected=Por favor, seleccione una cuenta bancaria
+ErrorTooManyTrx=Error: Demasiadas coincidencias encontradas en la base de datos
+
+# Table & Display
+Linked=Vinculado
+Correspondence=Correspondencia
+BankTransactions=Transacciones bancarias
+CustomersInvoices=Facturas de clientes
+SupplierInvoices=Facturas de proveedores
+NoCorrespondenceFound=No se encontró correspondencia
+Validate=Validar
+Select=Seleccionar
+Parameters=Parámetros
+
+# Core Fallbacks
+Month=Mes
+Year=Año
+BankAccount=Cuenta bancaria
+Search=Buscar
+Date=Fecha
+Label=Concepto
+Amount=Importe
+Action=Acción
+BackToModuleList=Volver a la lista de módulos
+Parameter=Parámetro
+Value=Valor
+Save=Guardar
+Test=Probar
