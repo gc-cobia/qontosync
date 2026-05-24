@@ -34,9 +34,9 @@ $slug = GETPOST('QONTOSYNC_SLUG', 'alphanohtml');
 $sandbox = GETPOST('QONTOSYNC_SANDBOX', 'int') ? 1 : 0;
 $sandbox_token = GETPOST('QONTOSYNC_SANDBOX_TOKEN', 'alphanohtml');
 $pm_transfer = GETPOST('QONTOSYNC_PM_TRANSFER', 'int');
-$pm_card     = GETPOST('QONTOSYNC_PM_CARD', 'int');
-$pm_dd       = GETPOST('QONTOSYNC_PM_DD', 'int');
-$pm_check    = GETPOST('QONTOSYNC_PM_CHECK', 'int');
+$pm_card = GETPOST('QONTOSYNC_PM_CARD', 'int');
+$pm_dd = GETPOST('QONTOSYNC_PM_DD', 'int');
+$pm_check = GETPOST('QONTOSYNC_PM_CHECK', 'int');
 
 // Update constants
 if ($action == 'update') {
@@ -55,7 +55,7 @@ if ($action == 'update') {
 	dolibarr_set_const($db, 'QONTOSYNC_PM_DD', $pm_dd, 'chaine', 0, '', $conf->entity);
 	dolibarr_set_const($db, 'QONTOSYNC_PM_CHECK', $pm_check, 'chaine', 0, '', $conf->entity);
 
-		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
+	setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
 	}
 }
 
@@ -80,7 +80,7 @@ if ($action == 'test') {
 }
 
 // Get VAR from dictionary
-$sql = "SELECT id, code, libelle FROM " . MAIN_DB_PREFIX . "c_paiement WHERE active = 1";
+$sql = "SELECT id, code, libelle FROM " . MAIN_DB_PREFIX . "c_paiement WHERE active = 1 AND entity IN (" . getEntity('c_paiement') . ")";
 $resql = $db->query($sql);
 $payment_modes = array();
 $payment_modes[''] = '-- ' . $langs->trans("Select") . ' --';
