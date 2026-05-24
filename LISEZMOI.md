@@ -1,46 +1,50 @@
-# QontoSync pour Dolibarr
+# QontoSync for Dolibarr
 
-Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionnant sans aucun stockage de données tiers.
+Manual bank reconciliation module between Qonto API and Dolibarr, operating without any third-party data storage.
 
-## Fonctionnalités
+## Features
 
-- **Interface de sélection** : Sélection de la période (Mois/Année) et du compte bancaire Dolibarr via des listes déroulantes natives.
-- **Récupération à la volée** : Appel en temps réel de l'API Qonto pour afficher les transactions du compte (IBAN) sur la période choisie.
-- **Tableau de réconciliation** :
-    - Affichage des données Qonto (Date, Libellé avec vignette de référence, ID de transaction).
-    - Suggestion dynamique dans une liste déroulante des écritures bancaires ou factures Dolibarr ayant le **montant exact**.
-- **Correspondance des modes de paiement** : Associez les types d'opérations Qonto (Virements, Cartes, Prélèvements, Chèques) à vos modes de paiement Dolibarr.
-- **Liaison manuelle** : Bouton permettant de lier une transaction Qonto à une écriture Dolibarr existante via l'injection de l'ID Qonto dans un `extrafield`.
-- **Mode Sandbox** : Testez vos intégrations en toute sécurité grâce au support du mode Sandbox de Qonto.
+- **Selection Interface**: Choose the period (Month/Year) and the Dolibarr bank account via native dropdown lists.
+- **On-the-fly Retrieval**: Real-time Qonto API calls to fetch transactions for the selected account (IBAN) and period.
+- **Reconciliation Table**:
+    - Display of Qonto data (Date, Label with reference badge, Transaction ID).
+    - Dynamic suggestion in a dropdown list of Dolibarr bank entries or invoices with the **exact matching amount**.
+- **Payment Modes Mapping**: Map Qonto transaction types (Transfer, Card, Direct Debit, Check) directly to your Dolibarr payment modes in the module setup.
+- **Manual Linking**: Button to link a Qonto transaction to an existing Dolibarr entry by injecting the Qonto ID into an `extrafield`.
+- **Sandbox Support**: Test your integrations safely using Qonto's Sandbox mode and Staging Tokens.
 
-## Spécifications Techniques et Sécurité
+## Technical & Security Specifications
 
-- **Zéro table SQL supplémentaire** : Utilisation exclusive des tables natives et d'un `extrafield` sur la table `llx_bank`.
-- **Stockage sécurisé** : Identifiants API (Clé secrète, Login/Slug) stockés dans les constantes de configuration de Dolibarr (`llx_const`).
-- **Intégrité des données (Rollback)** : Gestion stricte des transactions SQL. En cas d'erreur pendant la création d'un paiement ou d'une liaison, toute l'opération est annulée pour éviter les données corrompues.
-- **Protection Anti-Doublon** : Sécurité intégrée empêchant la double soumission d'une transaction (ex: lors d'un rafraîchissement de page).
-- **Intégration Visuelle** : Utilisation exclusive du CSS natif de Dolibarr pour garantir la compatibilité avec tous les thèmes.
+- **Zero Additional SQL Tables**: Uses only native tables and one `extrafield` on the `llx_bank` table.
+- **Secure Storage**: API credentials (Secret Key, Login/Slug) stored in Dolibarr configuration constants (`llx_const`).
+- **Data Integrity (Rollback)**: Complete database transaction management. If a single step fails during the linking process, nothing is saved, preventing partial or corrupted entries.
+- **Anti-Duplicate Protection**: Built-in verification preventing a transaction from being processed twice (e.g., in case of page refresh or concurrent submissions).
+- **Visual Integration**: Exclusive use of native Dolibarr CSS to ensure compatibility with all themes.
+- **Multi-company Compatible**: Native support for Dolibarr's multi-entity environment.
+- **High Performance**: Highly optimized SQL queries (manual object hydration) allowing instant processing of thousands of unpaid invoices without server overload.
+- **Strict Permissions Management**: Granular separation of rights between read-only access and the ability to link/create payments (Write access).
+- **XSS Protection**: Systematic sanitization of API data before HTML rendering.
 
-## Prérequis
+## Prerequisites
 
-Les modules natifs suivants de Dolibarr doivent être activés :
-- **Banques et Caisses** (`modBanque`)
-- **Factures clients** (`modFacture`)
-- **Factures fournisseurs** (`modFournisseur`)
+The following native Dolibarr modules must be enabled:
+- **Bank & Cash** (`modBanque`)
+- **Invoices** (`modFacture`)
+- **Supplier Invoices** (`modFournisseur`)
 
-## Liens utiles & Ressources
+## Useful Links & Resources
 
-Pour utiliser ce module, vous devez posséder des identifiants API Qonto. Vous pouvez les gérer sur les plateformes officielles :
-- **Portail Développeur Qonto** : [https://developer.qonto.com/](https://developer.qonto.com/) (Pour créer vos clés API et votre Identifiant/Slug).
-- **Documentation API** : [https://api-doc.qonto.com/](https://api-doc.qonto.com/) (Détails techniques sur les points de terminaison et le mode Sandbox).
-- **Centre d'aide Qonto** : Pour toute question relative aux permissions de votre compte professionnel.
+To use this module, you need Qonto API credentials. You can manage them on the official Qonto platforms:
+- **Qonto Developer Portal**: [https://developer.qonto.com/](https://developer.qonto.com/) (To create your API Keys and Login/Slug).
+- **API Documentation**: [https://api-doc.qonto.com/](https://api-doc.qonto.com/) (Technical details on endpoints and Sandbox mode).
+- **Qonto Help Center**: For any questions regarding your business account permissions.
 
-## Installation et Utilisation
+## Installation & Usage
 
-1. Copiez le dossier `qontosync` dans votre répertoire `custom` de Dolibarr.
-2. Activez le module dans **Accueil > Configuration > Modules/Applications**.
-3. Renseignez la clé d'API et configurez les correspondances dans la configuration du module.
-4. Accédez au menu **Banques/Caisses > QontoSync** pour commencer le rapprochement.
+1. Copy the `qontosync` folder into your Dolibarr `custom` directory.
+2. Enable the module in **Home > Setup > Modules/Applications**.
+3. Go to the module setup to enter your API Key and configure mappings.
+4. Go to **Bank > QontoSync** to start reconciling your transactions.
 
 ---
-Développé pour Dolibarr.
+Developed for Dolibarr.
