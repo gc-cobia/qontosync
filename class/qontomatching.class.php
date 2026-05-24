@@ -192,7 +192,7 @@ class QontoMatching
 	 * @param string $qonto_id
 	 * @return int 1 on success, -1 on error
 	 */
-	public function linkTransaction($bank_line_id, $qonto_id)
+	private function linkTransaction($bank_line_id, $qonto_id)
 	{
 		if (empty($bank_line_id) || empty($qonto_id)) {
 			dol_syslog("QontoMatching::linkTransaction: Error on input parameters", LOG_ERR);
