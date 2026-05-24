@@ -1,0 +1,55 @@
+QontoSync=QontoSync
+QontoSyncSetup=QontoSync Setup
+
+# Parameters
+QontoAPIKey=Qonto API Key (Secret Key)
+QontoSlug=Qonto Login (Slug)
+QontoSandboxMode=Sandbox Mode
+QontoSandboxToken=Sandbox Token (Staging Token)
+QontoSyncPMTransfer=Payment mode for Transfers (Incoming / Outgoing)
+QontoSyncPMCard=Payment mode for Cards
+QontoSyncPMDD=Payment mode for Direct Debits
+QontoSyncPMCheck=Payment mode for Checks
+
+# Messages
+SetupSaved=Setup has been saved.
+NoParameters=Please enter your Qonto API Key and Login/Slug.
+ConnectionError=Failed to connect to Qonto API. Please check your credentials.
+Connected=Successfully connected to Qonto API.
+
+# Actions & Results
+InvalidToken=Invalid security token
+TransactionSuccessfullyLinked=Transaction successfully linked
+FailedToLinkTransaction=Failed to link the transaction
+TransactionNotFound=Transaction not found
+ErrorFetchingTransactions=Error fetching transactions from Qonto
+NoTransactionToLink=No transaction selected to link
+NoTransactionsFound=No transactions found for this period
+NoBankSelected=Please select a bank account
+ErrorTooManyTrx=Error: Too many matching transactions found in database
+
+# Table & Display
+Linked=Linked
+Correspondence=Correspondence
+BankTransactions=Bank Transactions
+CustomersInvoices=Customers Invoices
+SupplierInvoices=Supplier Invoices
+NoCorrespondenceFound=No correspondence found
+Validate=Validate
+Select=Select
+Parameters=Parameters
+
+# Core Fallbacks
+Month=Month
+Year=Year
+BankAccount=Bank Account
+Search=Search
+Date=Date
+Label=Label
+Amount=Amount
+Action=Action
+BackToModuleList=Back to module list
+Parameter=Parameter
+Value=Value
+Save=Save
+Test=Test
