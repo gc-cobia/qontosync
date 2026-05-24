@@ -1,0 +1,49 @@
+QontoSync=QontoSync
+QontoSyncSetup=QontoSync-Konfiguration
+
+# Parameters
+QontoAPIKey=Qonto API-Schlüssel (Secret Key)
+QontoSlug=Qonto-Anmeldename (Slug)
+QontoSandboxMode=Sandbox-Modus
+QontoSandboxToken=Sandbox-Token (Staging Token)
+QontoSyncPMTransfer=Zahlungsart für Überweisungen (Ein- / Ausgehend)
+QontoSyncPMCard=Zahlungsart für Kartenzahlungen
+QontoSyncPMDD=Zahlungsart für Lastschriften
+QontoSyncPMCheck=Zahlungsart für Schecks
+
+# Messages
+SetupSaved=Einstellungen wurden gespeichert.
+NoParameters=Bitte geben Sie Ihren Qonto API-Schlüssel und Login/Slug ein.
+ConnectionError=Verbindung zur Qonto-API fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten.
+Connected=Erfolgreich mit der Qonto-API verbunden.
+
+# Actions & Results
+InvalidToken=Ungültiges Sicherheits-Token
+TransactionSuccessfullyLinked=Transaktion erfolgreich verknüpft
+FailedToLinkTransaction=Fehler beim Verknüpfen der Transaktion
+TransactionNotFound=Transaktion nicht gefunden
+ErrorFetchingTransactions=Fehler beim Abrufen der Transaktionen von Qonto
+NoTransactionToLink=Keine Transaktion zum Verknüpfen ausgewählt
+NoTransactionsFound=Keine Transaktionen für diesen Zeitraum gefunden
+NoBankSelected=Bitte wählen Sie ein Bankkonto aus
+ErrorTooManyTrx=Fehler: Zu viele übereinstimmende Transaktionen in der Datenbank gefunden
+
+# Table & Display
+Linked=Verknüpft
+Correspondence=Übereinstimmung
+BankTransactions=Banktransaktionen
+CustomersInvoices=Kundenrechnungen
+SupplierInvoices=Lieferantenrechnungen
+NoCorrespondenceFound=Keine Übereinstimmung gefunden
+Validate=Bestätigen
+Select=Auswählen
+Parameters=Parameter
+
+# Core Fallbacks
+Month=Monat
+Year=Jahr
+BankAccount=Bankkonto
+Search=Suchen
+Date=Datum
+Label=Bezeichnung
+Amount=Betrag
