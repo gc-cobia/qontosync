@@ -20,6 +20,10 @@ Manual bank reconciliation module between Qonto API and Dolibarr, operating with
 - **Data Integrity (Rollback)**: Complete database transaction management. If a single step fails during the linking process, nothing is saved, preventing partial or corrupted entries.
 - **Anti-Duplicate Protection**: Built-in verification preventing a transaction from being processed twice (e.g., in case of page refresh or concurrent submissions).
 - **Visual Integration**: Exclusive use of native Dolibarr CSS to ensure compatibility with all themes.
+- **Multi-company Compatible**: Native support for Dolibarr's multi-entity environment.
+- **High Performance**: Highly optimized SQL queries (manual object hydration) allowing instant processing of thousands of unpaid invoices without server overload.
+- **Strict Permissions Management**: Granular separation of rights between read-only access and the ability to link/create payments (Write access).
+- **XSS Protection**: Systematic sanitization of API data before HTML rendering.
 
 ## Prerequisites
 
