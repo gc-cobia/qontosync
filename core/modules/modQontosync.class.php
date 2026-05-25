@@ -68,7 +68,7 @@ class modQontosync extends DolibarrModules
 			'moduleforexternal' => 0,
 			'websitetemplates' => 0,
 			'captcha' => 0
-			),
+			);
 
 		// Constants
 		$this->const = array(
