@@ -111,7 +111,7 @@ class QontoMatching
 						}
 						
 						// Looking for unpaid suppliers invoices
-						$sql_c_inv = "SELECT rowid, ref, total_ttc, type, datef FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE entity IN (" . getEntity('facture_fourn') . ") AND fk_statut = 1 AND paye = 0";
+						$sql_s_inv = "SELECT rowid, ref, total_ttc, type, datef FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE entity IN (" . getEntity('facture_fourn') . ") AND fk_statut = 1 AND paye = 0";
 						$resql_s_inv = $this->db->query($sql_s_inv);
 						if ($resql_s_inv) {
 							while ($obj_s_inv = $this->db->fetch_object($resql_s_inv)) {
