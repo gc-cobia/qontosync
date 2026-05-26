@@ -190,11 +190,14 @@ class QontoMatching
 	 *
 	 * @param int $bank_line_id
 	 * @param string $qonto_id
+	 * @param string $ref_releve
 	 * @return int 1 on success, -1 on error
 	 */
-	private function linkTransaction($bank_line_id, $qonto_id)
+	private function linkTransaction($bank_line_id, $qonto_id, $ref_releve)
 	{
-		if (empty($bank_line_id) || empty($qonto_id)) {
+		global $user;
+
+		if (empty($bank_line_id) || empty($qonto_id) || empty($ref_releve)) {
 			dol_syslog("QontoMatching::linkTransaction: Error on input parameters", LOG_ERR);
 			return -1;
 		}
@@ -224,9 +227,17 @@ class QontoMatching
 			$res = $bank->insertExtraFields();
 			
 			if ($res <= 0) {
-				dol_syslog("QontoMatching::linkTransaction: Error creating the bank line: ".$bank->error, LOG_ERR);
+				dol_syslog("QontoMatching::linkTransaction: Error creating the bank line extrafield: ".$bank->error, LOG_ERR);
 				return -1;
 			}
+		}
+		
+		// Update the bank line with the statement rapprochement
+        $bank->num_releve = $ref_releve;
+		$res = $bank->update_conciliation($user, null, 1);
+		if ($res <= 0) {
+			dol_syslog("QontoMatching::linkTransaction: Error updating the bank line statement: ".$bank->error, LOG_ERR);
+			return -1;
 		}
 	
 		return 1;
@@ -306,11 +317,17 @@ class QontoMatching
 		} else {
 			$num_chq = isset($qonto_trx['reference']) ? $qonto_trx['reference'] : '';
 		}
+
+		// Extract statement reference
+		$ref_releve = '';
+		if (isset($qonto_trx['settled_at'])) {
+			$ref_releve = date('Y-m', strtotime($qonto_trx['settled_at']));
+		}
 		
 		switch ($type) {
 			case 'bank':
 				// Trying to link the transaction
-				$run = $this->linkTransaction($rowid, $qonto_trx['id']);
+				$run = $this->linkTransaction($rowid, $qonto_trx['id'], $ref_releve);
 				if ($run < 0) {
 					dol_syslog("QontoMatching::update: Error, can not link the transaction", DOL_LOG_ERROR);
 					$error++;
@@ -359,12 +376,12 @@ class QontoMatching
 							// Complete bank line with Qonto data
 							$line->label	= isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $invoice->ref;
 							$line->datev	= strtotime($qonto_trx['settled_at']);
-							$line->dateo	= isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']); // Date d'opération
+							$line->dateo	= isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
 							
 							$update = $line->update($user);
 							
 							if ($update > 0) {
-								$run = $this->linkTransaction($bank_line, $qonto_trx['id']);
+								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
 								if ($run < 0) { $error++; }
 							} else {
 								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, DOL_LOG_ERROR);
@@ -428,7 +445,7 @@ class QontoMatching
 							$update = $line->update($user);
 							
 							if ($update > 0) {
-								$run = $this->linkTransaction($bank_line, $qonto_trx['id']);
+								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
 								if ($run < 0) { $error++; }
 							} else {
 								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, DOL_LOG_ERROR);
