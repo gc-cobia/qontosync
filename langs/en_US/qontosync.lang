@@ -34,6 +34,7 @@ Correspondence=Correspondence
 BankTransactions=Bank Transactions
 CustomersInvoices=Customers Invoices
 SupplierInvoices=Supplier Invoices
+VAT=VAT
 NoCorrespondenceFound=No correspondence found
 Validate=Validate
 Select=Select
