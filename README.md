@@ -8,7 +8,7 @@ Manual bank reconciliation module between Qonto API and Dolibarr, operating with
 - **On-the-fly Retrieval**: Real-time Qonto API calls to fetch transactions for the selected account (IBAN) and period.
 - **Reconciliation Table**:
     - Display of Qonto data (Date, Label with reference badge, Transaction ID).
-    - Dynamic suggestion in a dropdown list of Dolibarr bank entries or invoices with the **exact matching amount**.
+    - Dynamic suggestion in a dropdown list of Dolibarr bank entries, invoices, and VAT declarations with the **exact matching amount**.
 - **Payment Modes Mapping**: Map Qonto transaction types (Transfer, Card, Direct Debit, Check) directly to your Dolibarr payment modes in the module setup.
 - **Manual Linking**: Button to link a Qonto transaction to an existing Dolibarr entry by injecting the Qonto ID into an `extrafield`.
 - **Sandbox Support**: Test your integrations safely using Qonto's Sandbox mode and Staging Tokens.
@@ -31,6 +31,7 @@ The following native Dolibarr modules must be enabled:
 - **Bank & Cash** (`modBanque`)
 - **Invoices** (`modFacture`)
 - **Supplier Invoices** (`modFournisseur`)
+- **Taxes** (`modTax`)
 
 ## Useful Links & Resources
 
