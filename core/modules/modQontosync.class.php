@@ -41,7 +41,7 @@ class modQontosync extends DolibarrModules
 		$this->config_page_url = array("setup.php@qontosync");
 
 		// Dependencies
-		$this->depends = array('modBanque', 'modFacture', 'modFournisseur');
+		$this->depends = array('modBanque', 'modFacture', 'modFournisseur', 'modTax');
 		$this->requiredby = array();
 		$this->langfiles = array("qontosync@qontosync");
 
