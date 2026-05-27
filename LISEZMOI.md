@@ -8,7 +8,7 @@ Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionn
 - **Récupération à la volée** : Appel en temps réel de l'API Qonto pour afficher les transactions du compte (IBAN) sur la période choisie.
 - **Tableau de réconciliation** :
     - Affichage des données Qonto (Date, Libellé avec vignette de référence, ID de transaction).
-    - Suggestion dynamique dans une liste déroulante des écritures bancaires ou factures Dolibarr ayant le **montant exact**.
+    - Suggestion dynamique dans une liste déroulante des écritures bancaires, factures, et déclarations de TVA Dolibarr ayant le **montant exact**.
 - **Correspondance des modes de paiement** : Associez les types d'opérations Qonto (Virements, Cartes, Prélèvements, Chèques) à vos modes de paiement Dolibarr.
 - **Liaison manuelle** : Bouton permettant de lier une transaction Qonto à une écriture Dolibarr existante via l'injection de l'ID Qonto dans un `extrafield`.
 - **Mode Sandbox** : Testez vos intégrations en toute sécurité grâce au support du mode Sandbox de Qonto.
@@ -31,6 +31,7 @@ Les modules natifs suivants de Dolibarr doivent être activés :
 - **Banques et Caisses** (`modBanque`)
 - **Factures clients** (`modFacture`)
 - **Factures fournisseurs** (`modFournisseur`)
+- **Taxes, charges sociales et dividendes** (`modTax`)
 
 ## Liens utiles & Ressources
 
