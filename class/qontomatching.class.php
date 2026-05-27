@@ -526,7 +526,7 @@ class QontoMatching
 					$bank_line = $payment->addPaymentToBank(
 						$user,
 						'payment_vat',
-						'(Payment) ' . $vat->ref,
+						'(VATPayment) #' . $vat->ref,
 						$bank_account_id,
 						$emitter_name,
 						$emitter_bank_name
