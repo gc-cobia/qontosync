@@ -34,6 +34,7 @@ Correspondence=Correspondance
 BankTransactions=Écritures bancaires
 CustomersInvoices=Factures clients
 SupplierInvoices=Factures fournisseurs
+VAT=TVA
 NoCorrespondenceFound=Aucune correspondance trouvée
 Validate=Valider
 Select=Sélectionner
