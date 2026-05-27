@@ -10,8 +10,11 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
+require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/tva.class.php';
+require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/paymentvat.class.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
+
 
 class QontoMatching
 {
@@ -29,18 +32,21 @@ class QontoMatching
 	 * @param int $bank_id Bank account id
 	 * @return array Array transactions with trx status and linked_rowid or trx_status = "ErrorTooManyTrx" or trx_status = "unlinked" with trx array
 	 */
-	public function fetchTransactions($transaction, $bank_id)
+	public function fetchTransactions($transaction, $bank_id, $fast_mod = false)
 	{
 		if (empty($transaction) || !is_array($transaction) || empty($bank_id)) {
 			dol_syslog("QontoMatching::fetchTransactions: Error on input parameters", LOG_ERR);
 			return array();
 		}
+
+		# Tempory fast mode: only not fast
 		
 		/**
 		* Invoices will be loaded only if at least one transaction is unlinked
 		*/
 		$unpaid_c_invoices = array();
 		$unpaid_s_invoices = array();
+		$unpaid_vat = array();
 		$items_loaded = false;
 		
 		$entries = array();
@@ -134,6 +140,23 @@ class QontoMatching
 							}
 							$this->db->free($resql_s_inv);
 						}
+
+						// Looking for unpaid VAT
+						$sql_vat = "SELECT rowid, label, amount, datev FROM " . MAIN_DB_PREFIX . "tva WHERE entity IN (" . getEntity('tva') . ") AND paye = 0";
+						$resql_vat = $this->db->query($sql_vat);
+						if ($resql_vat) {
+							while ($obj_vat = $this->db->fetch_object($resql_vat)) {
+								$unpaid_vat[] = (object) array(
+									'rowid'  => $obj_vat->rowid,
+									'label'  => $obj_vat->label ? $obj_vat->label : 'VAT',
+									'amount' => $obj_vat->amount,
+									'datev'  => $this->db->jdate($obj_vat->datev)
+								);
+							}
+						$this->db->free($resql_vat);
+						}
+						
+
 						$items_loaded = true;
 					}
 					
@@ -158,6 +181,7 @@ class QontoMatching
 			
 			$t["c_invoices"] = array();
 			$t["s_invoices"] = array();
+			$t["vat"] = array();
 			
 			if ($t["trx_status"] === "unlinked" && is_array($unpaid_c_invoices)) {
 				$qonto_amount = abs((float)$t['amount']);
@@ -173,6 +197,13 @@ class QontoMatching
 				foreach ($unpaid_s_invoices as $s_inv) {
 					if (price2num(abs((float)$s_inv->amount), 'MT') == price2num($qonto_amount, 'MT')) {
 						$t["s_invoices"][] = $s_inv;
+					}
+				}
+
+				// Compare transactions amount with unpaid VAT
+				foreach ($unpaid_vat as $vat) {
+					if (price2num(abs((float)$vat->amount), 'MT') == price2num($qonto_amount, 'MT')) {
+						$t["vat"][] = $vat;
 					}
 				}
 			}
@@ -329,7 +360,7 @@ class QontoMatching
 				// Trying to link the transaction
 				$run = $this->linkTransaction($rowid, $qonto_trx['id'], $ref_releve);
 				if ($run < 0) {
-					dol_syslog("QontoMatching::update: Error, can not link the transaction", DOL_LOG_ERROR);
+					dol_syslog("QontoMatching::update: Error, can not link the transaction", LOG_ERR);
 					$error++;
 				}
 				
@@ -369,8 +400,7 @@ class QontoMatching
 					
 					if($bank_line > 0) {
 					
-						$line = new AccountLine($this->db);
-						
+						$line = new AccountLine($this->db);						
 						if ($line->fetch($bank_line) > 0) {
 							
 							// Complete bank line with Qonto data
@@ -384,18 +414,19 @@ class QontoMatching
 								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
 								if ($run < 0) { $error++; }
 							} else {
-								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, DOL_LOG_ERROR);
+								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, LOG_ERR);
 								$error++;
 							}
 						} else {
+							dol_syslog("QontoMatching::update: Error fetching bank line: " . $line->error, LOG_ERR);
 							$error++;
 						}
 					} else {
-						dol_syslog("QontoMatching::update: Error pushing payment to the bank: ".$payment->error, DOL_LOG_ERROR);
+						dol_syslog("QontoMatching::update: Error pushing payment to the bank: ".$payment->error, LOG_ERR);
 						$error++;
 					}
 				} else {
-					dol_syslog("QontoMatching::update: Error creating the payment: ".$payment->error, DOL_LOG_ERROR);
+					dol_syslog("QontoMatching::update: Error creating the payment: ".$payment->error, LOG_ERR);
 					$error++;
 				}
 				
@@ -424,7 +455,7 @@ class QontoMatching
 						$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
 					}
 					
-					// Trying to push the payment to bank					
+					// Trying to push the payment to bank
 					$bank_line = $payment->addPaymentToBank(
 						$user,
 						'payment_supplier',
@@ -437,6 +468,7 @@ class QontoMatching
 					if($bank_line > 0) {
 						$line = new AccountLine($this->db);
 						if ($line->fetch($bank_line) > 0) {
+                          
 							// Complete bank line with Qonto data
 							$line->label	= isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $invoice->ref;
 							$line->datev	= strtotime($qonto_trx['settled_at']);
@@ -448,23 +480,97 @@ class QontoMatching
 								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
 								if ($run < 0) { $error++; }
 							} else {
-								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, DOL_LOG_ERROR);
+								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, LOG_ERR);
 								$error++;
 							}
 						} else {
+							dol_syslog("QontoMatching::update: Error fetching bank line: " . $line->error, LOG_ERR);
 							$error++;
 						}
 					} else {
-						dol_syslog("QontoMatching::update: Error pushing payment to the bank: ".$payment->error, DOL_LOG_ERROR);
+						dol_syslog("QontoMatching::update: Error pushing payment to the bank: ".$payment->error, LOG_ERR);
 						$error++;
 					}
 				} else {
-					dol_syslog("QontoMatching::update: Error creating the payment: ".$payment->error, DOL_LOG_ERROR);
+					dol_syslog("QontoMatching::update: Error creating the payment: ".$payment->error, LOG_ERR);
 					$error++;
 				}
 				
 				break;
+			
+			case 'vat':
+				$payment = new PaymentVat($this->db);
+				$vat = new Tva($this->db);
+
+				if ($vat->fetch($rowid) <= 0) { $error++; break; }
 				
+				$payment->datepaye			= strtotime($qonto_trx['settled_at']);
+				$payment->fk_bank			= $bank_account_id;
+				$payment->paiementtype		= $mop;
+				$payment->num_payment		= $num_chq;
+				$payment->amounts			= array($vat->id => abs((float)$qonto_trx['amount']));
+				$payment->chid				= $rowid;
+				
+				// Trying to create a payment on the vat (arg 1 = auto close)
+				$run = $payment->create($user, 1);
+				if ($run > 0) {
+					$vat->fetch($rowid);
+					
+					// Get emitter name for emitter if not found in API
+					$vat->fetch_thirdparty();
+					if (empty($emitter_name)) {
+						$emitter_name = is_object($vat->thirdparty) ? $vat->thirdparty->name : '';
+					}
+					
+					// Trying to push the payment to bank
+					$bank_line = $payment->addPaymentToBank(
+						$user,
+						'payment_vat',
+						'(Payment) ' . $vat->ref,
+						$bank_account_id,
+						$emitter_name,
+						$emitter_bank_name
+					);
+					
+					// Workaround: PaymentVAT::addPaymentToBank() always returns 1 on success instead of bank_line_id
+					if ($bank_line > 0) {
+						$payment->fetch($payment->id);
+						$bank_line = $payment->fk_bank;
+					}
+					
+					if($bank_line > 0) {
+						$line = new AccountLine($this->db);
+						if ($line->fetch($bank_line) > 0) {
+                          
+							// Complete bank line with Qonto data
+							$line->label	= isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $vat->ref;
+							$line->datev	= strtotime($qonto_trx['settled_at']);
+							$line->dateo	= isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
+							
+							$update = $line->update($user);
+							
+							if ($update > 0) {
+								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
+								if ($run < 0) { $error++; }
+							} else {
+								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, LOG_ERR);
+								$error++;
+							}
+						} else {
+							dol_syslog("QontoMatching::update: Error fetching bank line: " . $line->error, LOG_ERR);
+							$error++;
+						}
+					} else {
+						dol_syslog("QontoMatching::update: Error pushing payment to the bank: ".$payment->error, LOG_ERR);
+						$error++;
+					}
+				} else {
+					dol_syslog("QontoMatching::update: Error creating the payment: ".$payment->error, LOG_ERR);
+					$error++;
+				}
+				
+				break;
+			
 			default:
 				break;
 		}
@@ -472,6 +578,7 @@ class QontoMatching
 		// Finalizing the transaction
 		if ($error === 0) {
 			$this->db->commit();
+			dol_syslog("QontoMatching::update: Transaction Qonto ID (".$qonto_trx['id'].") successfully matched with target ".$target, LOG_INFO);
 			return 1;
 		} else {
 			$this->db->rollback();
