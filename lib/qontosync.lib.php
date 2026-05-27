@@ -144,8 +144,9 @@ class QontoSyncLib
 				$has_bank_entries = (!empty($t['trx']) && is_array($t['trx']));
 				$has_c_invoices = (!empty($t['c_invoices']) && is_array($t['c_invoices']));
 				$has_s_invoices = (!empty($t['s_invoices']) && is_array($t['s_invoices']));
+				$has_vat = (!empty($t['vat']) && is_array($t['vat']));
 
-				if ($has_bank_entries || $has_c_invoices || $has_s_invoices) {
+				if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat) {
 					// Apply form id to be HTML5 valid
 					$form_id = 'form_link_' . md5($q_id);
 					
@@ -176,6 +177,15 @@ class QontoSyncLib
 						print '<optgroup label="'.$langs->trans('SupplierInvoices').'">';
 						foreach ($t['s_invoices'] as $sinv) {
 							print '<option value="sinv_'.$sinv->rowid.'">' . dol_print_date($sinv->datev, 'day') . ' - ' . $sinv->label . ' (' . price($sinv->amount) . ')</option>';
+						}
+						print '</optgroup>';
+					}
+
+					// TVA
+					if ($has_vat) {
+						print '<optgroup label="'.$langs->trans('VAT').'">';
+						foreach ($t['vat'] as $vat) {
+							print '<option value="vat_'.$vat->rowid.'">' . dol_print_date($vat->datev, 'day') . ' - ' . $vat->label . ' (' . price($vat->amount) . ')</option>';
 						}
 						print '</optgroup>';
 					}
