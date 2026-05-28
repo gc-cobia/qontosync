@@ -6,7 +6,7 @@
  * @license    GPLv3
  */
 
-require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+dol_include_once('/core/class/html.form.class.php');
 
 /**
  * Class QontoSyncLib
