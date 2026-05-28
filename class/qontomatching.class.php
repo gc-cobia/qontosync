@@ -6,14 +6,14 @@
  *  @license    GPLv3
  */
 
-require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
-require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
-require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
-require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/tva.class.php';
-require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/paymentvat.class.php';
-require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
-require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
+dol_include_once('/core/class/extrafields.class.php');
+dol_include_once('/compta/bank/class/account.class.php');
+dol_include_once('/compta/facture/class/facture.class.php');
+dol_include_once('/compta/paiement/class/paiement.class.php');
+dol_include_once('/compta/tva/class/tva.class.php');
+dol_include_once('/compta/tva/class/paymentvat.class.php');
+dol_include_once('/fourn/class/fournisseur.facture.class.php');
+dol_include_once('/fourn/class/paiementfourn.class.php');
 
 
 class QontoMatching
@@ -541,7 +541,7 @@ class QontoMatching
 					if($bank_line > 0) {
 						$line = new AccountLine($this->db);
 						if ($line->fetch($bank_line) > 0) {
-                          
+							
 							// Complete bank line with Qonto data
 							$line->label	= isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $vat->ref;
 							$line->datev	= strtotime($qonto_trx['settled_at']);
