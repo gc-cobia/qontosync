@@ -6,10 +6,15 @@
  *  @license    GPLv3
  */
 
-require '../../../main.inc.php';
-require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
-require_once dol_buildpath('/qontosync/class/qontoapi.class.php', 0);
+$res = 0;
+if (! $res && file_exists("../../main.inc.php")) $res = @include "../../main.inc.php";
+if (! $res && file_exists("../../../main.inc.php")) $res = @include "../../../main.inc.php";
+if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../../../main.inc.php";
+if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
+
+dolib_include_once('/core/lib/admin.lib.php');
+dolib_include_once('/core/class/html.form.class.php');
+dolib_include_once('/qontosync/class/qontoapi.class.php');
 
 $langs->loadLangs(array("admin", "qontosync@qontosync"));
 
