@@ -6,11 +6,16 @@
  *  @license    GPLv3
  */
 
-require '../../main.inc.php';
-require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
-require_once dol_buildpath('/qontosync/class/qontoapi.class.php', 0);
-require_once dol_buildpath('/qontosync/class/qontomatching.class.php', 0);
-require_once dol_buildpath('/qontosync/lib/qontosync.lib.php', 0);
+$res = 0;
+if (! $res && file_exists("../../main.inc.php")) $res = @include "../../main.inc.php";
+if (! $res && file_exists("../../../main.inc.php")) $res = @include "../../../main.inc.php";
+if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../../../main.inc.php";
+if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
+
+dol_include_once('/compta/bank/class/account.class.php');
+dol_include_once('/qontosync/class/qontoapi.class.php');
+dol_include_once('/qontosync/class/qontomatching.class.php');
+dol_include_once('/qontosync/lib/qontosync.lib.php');
 
 $matching = new QontoMatching($db);
 
