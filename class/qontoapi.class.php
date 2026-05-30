@@ -117,7 +117,9 @@ class QontoApi
 	 */
 	public function getTransactions($iban, $dateStart, $dateEnd)
 	{
-		$base_endpoint = "/v2/transactions?iban=" . urlencode($iban) . "&settled_at_from=" . urlencode($dateStart . "T00:00:00.000Z") . "&settled_at_to=" . urlencode($dateEnd . "T23:59:59.999Z");
+		// Clean the IBAN by removing spaces
+		$clean_iban = str_replace(' ', '', $iban);
+		$base_endpoint = "/v2/transactions?iban=" . urlencode($clean_iban) . "&settled_at_from=" . urlencode($dateStart . "T00:00:00.000Z") . "&settled_at_to=" . urlencode($dateEnd . "T23:59:59.999Z");
 		
 		$all_transactions = array();
 		$current_page = 1;
