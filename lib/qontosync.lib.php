@@ -167,7 +167,7 @@ class QontoSyncLib
 					if ($has_c_invoices) {
 						print '<optgroup label="'.$langs->trans('CustomersInvoices').'">';
 						foreach ($t['c_invoices'] as $cinv) {
-							print '<option value="cinv_'.$cinv->rowid.'">' . dol_print_date($cinv->datev, 'day') . ' - ' . $cinv->label . ' (' . price($cinv->amount) . ')</option>';
+							print '<option value="cinv_'.$cinv->rowid.'">' . dol_print_date($cinv->datev, 'day') . ' - ' . $cinv->label . ' (' . price($cinv->amount) . ') - ' . $cinv->thirdparty . '</option>';
 						}
 						print '</optgroup>';
 					}
@@ -176,7 +176,7 @@ class QontoSyncLib
 					if ($has_s_invoices) {
 						print '<optgroup label="'.$langs->trans('SupplierInvoices').'">';
 						foreach ($t['s_invoices'] as $sinv) {
-							print '<option value="sinv_'.$sinv->rowid.'">' . dol_print_date($sinv->datev, 'day') . ' - ' . $sinv->label . ' (' . price($sinv->amount) . ')</option>';
+							print '<option value="sinv_'.$sinv->rowid.'">' . dol_print_date($sinv->datev, 'day') . ' - ' . $sinv->label . ' (' . $sinv->ref_supplier . ') - ' . $sinv->thirdparty . '  (' . price($sinv->amount) . ') </option>';
 						}
 						print '</optgroup>';
 					}
