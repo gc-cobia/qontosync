@@ -90,12 +90,16 @@ class QontoMatching
 					// Load unpaid items ONCE if not already loaded
 					if (!$items_loaded) {
 						
-						// Looking for unpaid customers invoices
-						$sql_c_inv = "SELECT rowid, ref, total_ttc, type, datef FROM " . MAIN_DB_PREFIX . "facture WHERE entity IN (" . getEntity('facture') . ") AND fk_statut = 1 AND paye = 0";
+						// Looking for unpaid customers invoices (with thirdparty name)
+                        $sql_c_inv = "SELECT f.rowid, f.ref, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
+                        $sql_c_inv .= "FROM " . MAIN_DB_PREFIX . "facture as f ";
+                        $sql_c_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
+                        $sql_c_inv .= "WHERE f.entity IN (" . getEntity('facture') . ") AND f.fk_statut = 1 AND f.paye = 0";
+                        
 						$resql_c_inv = $this->db->query($sql_c_inv);
 						if ($resql_c_inv) {
+							$fact = new Facture($this->db);							
 							while ($obj_c_inv = $this->db->fetch_object($resql_c_inv)) {
-								$fact = new Facture($this->db);
 								$fact->id = $obj_c_inv->rowid;
 								$fact->ref = $obj_c_inv->ref;
 								$fact->total_ttc = $obj_c_inv->total_ttc;
@@ -105,10 +109,11 @@ class QontoMatching
 								$remain = $fact->getRemainToPay();						
 								if ($remain != 0) {
 									$unpaid_c_invoices[] = (object) array(
-										'rowid'  => $fact->id,
-										'label'  => $fact->ref,
-										'amount' => $remain,
-										'datev'  => $fact->date
+										'rowid'         => $fact->id,
+										'label'         => $fact->ref,
+										'amount'        => $remain,
+										'datev'         => $fact->date,
+										'thirdparty'    => $obj_c_inv->thirdparty_name
 									);
 								}
 								
@@ -116,12 +121,16 @@ class QontoMatching
 							$this->db->free($resql_c_inv);
 						}
 						
-						// Looking for unpaid suppliers invoices
-						$sql_s_inv = "SELECT rowid, ref, total_ttc, type, datef FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE entity IN (" . getEntity('facture_fourn') . ") AND fk_statut = 1 AND paye = 0";
+                        // Looking for unpaid suppliers invoices (with thirdparty name AND ref supplier)
+                        $sql_s_inv = "SELECT f.rowid, f.ref, f.ref_supplier, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
+                        $sql_s_inv .= "FROM " . MAIN_DB_PREFIX . "facture_fourn as f ";
+                        $sql_s_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
+                        $sql_s_inv .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") AND f.fk_statut = 1 AND f.paye = 0";
+                        
 						$resql_s_inv = $this->db->query($sql_s_inv);
 						if ($resql_s_inv) {
+							$fact_fourn = new FactureFournisseur($this->db);
 							while ($obj_s_inv = $this->db->fetch_object($resql_s_inv)) {
-								$fact_fourn = new FactureFournisseur($this->db);
 								$fact_fourn->id = $obj_s_inv->rowid;
 								$fact_fourn->ref = $obj_s_inv->ref;
 								$fact_fourn->total_ttc = $obj_s_inv->total_ttc;
@@ -134,7 +143,9 @@ class QontoMatching
 										'rowid'  => $fact_fourn->id,
 										'label'  => $fact_fourn->ref,
 										'amount' => $remain,
-										'datev'  => $fact_fourn->date
+										'datev'  => $fact_fourn->date,
+										'thirdparty' => $obj_s_inv->thirdparty_name,
+										'ref_supplier' => $obj_s_inv->ref_supplier
 									);
 								}
 							}
