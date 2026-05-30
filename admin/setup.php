@@ -12,9 +12,9 @@ if (! $res && file_exists("../../../main.inc.php")) $res = @include "../../../ma
 if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../../../main.inc.php";
 if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
-dolib_include_once('/core/lib/admin.lib.php');
-dolib_include_once('/core/class/html.form.class.php');
-dolib_include_once('/qontosync/class/qontoapi.class.php');
+dol_include_once('/core/lib/admin.lib.php');
+dol_include_once('/core/class/html.form.class.php');
+dol_include_once('/qontosync/class/qontoapi.class.php');
 
 $langs->loadLangs(array("admin", "qontosync@qontosync"));
 
