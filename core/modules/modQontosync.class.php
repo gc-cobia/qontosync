@@ -129,7 +129,7 @@ class modQontosync extends DolibarrModules
 		$extrafields = new ExtraFields($this->db);
 
 		// Extrafield bank
-		$result = $extrafields->addExtraField('qonto_id', 'Qonto Transaction ID', 'varchar', 100, 255, 'bank', 1, 0, '', '', 1, '', '1', 0, 'Qonto Transaction ID to avoid duplicates', '', 'qontosync', '$conf->qontosync->enabled');
+		$result = $extrafields->addExtraField('qonto_id', 'Qonto Transaction ID', 'varchar', 100, 255, 'bank', 1, 0, '', '', 1, '', '0', 'Qonto Transaction ID to avoid duplicates', '', 0, 'qontosync', '$conf->qontosync->enabled');
 		$sql = array();
 		return $this->_init($sql, $options);
 	}
