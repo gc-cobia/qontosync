@@ -42,8 +42,8 @@ $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 
 
 // Fetch transactions before processing link or displaying search
-if (!empty($bank_rowid) && $bank_rowid > 0 && ($action == 'search' || $action == 'link')) {
-
+if (!empty($bank_rowid) && $bank_rowid > 0 && ($action == 'search' || $action == 'batch_link')) {
+    
 	// Init variables
 	$transactions = null;
 
@@ -130,7 +130,7 @@ QontoSyncLib::printPageBegin();
 QontoSyncLib::printSearchForm($month, $year, $bank_rowid);
 
 // Print search results table if form has been submitted
-if (($action == 'search' || $action == 'link')) {
+if (($action == 'search' || $action == 'batch_link')) {
 	if (!empty($bank_rowid) && $bank_rowid > 0) {
 		if ($transactions === false) {
 			setEventMessages($langs->trans("ErrorFetchingTransactions"), null, 'errors');
