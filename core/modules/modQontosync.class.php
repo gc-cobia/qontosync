@@ -32,7 +32,7 @@ class modQontosync extends DolibarrModules
 		$this->description = "Manual bank reconciliation module between Qonto API and Dolibarr.";
 		$this->version = '1.0.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
-		$this->picto = 'bank';
+		$this->picto = 'qonto.svg@qontosync';
 
 		// Data directories to create when module is enabled
 		$this->dirs = array();
@@ -111,6 +111,7 @@ class modQontosync extends DolibarrModules
 			'perms' => '$user->rights->qontosync->read',
 			'target' => '',
 			'user' => 2,
+			'picto' => 'qonto@qontosync'
 		);
 	}
 
