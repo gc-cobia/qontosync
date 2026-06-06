@@ -20,7 +20,7 @@ dol_include_once('/qontosync/lib/qontosync.lib.php');
 $matching = new QontoMatching($db);
 
 
-$langs->loadLangs(array("qontosync@qontosync", "banks"));
+$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compta"));
 
 // Security check
 if ($user->socid > 0) {
