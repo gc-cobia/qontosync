@@ -16,6 +16,7 @@ SetupSaved=La configuración se ha guardado.
 NoParameters=Por favor, introduzca su Clave API y Usuario (Slug) de Qonto.
 ConnectionError=Error al conectar con la API de Qonto. Verifique sus credenciales.
 Connected=Conectado con éxito a la API de Qonto.
+BatchProcessingCompleted=Procesamiento por lotes completado: %s transacción(es) vinculada(s) con éxito, %s fallida(s).
 
 # Actions & Results
 InvalidToken=Token de seguridad no válido
