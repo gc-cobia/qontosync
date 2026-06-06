@@ -6,7 +6,7 @@
  * @license    GPLv3
  */
 
-dol_include_once('/core/class/html.form.class.php');
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 
 /**
  * Class QontoSyncLib
@@ -149,16 +149,26 @@ class QontoSyncLib
 				if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat) {
 					// Apply form id to be HTML5 valid
 					$form_id = 'form_link_' . md5($q_id);
+					// Apply select id to be compatible with SELECT2
+					$select_id = 'form_select_' . md5($q_id);
 					
 					print '<td>';
-					print '<select name="target_val" form="'.$form_id.'" class="flat" style="'.$style_select.'" required>';
+					print '<select name="target_val" id="'.$select_id.'" form="'.$form_id.'" class="flat" style="'.$style_select.'" required>';
 					print '<option value="">-- '.$langs->trans('Select').' --</option>';
 					
 					// Bank entries
 					if ($has_bank_entries) {
 						print '<optgroup label="'.$langs->trans('BankTransactions').'">';
 						foreach ($t['trx'] as $de) {
-							print '<option value="bank_'.$de->rowid.'">' . dol_print_date($db->jdate($de->datev), 'day') . ' - ' . $de->label . ' (' . price($de->amount) . ')</option>';
+							// Try to translate the label
+							$trans_label = $de->label;
+							if (preg_match('/^\(([^)]+)\)(.*)$/i', $trans_label, $reg)) {
+							    $trans_label = '(' . $langs->trans($reg[1]) . ')' . $reg[2];
+							} else {
+							    $trans_label = $langs->trans($trans_label);
+							}
+							
+							print '<option value="bank_'.$de->rowid.'">' . dol_print_date($db->jdate($de->datev), 'day') . ' - ' . $trans_label . ' (' . price($de->amount) . ')</option>';
 						}
 						print '</optgroup>';
 					}
@@ -205,6 +215,14 @@ class QontoSyncLib
 					print '<input type="submit" class="button button-edit" value="'.$langs->trans('Validate').'">';
 					print '</form>';
 					print '</td>';
+					
+					print'<script>
+					$(function() {
+						$("#' .  $select_id . '").select2({
+							
+						});
+					});
+					</script>';
 					
 				} else {
 					// Nothing found
