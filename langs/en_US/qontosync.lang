@@ -16,6 +16,7 @@ SetupSaved=Setup has been saved.
 NoParameters=Please enter your Qonto API Key and Login/Slug.
 ConnectionError=Failed to connect to Qonto API. Please check your credentials.
 Connected=Successfully connected to Qonto API.
+BatchProcessingCompleted=Batch processing completed: %s transaction(s) successfully linked, %s failed.
 
 # Actions & Results
 InvalidToken=Invalid security token
