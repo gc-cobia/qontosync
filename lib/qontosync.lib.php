@@ -36,6 +36,22 @@ class QontoSyncLib
 	}
 
 	/**
+	 * Print the opening tag for the main flexbox layout container
+	 */
+	public static function printPageBegin()
+	{
+		print '<div style="display: flex; flex-direction: column; height: calc(100vh - 160px); gap: 15px;">';
+	}
+
+	/**
+	 * Print the closing tag for the main flexbox layout container
+	 */
+	public static function printPageEnd()
+	{
+		print '</div>';
+	}
+
+	/**
 	 * Print the search form for the module
 	 *
 	 * @param int 	$month
@@ -47,6 +63,8 @@ class QontoSyncLib
 		global $langs, $db;
 
 		$bank_rowid = $bank_rowid > 0 ? $bank_rowid : '';
+
+		print '<div style="flex: 0 0 auto;">';
 
 		print '<form method="post" action="'.$_SERVER["PHP_SELF"].'">';
 		print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -83,13 +101,18 @@ class QontoSyncLib
 
 		print '&nbsp;&nbsp;&nbsp;&nbsp;';
 
-		// Submit Button
+		// Submit Button for search
 		print '<input type="submit" class="button" value="' . $langs->trans("Search") . '">';
+
+		// Button validate all matches
+		print '&nbsp;&nbsp;';
+		print '<input type="submit" form="form_batch_link" class="button button-save" value="' . $langs->trans("Validate") . '">';
 
 		print '</td>';
 		print '</tr>';
 		print '</table>';
 		print '</form>';
+		print '</div>';
 	}
 
 	/**
@@ -105,13 +128,23 @@ class QontoSyncLib
 	{
 		global $langs;
 
-		print '<br><table class="noborder centpercent">';
+		print '<div style="flex: 1 1 auto; overflow-y: auto; border: 1px solid var(--colborder, #ccc); border-radius: 4px; background: var(--colorbackbody, #fff);">';
+		
+		print '<form id="form_batch_link" method="post" action="'.$_SERVER["PHP_SELF"].'" style="margin: 0;">';
+		print '<input type="hidden" name="token" value="'.newToken().'">';
+		print '<input type="hidden" name="action" value="batch_link">';
+		print '<input type="hidden" name="bank_rowid" value="'.$bank_rowid.'">';
+		print '<input type="hidden" name="month" value="'.$month.'">';
+		print '<input type="hidden" name="year" value="'.$year.'">';
+
+
+		print '<table class="noborder centpercent" style="margin: 0;">';
 		print '<tr class="liste_titre">';
-		print '<td>'.$langs->trans('Date').'</td>';
+		print '<td style="width: 1%; white-space: nowrap;">'.$langs->trans('Date').'</td>';
 		print '<td>'.$langs->trans('Label').'</td>';
 		print '<td>'.$langs->trans('Amount').'</td>';
 		print '<td>'.$langs->trans('Correspondence').'</td>';
-		print '<td>'.$langs->trans('Action').'</td>';
+		print '<td style="width: 1%; white-space: nowrap;">'.$langs->trans('Action').'</td>';
 		print '</tr>';
 		
 		foreach ($transactions as $t) {			
@@ -147,13 +180,12 @@ class QontoSyncLib
 				$has_vat = (!empty($t['vat']) && is_array($t['vat']));
 
 				if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat) {
-					// Apply form id to be HTML5 valid
-					$form_id = 'form_link_' . md5($q_id);
+					
 					// Apply select id to be compatible with SELECT2
 					$select_id = 'form_select_' . md5($q_id);
 					
 					print '<td>';
-					print '<select name="target_val" id="'.$select_id.'" form="'.$form_id.'" class="flat" style="'.$style_select.'" required>';
+					print '<select name="target_val['.$q_id.']" id="'.$select_id.'" form="form_batch_link" class="flat" style="'.$style_select.'" required>';
 					print '<option value="">-- '.$langs->trans('Select').' --</option>';
 					
 					// Bank entries
@@ -203,17 +235,10 @@ class QontoSyncLib
 					print '</select>';
 					print '</td>';
 					
-					print '<td>';
-					print '<form id="'.$form_id.'" method="post" action="'.$_SERVER["PHP_SELF"].'" style="margin: 0;">';
-					print '<input type="hidden" name="token" value="'.newToken().'">';
-					print '<input type="hidden" name="action" value="link">';
-					print '<input type="hidden" name="bank_rowid" value="'.$bank_rowid.'">';
-					print '<input type="hidden" name="month" value="'.$month.'">';
-					print '<input type="hidden" name="year" value="'.$year.'">';
-					print '<input type="hidden" name="qonto_id" value="'.$q_id.'">';
-					
-					print '<input type="submit" class="button button-edit" value="'.$langs->trans('Validate').'">';
-					print '</form>';
+					print '<td class="center">';
+					print '<button type="button" class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="Détails">';
+					print '<span class="fa fa-search"></span>';
+					print '</button>';
 					print '</td>';
 					
 					print'<script>
@@ -229,7 +254,11 @@ class QontoSyncLib
 					print '<td>';
 					print '<span class="badge badge-warning" style="'.$style_badge.'">'.$langs->trans('NoCorrespondenceFound').'</span>';
 					print '</td>';
-					print '<td></td>';
+					print '<td>';
+					print '<button type="button" class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="Détails">';
+					print '<span class="fa fa-search"></span>';
+					print '</button>';
+					print '</td>';
 				}
 			}
 			
@@ -237,5 +266,7 @@ class QontoSyncLib
 		}
 		
 		print '</table>';
+		print '</form>';
+		print '</div>';
 	}
 }
