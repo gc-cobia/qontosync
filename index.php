@@ -32,8 +32,7 @@ if (!$user->rights->qontosync->read) {
 
 llxHeader('', $langs->trans("QontoSync"));
 
-print load_fiche_titre($langs->trans("QontoSync"), '', 'bank');
-
+print load_fiche_titre($langs->trans("QontoSync"), '', 'object_qonto.svg@qontosync');
 
 // Get params and define default values for month and year 
 $action = GETPOST('action', 'alpha');
@@ -65,47 +64,67 @@ if (!empty($bank_rowid) && $bank_rowid > 0 && ($action == 'search' || $action ==
 }
 
 // Link transaction if form has been submitted
-if ($action == 'link') {
+if ($action == 'batch_link') {
 
 	// Check CSRF token
 	if (GETPOST('token', 'alpha') !== currentToken()) {
 		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
 	} else {
 		// Get params
-		$target = GETPOST('target_val', 'alphanohtml');
-		$qonto_id = GETPOST('qonto_id', 'alphanohtml');
+		$target_vals = GETPOST('target_val', 'array');
 	
-	if (!empty($qonto_id) && !empty($target)) {
-		if (is_array($transactions)) {
+        if (is_array($target_vals) && is_array($transactions)) {
+            $success_count = 0;
+            $error_count = 0;
 
-			// Find the correct transaction securely from the API payload
-			$selected_trx = null;
-			foreach ($transactions as $t) {
-				if ($t['id'] === $qonto_id) {
-					$selected_trx = $t;
-					break;
-				}
-			}
-			
-			if ($selected_trx) {
-				// Trying to Link
-				$res = $matching->update($target, $selected_trx, $bank_rowid);
-				if ($res > 0) {
-					setEventMessages($langs->trans("TransactionSuccessfullyLinked"), null, 'mesgs');
-				} else {
-					setEventMessages($langs->trans("FailedToLinkTransaction"), null, 'errors');
-				}
-			} else {
-				setEventMessages($langs->trans("TransactionNotFound"), null, 'errors');
-			}
-		} else {
-			setEventMessages($langs->trans("ErrorFetchingTransactions"), null, 'errors');
-		}
-		} else {
-			setEventMessages($langs->trans("NoTransactionToLink"), null, 'warnings');
-		}
-	}
+			foreach ($target_vals as $qonto_id => $target) {
+
+				// Double check : cleaning keys and values extracted from the table
+                $qonto_id = sanitizeVal($qonto_id, 'alphanohtml');
+                $target = sanitizeVal($target, 'alphanohtml');
+
+                // If the user hasn't chosen any match for this line, skip it
+                if (empty($target)) {
+                    continue;
+                }
+
+                // Find the correct transaction securely from the API payload
+                $selected_trx = null;
+                foreach ($transactions as $t) {
+                    if ($t['id'] === $qonto_id) {
+                        $selected_trx = $t;
+                        break;
+                    }
+                }
+
+                if ($selected_trx) {
+                    // Trying to Link
+                    $res = $matching->update($target, $selected_trx, $bank_rowid);
+                    if ($res > 0) {
+                        $success_count++;
+                    } else {
+                        $error_count++;
+                    }
+                }
+            }
+
+
+            // Global notification to the user
+            if ($success_count > 0 || $error_count > 0) {
+                $msg = $langs->trans("BatchProcessingCompleted", $success_count, $error_count);
+                $type = ($error_count > 0) ? 'warnings' : 'mesgs';
+                setEventMessages($msg, null, $type);
+            } else {
+                setEventMessages($langs->trans("NoTransactionToLink"), null, 'warnings');
+            }
+        } else {
+            setEventMessages($langs->trans("ErrorFetchingTransactions"), null, 'errors');
+        }
+    }
 }
+
+// Print page begin flexbox container
+QontoSyncLib::printPageBegin();
 
 // Print search form
 QontoSyncLib::printSearchForm($month, $year, $bank_rowid);
@@ -130,5 +149,7 @@ if (($action == 'search' || $action == 'link')) {
 	}
 }
 
+// Print page end flexbox container
+QontoSyncLib::printPageEnd();
 
 llxFooter();
