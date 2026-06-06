@@ -128,7 +128,7 @@ class QontoSyncLib
 	{
 		global $langs;
 
-		print '<div style="flex: 1 1 auto; overflow-y: auto; border: 1px solid var(--colborder, #ccc); border-radius: 4px; background: var(--colorbackbody, #fff);">';
+		print '<div style="flex: 1 1 auto; overflow-y: auto; background: var(--colorbackbody, #fff);">';
 		
 		print '<form id="form_batch_link" method="post" action="'.$_SERVER["PHP_SELF"].'" style="margin: 0;">';
 		print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -185,7 +185,7 @@ class QontoSyncLib
 					$select_id = 'form_select_' . md5($q_id);
 					
 					print '<td>';
-					print '<select name="target_val['.$q_id.']" id="'.$select_id.'" form="form_batch_link" class="flat" style="'.$style_select.'" required>';
+					print '<select name="target_val['.$q_id.']" id="'.$select_id.'" form="form_batch_link" class="flat" style="'.$style_select.'">';
 					print '<option value="">-- '.$langs->trans('Select').' --</option>';
 					
 					// Bank entries
