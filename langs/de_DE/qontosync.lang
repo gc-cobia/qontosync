@@ -16,6 +16,7 @@ SetupSaved=Einstellungen wurden gespeichert.
 NoParameters=Bitte geben Sie Ihren Qonto API-Schlüssel und Login/Slug ein.
 ConnectionError=Verbindung zur Qonto-API fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten.
 Connected=Erfolgreich mit der Qonto-API verbunden.
+BatchProcessingCompleted=Stapelverarbeitung abgeschlossen: %s Transaktion(en) erfolgreich verknüpft, %s fehlgeschlagen.
 
 # Actions & Results
 InvalidToken=Ungültiges Sicherheits-Token
@@ -48,3 +49,9 @@ Search=Suchen
 Date=Datum
 Label=Bezeichnung
 Amount=Betrag
+Action=Aktion
+BackToModuleList=Zurück zur Modulliste
+Parameter=Parameter
+Value=Wert
+Save=Speichern
+Test=Testen
