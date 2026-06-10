@@ -26,7 +26,7 @@ $langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compt
 if ($user->socid > 0) {
 	accessforbidden();
 }
-if (!$user->rights->qontosync->read) {
+if (!$user->hasRight('qontosync', 'read')) {
 	accessforbidden();
 }
 
