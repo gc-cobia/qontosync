@@ -16,6 +16,7 @@ class QontoApi
 	 * @var string
 	 */
 	public $error = '';
+	public $traceId = '';
 	private $apiKey;
 	private $slug;
 	private $sandbox;
@@ -47,6 +48,9 @@ class QontoApi
 		// Check if slug or API key is missing
 		if (empty($this->slug) || empty($this->apiKey)) {
 			$this->error = "ErrorConfigParameterMissing";
+			dol_syslog("QontoSync: Configuration parameter missing (slug or API key)", LOG_ERR);
+		} else {
+			dol_syslog("QontoSync: API initialized. Sandbox mode: " . ($this->sandbox ? 'YES' : 'NO'), LOG_DEBUG);
 		}
 	}
 
@@ -58,13 +62,18 @@ class QontoApi
 	 */
 	private function sendRequest($endpoint)
 	{
+		// Init trace ID
+		$this->traceId = '';
+
 		// 1. Guard clause: If a configuration error was already detected, skip execution
 		if (!empty($this->error)) {
+			dol_syslog("QontoSync: Request aborted due to previous error: " . $this->error, LOG_WARNING);
 			return false;
 		}
 
 		// 2. Build the full URL
 		$url = $this->baseUrl . $endpoint;
+		dol_syslog("QontoSync: Sending GET request to " . $url, LOG_DEBUG);
 
 		// 3. Build the HTTP headers dynamically using credentials and staging token if Sandbox is active
 		$headers = array(
@@ -82,6 +91,19 @@ class QontoApi
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_TIMEOUT, 15);
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+		// 4.1 Capture trace ID in headers
+		$responseHeaders = array();
+		curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($ch, $headerLine) use (&$responseHeaders) {
+			$len = strlen($headerLine);
+			$parts = explode(':', $headerLine, 2);
+			if (count($parts) === 2) {
+				$key = strtolower(trim($parts[0]));
+				$value = trim($parts[1]);
+				$responseHeaders[$key] = $value;
+			}
+			return $len;
+		});
 		
 		// 5. Execute the HTTP request
 		$response = curl_exec($ch);
@@ -89,6 +111,7 @@ class QontoApi
 		// 6. Handle transport-level errors (e.g. DNS, connection timeout, server unreachable)
 		if ($response === false) {
 			$this->error = curl_error($ch);
+			dol_syslog("QontoSync: cURL error: " . $this->error, LOG_ERR);
 			curl_close($ch);
 			return false;
 		}
@@ -99,10 +122,37 @@ class QontoApi
 
 		// 8. Handle API-level response status codes
 		if ($httpcode == 200) {
+			// Capture trace ID in headers
+			if (!empty($responseHeaders['x-tyk-trace-id'])) {
+				$this->traceId = $responseHeaders['x-tyk-trace-id'];
+			}
+			dol_syslog("QontoSync: Request successful (200). Trace-ID: " . $this->traceId, LOG_DEBUG);
 			return $response;
 		} else {
+			// Tenter d'extraire le Trace-ID depuis l'en-tête HTTP
+			if (!empty($responseHeaders['x-tyk-trace-id'])) {
+				$this->traceId = $responseHeaders['x-tyk-trace-id'];
+			} else {
+				// If absent from the header, look in the JSON body of the error
+				$data = json_decode($response, true);
+				if (is_array($data) && isset($data['trace_id'])) {
+					$this->traceId = $data['trace_id'];
+				}
+			}
+
 			// Format the HTTP code as a clean translation key pattern
 			$this->error = "ErrorHTTPCode" . $httpcode;
+
+			// If a Trace-ID has been intercepted, add it to the error message for the interface
+			if (!empty($this->traceId)) {
+				$this->error .= " (Trace-ID: " . $this->traceId . ")";
+			}
+			
+			// Log in Dolibarr (SYSLOG)
+			dol_syslog("QontoSync: API Error HTTP " . $httpcode . " on URL " . $url, LOG_ERR);
+			dol_syslog("QontoSync: Trace-ID: " . $this->traceId, LOG_ERR);
+			dol_syslog("QontoSync: Raw API Response: " . $response, LOG_ERR);
+			
 			return false;
 		}
 	}
@@ -146,6 +196,8 @@ class QontoApi
 			}
 			
 		} while ($current_page !== null);
+
+		dol_syslog("QontoSync: getTransactions fetched " . count($all_transactions) . " transactions.", LOG_DEBUG);
 
 		return $all_transactions;
 	}
