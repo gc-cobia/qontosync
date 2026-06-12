@@ -30,7 +30,10 @@ if (!$user->hasRight('qontosync', 'read')) {
 	accessforbidden();
 }
 
-llxHeader('', $langs->trans("QontoSync"));
+// Load javascript files
+$arrayofjs = array('/qontosync/js/toggle_linked_rows.js');
+
+llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
 
 print load_fiche_titre($langs->trans("QontoSync"), '', 'object_qonto.svg@qontosync');
 
