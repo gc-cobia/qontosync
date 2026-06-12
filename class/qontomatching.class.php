@@ -338,6 +338,12 @@ class QontoMatching
 			$mop = getDolGlobalInt('QONTOSYNC_PM_DD') ? getDolGlobalInt('QONTOSYNC_PM_DD') : '';
 		} elseif ($op_type == 'check') {
 			$mop = getDolGlobalInt('QONTOSYNC_PM_CHECK') ? getDolGlobalInt('QONTOSYNC_PM_CHECK') : '';
+		} elseif ($op_type == 'qonto_fee') {
+			if (isset($qonto_trx['side']) && $qonto_trx['side'] == 'credit') {
+				$mop = getDolGlobalInt('QONTOSYNC_PM_TRANSFER');
+			} else {
+				$mop = getDolGlobalInt('QONTOSYNC_PM_DD');
+			}
 		} else {
 			$mop = '';
 		}
