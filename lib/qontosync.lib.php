@@ -107,6 +107,29 @@ class QontoSyncLib
 		// Button validate all matches
 		print '&nbsp;&nbsp;';
 		print '<input type="submit" form="form_batch_link" class="button button-save" value="' . $langs->trans("Validate") . '">';
+		
+		print '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+
+
+		// JavaScript filter - Toggle switch style
+		print '<style>
+		.qonto-switch { position: relative; display: inline-block; width: 34px; height: 20px; margin-right: 8px; vertical-align: middle; }
+		.qonto-switch input { opacity: 0; width: 0; height: 0; }
+		.qonto-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 20px; }
+		.qonto-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+		.qonto-switch input:checked + .qonto-slider { background-color: #2196F3; } /* Bleu standard moderne */
+		.qonto-switch input:checked + .qonto-slider:before { transform: translateX(14px); }
+		.qonto-filter-wrapper { display: inline-flex; align-items: center; background: #fff; border: 1px solid #ddd; padding: 4px 12px; border-radius: 20px; font-size: 0.95em; color: #555; box-shadow: 0 1px 2px rgba(0,0,0,0.05); user-select: none; }
+		.qonto-filter-wrapper:hover { border-color: #bbb; background: #fdfdfd; }
+		</style>';
+
+		print '<div class="qonto-filter-wrapper">';
+		print '  <label class="qonto-switch" style="margin-bottom: 0;">';
+		print '    <input type="checkbox" id="filter_linked">';
+		print '    <span class="qonto-slider"></span>';
+		print '  </label>';
+		print '  <span style="cursor: pointer;" onclick="document.getElementById(\'filter_linked\').click()">Masquer les opérations déjà rapprochées</span>';
+		print '</div>';
 
 		print '</td>';
 		print '</tr>';
@@ -158,7 +181,10 @@ class QontoSyncLib
 			$style_badge = "width: {$fixed_width}; display: inline-block; text-align: center; box-sizing: border-box; padding: 6px; white-space: normal;";
 			$style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: border-box;";
 
-			print '<tr class="oddeven">';
+			// Put a CSS class specific to the line state for the JS
+			$row_class = !empty($t['linked_rowid']) ? 'trx-linked' : 'trx-unlinked';
+
+			print '<tr class="oddeven ' . $row_class . '">';
 			print '<td>' . dol_print_date(strtotime($q_date), 'day') . '</td>';
 			print '<td>' . $q_label . ' <br><code class="opacitymedium small" style="font-size:0.8em;">ID: '.$q_id.'</code></td>';
 
