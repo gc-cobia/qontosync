@@ -194,7 +194,7 @@ class QontoMatching
 			$t["s_invoices"] = array();
 			$t["vat"] = array();
 			
-			if ($t["trx_status"] === "unlinked" && is_array($unpaid_c_invoices)) {
+			if ($t["trx_status"] === "unlinked") {
 				$qonto_amount = abs((float)$t['amount']);
 				
 				// Compare transactions amount with unpaid customers invoices amount
@@ -382,14 +382,20 @@ class QontoMatching
 				$invoice = new Facture($this->db);
 				
 				if ($invoice->fetch($rowid) <= 0) { $error++; break; }
+
+				// Handle Credit Notes by applying a negative sign to the payment amount
+				$pay_amount = abs((float)$qonto_trx['amount']);
+				if ($invoice->type == 2 || $invoice->total_ttc < 0) {
+					$pay_amount = -$pay_amount;
+				}
 				
 				$payment->datepaye		= strtotime($qonto_trx['settled_at']);
 				$payment->fk_account	= $bank_account_id;
 				$payment->paiementid	= $mop;
 				$payment->num_payment	= $num_chq;
-				$payment->amounts		= array($invoice->id => abs((float)$qonto_trx['amount']));
+				$payment->amounts		= array($invoice->id => $pay_amount);
 				
-				// Trying to create a payment on the invoice
+				// Trying to create a payment on the invoice (arg 1 = auto close)
 				$run = $payment->create($user, 1);
 				if ($run > 0) {
 					$invoice->fetch($rowid);
@@ -448,12 +454,18 @@ class QontoMatching
 				$invoice = new FactureFournisseur($this->db);
 				
 				if ($invoice->fetch($rowid) <= 0) { $error++; break; }
+
+				// Handle Credit Notes by applying a negative sign to the payment amount
+				$pay_amount = abs((float)$qonto_trx['amount']);
+				if ($invoice->type == 2 || $invoice->total_ttc < 0) {
+					$pay_amount = -$pay_amount;
+				}
 				
 				$payment->datepaye		= strtotime($qonto_trx['settled_at']);
 				$payment->fk_account	= $bank_account_id;
 				$payment->paiementid	= $mop;
 				$payment->num_payment	= $num_chq;
-				$payment->amounts		= array($invoice->id => abs((float)$qonto_trx['amount']));
+				$payment->amounts		= array($invoice->id => $pay_amount);
 				
 				// Trying to create a payment on the supplier invoice (arg 1 = auto close)
 				$run = $payment->create($user, 1);
@@ -514,12 +526,18 @@ class QontoMatching
 				$vat = new Tva($this->db);
 
 				if ($vat->fetch($rowid) <= 0) { $error++; break; }
+
+				// Handle negative VAT (e.g., VAT refund)
+				$pay_amount = abs((float)$qonto_trx['amount']);
+				if ($vat->amount < 0) {
+					$pay_amount = -$pay_amount;
+				}
 				
 				$payment->datepaye			= strtotime($qonto_trx['settled_at']);
 				$payment->fk_bank			= $bank_account_id;
 				$payment->paiementtype		= $mop;
 				$payment->num_payment		= $num_chq;
-				$payment->amounts			= array($vat->id => abs((float)$qonto_trx['amount']));
+				$payment->amounts			= array($vat->id => $pay_amount);
 				$payment->chid				= $rowid;
 				
 				// Trying to create a payment on the vat (arg 1 = auto close)
