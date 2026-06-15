@@ -119,4 +119,36 @@
 
 		return $documents;
 	}
+	
+    /**
+     * Determine the Dolibarr payment method (mop) based on the Qonto transaction type
+     *
+     * @param string $op_type   Qonto operation type (eg: 'card', 'transfer'...)
+     * @param string $side      Optional: Qonto side ('credit' or 'debit')
+     * @return string|int       Dolibarr payment method ID, empty string, or -1 if empty input
+     */
+    public function getPaymentModeId($op_type, $side = '')
+    {
+        if (empty($op_type)) {
+            return -1;
+        }
+    
+        if ($op_type == 'income' || $op_type == 'transfer') {
+            return getDolGlobalInt('QONTOSYNC_PM_TRANSFER') ? getDolGlobalInt('QONTOSYNC_PM_TRANSFER') : '';
+        } elseif ($op_type == 'card' || $op_type == 'card_acquirer_payout') {
+            return getDolGlobalInt('QONTOSYNC_PM_CARD') ? getDolGlobalInt('QONTOSYNC_PM_CARD') : '';
+        } elseif ($op_type == 'direct_debit' || $op_type == 'direct_debit_collection' ) {
+            return getDolGlobalInt('QONTOSYNC_PM_DD') ? getDolGlobalInt('QONTOSYNC_PM_DD') : '';
+        } elseif ($op_type == 'check') {
+            return getDolGlobalInt('QONTOSYNC_PM_CHECK') ? getDolGlobalInt('QONTOSYNC_PM_CHECK') : '';
+        } elseif ($op_type == 'qonto_fee') {
+            if ($side === 'credit') {
+                return getDolGlobalInt('QONTOSYNC_PM_TRANSFER');
+            } else {
+                return getDolGlobalInt('QONTOSYNC_PM_DD');
+            }
+        }
+    
+        return '';
+    }
 }
