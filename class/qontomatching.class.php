@@ -15,6 +15,8 @@ dol_include_once('/compta/tva/class/paymentvat.class.php');
 dol_include_once('/fourn/class/fournisseur.facture.class.php');
 dol_include_once('/fourn/class/paiementfourn.class.php');
 
+dol_include_once('/qontosync/class/qontorepository.class.php');
+
 
 class QontoMatching
 {
@@ -42,8 +44,7 @@ class QontoMatching
 		# Tempory fast mode: only not fast
 		
 		// Load utils functions
-	    dol_include_once('/qontosync/class/qontorepository.class.php');
-        $Repo = new QontoRepository($this->db);
+        $qontoRepo = new QontoRepository($this->db);
 		
 		/**
 		* Invoices will be loaded only if at least one transaction is unlinked
@@ -93,7 +94,7 @@ class QontoMatching
 					
 					// Load unpaid items ONCE if not already loaded
 					if (!$items_loaded) {
-                        $unpaid_docs = $Repo->getUnpaidDocuments('all');
+                        $unpaid_docs = $qontoRepo->getUnpaidDocuments('all');
             
                         $unpaid_c_invoices = $unpaid_docs['c_invoices'];
                         $unpaid_s_invoices = $unpaid_docs['s_invoices'];
@@ -232,7 +233,6 @@ class QontoMatching
 			dol_syslog("QontoMatching::update: Error on input parameters", LOG_ERR);
 			return false;
 		}
-		
 
 		// Explode target type & rowid
 		$parts = explode('_', $target, 2);
@@ -258,26 +258,17 @@ class QontoMatching
 		// Init error counter
 		$error = 0;
 
-		// Get operation type
+		// Load utils functions
+        $qontoRepo = new QontoRepository($this->db);
+        
+        // Define operation type string for legacy code use below
 		$op_type = isset($qonto_trx['operation_type']) ? $qonto_trx['operation_type'] : '';
 
-		if ($op_type == 'income' || $op_type == 'transfer') {
-			$mop = getDolGlobalInt('QONTOSYNC_PM_TRANSFER') ? getDolGlobalInt('QONTOSYNC_PM_TRANSFER') : '';
-		} elseif ($op_type == 'card' || $op_type == 'card_acquirer_payout') {
-			$mop = getDolGlobalInt('QONTOSYNC_PM_CARD') ? getDolGlobalInt('QONTOSYNC_PM_CARD') : '';
-		} elseif ($op_type == 'direct_debit' || $op_type == 'direct_debit_collection' ) {
-			$mop = getDolGlobalInt('QONTOSYNC_PM_DD') ? getDolGlobalInt('QONTOSYNC_PM_DD') : '';
-		} elseif ($op_type == 'check') {
-			$mop = getDolGlobalInt('QONTOSYNC_PM_CHECK') ? getDolGlobalInt('QONTOSYNC_PM_CHECK') : '';
-		} elseif ($op_type == 'qonto_fee') {
-			if (isset($qonto_trx['side']) && $qonto_trx['side'] == 'credit') {
-				$mop = getDolGlobalInt('QONTOSYNC_PM_TRANSFER');
-			} else {
-				$mop = getDolGlobalInt('QONTOSYNC_PM_DD');
-			}
-		} else {
-			$mop = '';
-		}
+        // Get operation type
+        $mop = $qontoRepo->getPaymentModeId(
+            $op_type, 
+            isset($qonto_trx['side']) ? $qonto_trx['side'] : ''
+        );
 		
 
 		// Extract bank identifier based on operation type (e.g., 'transfer', 'income', etc.)
