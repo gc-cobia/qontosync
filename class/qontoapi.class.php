@@ -201,6 +201,31 @@ class QontoApi
 
 		return $all_transactions;
 	}
+	
+	/**
+	 * Get a single transaction from Qonto API by its ID
+	 *
+	 * @param string $transaction_id ID of the transaction
+	 * @return array|bool Array of the transaction data or false on error
+	 */
+	public function getTransaction($transaction_id)
+	{
+		$endpoint = "/v2/transactions/" . urlencode(trim($transaction_id));
+		
+		$response = $this->sendRequest($endpoint);
+		
+		if ($response === false) {
+			return false;
+		}
+
+		$data = json_decode($response, true);
+		
+		if (isset($data['transaction'])) {
+			return $data['transaction'];
+		}
+
+		return false;
+	}
 
 	/**
 	 * Test the connection to the Qonto API without retrieving or processing the list of accounts.
