@@ -41,6 +41,10 @@ class QontoMatching
 
 		# Tempory fast mode: only not fast
 		
+		// Load utils functions
+	    dol_include_once('/qontosync/class/qontorepository.class.php');
+        $Repo = new QontoRepository($this->db);
+		
 		/**
 		* Invoices will be loaded only if at least one transaction is unlinked
 		*/
@@ -89,85 +93,12 @@ class QontoMatching
 					
 					// Load unpaid items ONCE if not already loaded
 					if (!$items_loaded) {
+                        $unpaid_docs = $Repo->getUnpaidDocuments('all');
+            
+                        $unpaid_c_invoices = $unpaid_docs['c_invoices'];
+                        $unpaid_s_invoices = $unpaid_docs['s_invoices'];
+                        $unpaid_vat        = $unpaid_docs['vat'];
 						
-						// Looking for unpaid customers invoices (with thirdparty name)
-                        $sql_c_inv = "SELECT f.rowid, f.ref, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
-                        $sql_c_inv .= "FROM " . MAIN_DB_PREFIX . "facture as f ";
-                        $sql_c_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
-                        $sql_c_inv .= "WHERE f.entity IN (" . getEntity('facture') . ") AND f.fk_statut = 1 AND f.paye = 0";
-                        
-						$resql_c_inv = $this->db->query($sql_c_inv);
-						if ($resql_c_inv) {
-							$fact = new Facture($this->db);							
-							while ($obj_c_inv = $this->db->fetch_object($resql_c_inv)) {
-								$fact->id = $obj_c_inv->rowid;
-								$fact->ref = $obj_c_inv->ref;
-								$fact->total_ttc = $obj_c_inv->total_ttc;
-								$fact->type = $obj_c_inv->type;
-								$fact->date = $this->db->jdate($obj_c_inv->datef);
-								
-								$remain = $fact->getRemainToPay();						
-								if ($remain != 0) {
-									$unpaid_c_invoices[] = (object) array(
-										'rowid'         => $fact->id,
-										'label'         => $fact->ref,
-										'amount'        => $remain,
-										'datev'         => $fact->date,
-										'thirdparty'    => $obj_c_inv->thirdparty_name
-									);
-								}
-								
-							}
-							$this->db->free($resql_c_inv);
-						}
-						
-                        // Looking for unpaid suppliers invoices (with thirdparty name AND ref supplier)
-                        $sql_s_inv = "SELECT f.rowid, f.ref, f.ref_supplier, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
-                        $sql_s_inv .= "FROM " . MAIN_DB_PREFIX . "facture_fourn as f ";
-                        $sql_s_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
-                        $sql_s_inv .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") AND f.fk_statut = 1 AND f.paye = 0";
-                        
-						$resql_s_inv = $this->db->query($sql_s_inv);
-						if ($resql_s_inv) {
-							$fact_fourn = new FactureFournisseur($this->db);
-							while ($obj_s_inv = $this->db->fetch_object($resql_s_inv)) {
-								$fact_fourn->id = $obj_s_inv->rowid;
-								$fact_fourn->ref = $obj_s_inv->ref;
-								$fact_fourn->total_ttc = $obj_s_inv->total_ttc;
-								$fact_fourn->type = $obj_s_inv->type;
-								$fact_fourn->date = $this->db->jdate($obj_s_inv->datef);
-								
-								$remain = $fact_fourn->getRemainToPay();
-								if ($remain != 0) {
-									$unpaid_s_invoices[] = (object) array(
-										'rowid'  => $fact_fourn->id,
-										'label'  => $fact_fourn->ref,
-										'amount' => $remain,
-										'datev'  => $fact_fourn->date,
-										'thirdparty' => $obj_s_inv->thirdparty_name,
-										'ref_supplier' => $obj_s_inv->ref_supplier
-									);
-								}
-							}
-							$this->db->free($resql_s_inv);
-						}
-
-						// Looking for unpaid VAT
-						$sql_vat = "SELECT rowid, label, amount, datev FROM " . MAIN_DB_PREFIX . "tva WHERE entity IN (" . getEntity('tva') . ") AND paye = 0";
-						$resql_vat = $this->db->query($sql_vat);
-						if ($resql_vat) {
-							while ($obj_vat = $this->db->fetch_object($resql_vat)) {
-								$unpaid_vat[] = (object) array(
-									'rowid'  => $obj_vat->rowid,
-									'label'  => $obj_vat->label ? $obj_vat->label : 'VAT',
-									'amount' => $obj_vat->amount,
-									'datev'  => $this->db->jdate($obj_vat->datev)
-								);
-							}
-						$this->db->free($resql_vat);
-						}
-						
-
 						$items_loaded = true;
 					}
 					
