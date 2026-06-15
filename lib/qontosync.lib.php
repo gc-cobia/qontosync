@@ -188,7 +188,9 @@ class QontoSyncLib
 			print '<td>' . dol_print_date(strtotime($q_date), 'day') . '</td>';
 			print '<td>' . $q_label . ' <br><code class="opacitymedium small" style="font-size:0.8em;">ID: '.$q_id.'</code></td>';
 
-			print '<td class="right">' . price($q_amount) . ' ' . $t['currency'] . '</td>';
+            // Adapt color of amount
+            $amount_color = ($q_amount < 0)	? 'var(--amountremaintopaycolor)' : 'var(--amountpaymentcomplete)';
+			print '<td class="right"><span class="amount" style="color:'.$amount_color.';">' . price($q_amount) . '</span> ' . $t['currency'] . '</td>';
 			
 			if (!empty($t['trx_status']) && $t['trx_status'] == 'errorTooManyTrx') {
 				// Application du style au badge d'erreur
