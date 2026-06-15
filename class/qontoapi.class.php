@@ -221,6 +221,7 @@ class QontoApi
 		$data = json_decode($response, true);
 		
 		if (isset($data['transaction'])) {
+        dol_syslog("QontoSync: getTransaction ' . $transaction_id . ' from Qonto.", LOG_DEBUG);
 			return $data['transaction'];
 		}
 
