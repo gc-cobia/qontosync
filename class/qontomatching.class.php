@@ -1,9 +1,9 @@
 <?php
 /*
- *  QontoSync dolibarr module 
- *  @file       qontomatching.class.php
- *  @author     Gaëtan COURTOIS
- *  @license    GPLv3
+ * QontoSync dolibarr module 
+ * @file       qontomatching.class.php
+ * @author     Gaëtan COURTOIS
+ * @license    GPLv3
  */
 
 dol_include_once('/core/class/extrafields.class.php');
@@ -28,6 +28,46 @@ class QontoMatching
 	}
 
 	/**
+	 * Verify if a transaction is already linked
+	 *
+	 * @param string $qonto_id Qonto transaction ID
+	 * @param int $bank_id Bank account id
+	 * @return int linked_rowid if linked, 0 if not linked, -1 if error (too many links)
+	 */
+	public function isLinked($qonto_id, $bank_id)
+	{
+		if (empty($qonto_id) || empty($bank_id)) {
+			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
+			return 0;
+		}
+		
+		$sql = "SELECT ef.fk_object ";
+		$sql .= "FROM " . MAIN_DB_PREFIX . "bank_extrafields as ef ";
+		$sql .= "JOIN " . MAIN_DB_PREFIX . "bank as b ON ef.fk_object = b.rowid ";
+		$sql .= "WHERE ef.qonto_id = '" . $this->db->escape($qonto_id) . "' ";
+		$sql .= "AND b.fk_account = " . (int) $bank_id;
+		
+		$resql = $this->db->query($sql);
+		
+		if ($resql) {
+			$num_rows = $this->db->num_rows($resql);
+			
+			if ($num_rows == 1) {
+				$obj = $this->db->fetch_object($resql);
+				$linked_id = $obj->fk_object;
+				$this->db->free($resql);
+				return $linked_id;
+			} elseif ($num_rows > 1) {
+				$this->db->free($resql);
+				return -1;
+			}
+			$this->db->free($resql);
+		}
+		
+		return 0;
+	}
+
+	/**
 	 * Get transactions linked or to link to the extrafield qonto_id
 	 *
 	 * @param array $transaction Qonto transactions array
@@ -37,14 +77,14 @@ class QontoMatching
 	public function fetchTransactions($transaction, $bank_id, $fast_mod = false)
 	{
 		if (empty($transaction) || !is_array($transaction) || empty($bank_id)) {
-			dol_syslog("QontoMatching::fetchTransactions: Error on input parameters", LOG_ERR);
+			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return array();
 		}
 
 		# Tempory fast mode: only not fast
 		
 		// Load utils functions
-        $qontoRepo = new QontoRepository($this->db);
+		$qontoRepo = new QontoRepository($this->db);
 		
 		/**
 		* Invoices will be loaded only if at least one transaction is unlinked
@@ -72,54 +112,42 @@ class QontoMatching
 			}
 
 			// Verify if transaction is already linked in the selected bank account
-			$sql = "SELECT ef.fk_object ";
-			$sql .= "FROM " . MAIN_DB_PREFIX . "bank_extrafields as ef ";
-			$sql .= "JOIN " . MAIN_DB_PREFIX . "bank as b ON ef.fk_object = b.rowid ";
-			$sql .= "WHERE ef.qonto_id = '" . $this->db->escape($t['id']) . "' ";
-			$sql .= "AND b.fk_account = " . (int) $bank_id;
-
-			$resql = $this->db->query($sql);
-			if ($resql) {
-				$num_rows = $this->db->num_rows($resql);
-				if ($num_rows > 0) {
-					if ($num_rows > 1) {
-						$t["trx_status"] = "errorTooManyTrx";
-					} else {
-						$obj = $this->db->fetch_object($resql);
-						$t["linked_rowid"] = (int)$obj->fk_object;
-						$t["trx_status"] = "linked";
-					}
-				} else {
-					$t["trx_status"] = "unlinked";
+			$link_status = $this->isLinked($t['id'], $bank_id);
+			
+			if ($link_status === -1) {
+				$t["trx_status"] = "errorTooManyTrx";
+			} elseif ($link_status > 0) {
+				$t["linked_rowid"] = (int)$link_status;
+				$t["trx_status"] = "linked";
+			} else {
+				$t["trx_status"] = "unlinked";
+				
+				// Load unpaid items ONCE if not already loaded
+				if (!$items_loaded) {
+					$unpaid_docs = $qontoRepo->getUnpaidDocuments('all');
+		
+					$unpaid_c_invoices = $unpaid_docs['c_invoices'];
+					$unpaid_s_invoices = $unpaid_docs['s_invoices'];
+					$unpaid_vat        = $unpaid_docs['vat'];
 					
-					// Load unpaid items ONCE if not already loaded
-					if (!$items_loaded) {
-                        $unpaid_docs = $qontoRepo->getUnpaidDocuments('all');
-            
-                        $unpaid_c_invoices = $unpaid_docs['c_invoices'];
-                        $unpaid_s_invoices = $unpaid_docs['s_invoices'];
-                        $unpaid_vat        = $unpaid_docs['vat'];
-						
-						$items_loaded = true;
-					}
-					
-					// Looking for bank line with same amout and not linked
-					$sql_bank = "SELECT b.rowid, b.amount, b.label, b.datev ";
-					$sql_bank .= "FROM " . MAIN_DB_PREFIX . "bank as b ";
-					$sql_bank .= "LEFT JOIN " . MAIN_DB_PREFIX . "bank_extrafields as ef ON ef.fk_object = b.rowid ";
-					$sql_bank .= "WHERE b.amount = " . (float)$t['amount'] . " ";
-					$sql_bank .= "AND b.fk_account = " . (int)$bank_id . " ";
-					$sql_bank .= "AND (ef.qonto_id IS NULL OR ef.qonto_id = '')";
-
-					$resql_bank = $this->db->query($sql_bank);
-					if ($resql_bank) {
-						while ($obj = $this->db->fetch_object($resql_bank)) {
-							$t["trx"][] = $obj;
-						}
-						$this->db->free($resql_bank);
-					}
+					$items_loaded = true;
 				}
-				$this->db->free($resql);
+				
+				// Looking for bank line with same amout and not linked
+				$sql_bank = "SELECT b.rowid, b.amount, b.label, b.datev ";
+				$sql_bank .= "FROM " . MAIN_DB_PREFIX . "bank as b ";
+				$sql_bank .= "LEFT JOIN " . MAIN_DB_PREFIX . "bank_extrafields as ef ON ef.fk_object = b.rowid ";
+				$sql_bank .= "WHERE b.amount = " . (float)$t['amount'] . " ";
+				$sql_bank .= "AND b.fk_account = " . (int)$bank_id . " ";
+				$sql_bank .= "AND (ef.qonto_id IS NULL OR ef.qonto_id = '')";
+
+				$resql_bank = $this->db->query($sql_bank);
+				if ($resql_bank) {
+					while ($obj = $this->db->fetch_object($resql_bank)) {
+						$t["trx"][] = $obj;
+					}
+					$this->db->free($resql_bank);
+				}
 			}
 			
 			$t["c_invoices"] = array();
@@ -172,7 +200,7 @@ class QontoMatching
 		global $user;
 
 		if (empty($bank_line_id) || empty($qonto_id) || empty($ref_releve)) {
-			dol_syslog("QontoMatching::linkTransaction: Error on input parameters", LOG_ERR);
+			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return -1;
 		}
 		
@@ -201,16 +229,16 @@ class QontoMatching
 			$res = $bank->insertExtraFields();
 			
 			if ($res <= 0) {
-				dol_syslog("QontoMatching::linkTransaction: Error creating the bank line extrafield: ".$bank->error, LOG_ERR);
+				dol_syslog(__METHOD__ . ": Error creating the bank line extrafield: ".$bank->error, LOG_ERR);
 				return -1;
 			}
 		}
 		
 		// Update the bank line with the statement rapprochement
-        $bank->num_releve = $ref_releve;
+		$bank->num_releve = $ref_releve;
 		$res = $bank->update_conciliation($user, null, 1);
 		if ($res <= 0) {
-			dol_syslog("QontoMatching::linkTransaction: Error updating the bank line statement: ".$bank->error, LOG_ERR);
+			dol_syslog(__METHOD__ . ": Error updating the bank line statement: ".$bank->error, LOG_ERR);
 			return -1;
 		}
 	
@@ -230,7 +258,7 @@ class QontoMatching
 		global $conf, $user;
 	
 		if (empty($target) || empty($qonto_trx) || !is_array($qonto_trx)) {
-			dol_syslog("QontoMatching::update: Error on input parameters", LOG_ERR);
+			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return false;
 		}
 
@@ -247,11 +275,9 @@ class QontoMatching
 		$this->db->begin();
 
 		// Check if Qonto ID already exists
-		$sql_check = "SELECT rowid FROM " . MAIN_DB_PREFIX . "bank_extrafields WHERE qonto_id = '" . $this->db->escape($qonto_trx['id']) . "'";
-		$resql_check = $this->db->query($sql_check);
-		if ($resql_check && $this->db->num_rows($resql_check) > 0) {
+		if ($this->isLinked($qonto_trx['id'], $bank_account_id) !== 0) {
 			$this->db->rollback();
-			dol_syslog("QontoMatching::update: Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
+			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
 			return -1;
 		}
 
@@ -259,16 +285,15 @@ class QontoMatching
 		$error = 0;
 
 		// Load utils functions
-        $qontoRepo = new QontoRepository($this->db);
-        
-        // Define operation type string for legacy code use below
+		$qontoRepo = new QontoRepository($this->db);
+		
+		// Define operation type string for legacy code use below
 		$op_type = isset($qonto_trx['operation_type']) ? $qonto_trx['operation_type'] : '';
-
-        // Get operation type
-        $mop = $qontoRepo->getPaymentModeId(
-            $op_type, 
-            isset($qonto_trx['side']) ? $qonto_trx['side'] : ''
-        );
+		
+		$mop = $qontoRepo->getPaymentModeId(
+			$op_type, 
+			isset($qonto_trx['side']) ? $qonto_trx['side'] : ''
+		);
 		
 
 		// Extract bank identifier based on operation type (e.g., 'transfer', 'income', etc.)
@@ -299,7 +324,7 @@ class QontoMatching
 				// Trying to link the transaction
 				$run = $this->linkTransaction($rowid, $qonto_trx['id'], $ref_releve);
 				if ($run < 0) {
-					dol_syslog("QontoMatching::update: Error, can not link the transaction", LOG_ERR);
+					dol_syslog(__METHOD__ . ": Error, can not link the transaction", LOG_ERR);
 					$error++;
 				}
 				
@@ -419,7 +444,7 @@ class QontoMatching
 					if($bank_line > 0) {
 						$line = new AccountLine($this->db);
 						if ($line->fetch($bank_line) > 0) {
-                          
+							
 							// Complete bank line with Qonto data
 							$line->label	= isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $invoice->ref;
 							$line->datev	= strtotime($qonto_trx['settled_at']);
