@@ -382,6 +382,13 @@ class QontoMatching
 				break;
 
 			case 'cinv':
+				// Security check: ensure Customer Invoices module is enabled
+				if (empty($conf->facture->enabled)) {
+					dol_syslog(__METHOD__ . ": Customer Invoice module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
+
 	        	if (!class_exists('Paiement')) {
                     dol_include_once('/compta/paiement/class/paiement.class.php');
             	}
@@ -468,6 +475,12 @@ class QontoMatching
 				break;
 				
 			case 'sinv':
+				// Security check: ensure Supplier Invoices module is enabled
+				if (empty($conf->fournisseur->enabled)) {
+					dol_syslog(__METHOD__ . ": Supplier Invoice module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
 			    
         		if (!class_exists('PaiementFourn')) {
         			dol_include_once('/fourn/class/paiementfourn.class.php');
@@ -556,7 +569,13 @@ class QontoMatching
 				break;
 			
 			case 'vat':
-			    
+				// Security check: ensure Tax module is enabled
+				if (empty($conf->tax->enabled)) {
+					dol_syslog(__METHOD__ . ": Tax/VAT module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
+
         		if (!class_exists('PaymentVat')) {
         			dol_include_once('/compta/tva/class/paymentvat.class.php');
         		}
