@@ -6,7 +6,8 @@
  * @license    GPLv3
  */
 
-require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+dol_include_once('/core/class/html.form.class.php');
+dol_include_once('/qontosync/class/qontorepository.class.php');
 
 /**
  * Class QontoSyncLib
@@ -47,6 +48,22 @@ class QontoSyncLib
 	 * Print the closing tag for the main flexbox layout container
 	 */
 	public static function printPageEnd()
+	{
+		print '</div>';
+	}
+	
+	/**
+	 * Print the opening tag for a modal container
+	 */
+	public static function printModalBegin()
+	{
+		print '<div class="fiche" style="padding: 15px; display: flex; flex-direction: column; gap: 15px;">';
+	}
+	
+	/**
+	 * Print the closing tag for a modal container
+	 */
+	public static function printModalEnd()
 	{
 		print '</div>';
 	}
@@ -188,8 +205,10 @@ class QontoSyncLib
 			print '<td>' . dol_print_date(strtotime($q_date), 'day') . '</td>';
 			print '<td>' . $q_label . ' <br><code class="opacitymedium small" style="font-size:0.8em;">ID: '.$q_id.'</code></td>';
 
+
             // Adapt color of amount
             $amount_color = ($q_amount < 0)	? 'var(--amountremaintopaycolor)' : 'var(--amountpaymentcomplete)';
+            
 			print '<td class="right"><span class="amount" style="color:'.$amount_color.';">' . price($q_amount) . '</span> ' . $t['currency'] . '</td>';
 			
 			if (!empty($t['trx_status']) && $t['trx_status'] == 'errorTooManyTrx') {
@@ -263,12 +282,6 @@ class QontoSyncLib
 					print '</select>';
 					print '</td>';
 					
-					print '<td class="center">';
-					print '<button type="button" class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="Détails">';
-					print '<span class="fa fa-search"></span>';
-					print '</button>';
-					print '</td>';
-					
 					print'<script>
 					$(function() {
 						$("#' .  $select_id . '").select2({
@@ -282,12 +295,24 @@ class QontoSyncLib
 					print '<td>';
 					print '<span class="badge badge-warning" style="'.$style_badge.'">'.$langs->trans('NoCorrespondenceFound').'</span>';
 					print '</td>';
-					print '<td>';
-					print '<button type="button" class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="Détails">';
-					print '<span class="fa fa-search"></span>';
-					print '</button>';
-					print '</td>';
 				}
+				
+				print '<td class="center">';
+				
+				$url_modal = dol_buildpath('/qontosync/ajax/advancedBox.php', 1) . '?qonto_id=' . urlencode($q_id) . '&bank_id=' . $bank_rowid;
+				$btn_html = '<span class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;"><span class="fa fa-search"></span></span>';
+				
+				// Signature : dolButtonToOpenUrlInDialogPopup($htmlname, $title, $buttonlabel, $url, $morecss='', $moreparam='')
+                print dolButtonToOpenUrlInDialogPopup(
+                    'btn_adv_match_' . md5($q_id),
+                    $langs->trans("AdvancedSearch"),
+                    $btn_html,
+                    $url_modal,
+                    '',
+                    ''
+                );
+				
+				print '</td>';
 			}
 			
 			print '</tr>';
@@ -296,5 +321,182 @@ class QontoSyncLib
 		print '</table>';
 		print '</form>';
 		print '</div>';
+	}
+	
+    /**
+	 * Print the box with the Qonto transaction details
+	 *
+	 * @param array $qonto_trx Transaction data from Qonto API
+	 */
+    public static function printTransactionSummary($trx)
+	{
+		global $langs, $db;
+		
+		$t_id       = $trx['id'];
+		$t_amount   = $trx['amount'];
+		$t_label    = $trx['label'];
+		$t_date     = $trx['settled_at'];
+		$t_currency = $trx['currency'];
+		$t_ref      = isset($trx['reference']) ? $trx['reference'] : '';
+		
+		// Load utils functions
+		$qontoRepo = new QontoRepository($db);
+		
+		// Define operation type string for legacy code use below
+		$op_type = isset($trx['operation_type']) ? $trx['operation_type'] : '';
+		
+		$mop = $qontoRepo->getPaymentModeId(
+			$op_type, 
+			isset($trx['side']) ? $trx['side'] : ''
+		);
+		
+		$payment_label = '';
+		if (!empty($mop)) {
+    		$payment_code = $langs->getLabelFromKey($db, $mop, 'c_paiement', 'id', 'code');
+    		$payment_label = $langs->trans("PaymentTypeShort" . $payment_code);
+    		
+            // Fallback
+    		if ($payment_label == "PaymentTypeShort" . $payment_code) {
+                $payment_label = $langs->getLabelFromKey($db, $mop, 'c_paiement', 'id', 'libelle');
+            }
+		}
+		
+		// Adapt color of amount
+        $amount_color = ($t_amount < 0)	? 'var(--amountremaintopaycolor)' : 'var(--amountpaymentcomplete)';
+
+		print load_fiche_titre($langs->trans("Détails de la transaction Qonto"), '', 'bank');
+		
+        print '<div style="display:grid;grid-template-columns:180px 1fr;row-gap:18px;">';
+        
+        print '<div>'.$langs->trans("Label").'</div>';
+        print '<div><span class="bold">'.dol_escape_htmltag($t_label).'</span></div>';
+        
+        print '<div>'.$langs->trans("Date").'</div>';
+        print '<div>'.dol_print_date(strtotime($t_date), 'day').'</div>';
+        
+        print '<div>'.$langs->trans("Amount").'</div>';
+        print '<div><span class="amount" style="color:'.$amount_color.';">'.price($t_amount).' '.dol_escape_htmltag($t_currency).'</span></div>';
+        
+        print '<div>'.$langs->trans("Type").'</div>';
+        print '<div>'.$payment_label.'</div>';
+        
+        if (isset($t_ref) && !empty($t_ref)) {
+            print '<div>'.$langs->trans("Ref").'</div>';
+            print '<div>'.dol_escape_htmltag($t_ref).'</div>';
+        }
+        
+        print '</div>';
+        
+        print '<div class="oddeven" style="margin-top:20px;padding:8px 10px;">';
+        print '<code>ID : '.dol_escape_htmltag($t_id).'</code>';
+        print '</div>';
+	}
+
+	/**
+	 * Print unpaid documents table
+	 *
+	 * @param array $qonto_trx Transaction data from Qonto API
+	 * @param array $open_documents Tableau contenant les factures/TVA à afficher (à venir)
+	 */
+    public static function printOpenDocumentsTable($qonto_trx, $documents = array())
+	{
+		global $langs, $conf;
+		
+		print '<br>';
+		print load_fiche_titre($langs->trans("Documents en attente de paiement"), '', 'bill');
+		print '<div class="clearboth"></div>';
+		
+		print '<form id="form_advanced_matching" method="post" action="'.dol_buildpath('/qontosync/index.php', 1).'">';
+		print '<input type="hidden" name="token" value="'.newToken().'">';
+		print '<input type="hidden" name="action" value="process_advanced_match">';
+		print '<input type="hidden" name="qonto_id" value="'.dol_escape_htmltag($qonto_trx['id']).'">';
+		print '<input type="hidden" name="bank_rowid" value="' . GETPOST('bank_rowid', 'int') . '">';
+
+		print '<div class="div-table-responsive">';
+		print '<table class="liste centpercent">';
+		
+		print '<tr class="liste_titre">';
+		print '<th class="liste_titre center" style="width: 40px;"><input type="checkbox" id="checkall" title="Tout cocher"></th>';
+		print '<th class="liste_titre">Type</th>';
+		print '<th class="liste_titre">Réf. Document</th>';
+		print '<th class="liste_titre">Tiers</th>';
+		print '<th class="liste_titre right">Reste à payer</th>';
+		print '<th class="liste_titre right" style="width: 140px;">Montant à imputer</th>';
+		print '</tr>';
+
+		$has_data = false;
+
+		// 1. Factures Clients
+		if (!empty($documents['c_invoices'])) {
+			$has_data = true;
+			foreach ($documents['c_invoices'] as $d) {
+				print '<tr class="oddeven">';
+				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_' . $d->rowid . '"></td>';
+				print '<td>Facture Client</td>';
+				print '<td>' . $d->label . '</td>';
+				print '<td>' . $d->thirdparty . '</td>';
+				print '<td class="right amount">' . price($d->amount) . '</td>';
+				print '<td class="right"><input type="text" class="flat right maxwidth75" name="amount_cinv_' . $d->rowid . '" value="" placeholder="0.00"></td>';
+				print '</tr>';
+			}
+		}
+
+		// 2. Factures Fournisseurs
+		if (!empty($documents['s_invoices'])) {
+			$has_data = true;
+			foreach ($documents['s_invoices'] as $d) {
+				print '<tr class="oddeven">';
+				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_' . $d->rowid . '"></td>';
+				print '<td>Facture Fournisseur</td>';
+				print '<td>' . $d->label . ' <span class="opacitymedium small">(' . $d->ref_supplier . ')</span></td>';
+				print '<td>' . $d->thirdparty . '</td>';
+				print '<td class="right amount">' . price($d->amount) . '</td>';
+				print '<td class="right"><input type="text" class="flat right maxwidth75" name="amount_sinv_' . $d->rowid . '" value="" placeholder="0.00"></td>';
+				print '</tr>';
+			}
+		}
+
+		// 3. TVA
+		if (!empty($documents['vat'])) {
+			$has_data = true;
+			foreach ($documents['vat'] as $d) {
+				print '<tr class="oddeven">';
+				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="vat_' . $d->rowid . '"></td>';
+				print '<td>TVA</td>';
+				print '<td>' . $d->label . '</td>';
+				print '<td>-</td>';
+				print '<td class="right amount">' . price($d->amount) . '</td>';
+				print '<td class="right"><input type="text" class="flat right maxwidth75" name="amount_vat_' . $d->rowid . '" value="" placeholder="0.00"></td>';
+				print '</tr>';
+			}
+		}
+
+		// Si aucun document trouvé
+		if (!$has_data) {
+			print '<tr><td colspan="6" class="center opacitymedium">Aucun document en attente de paiement trouvé.</td></tr>';
+		}
+
+		print '</table>';
+		print '</div>';
+		
+		// BARRE D'ACTIONS DOLIBARR
+		print '<div class="tabsAction">';
+		print '<div class="inline-block marginleftonly marginrightonly">';
+		print '<input type="submit" class="button button-save" value="'.$langs->trans("Validate").'">';
+		print '</div>';
+		print '<div class="inline-block marginleftonly marginrightonly">';
+		print '<input type="button" class="button button-cancel" value="'.$langs->trans("Cancel").'" onclick="$(this).closest(\'.ui-dialog-content\').dialog(\'close\');">';
+		print '</div>';
+		print '</div>';
+		
+		print '</form>';
+
+		print '<script>
+			$(document).ready(function() {
+				$("#checkall").click(function() {
+					$(".check_link_doc").prop("checked", $(this).prop("checked"));
+				});
+			});
+		</script>';
 	}
 }
