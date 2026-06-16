@@ -6,8 +6,10 @@
  */
 
 $(document).ready(function() {
-    $(".check_link_doc").on("change", function() {
-        let checkedBoxes = $(".check_link_doc:checked");
+    // Event delegation is required because the modal content is loaded via AJAX
+    $(document).on("change", ".check_link_doc", function() {
+        let modalForm = $(this).closest("form");
+        let checkedBoxes = modalForm.find(".check_link_doc:checked");
         let row = $(this).closest("tr");
         let amountInput = row.find(".amount_input");
         
@@ -21,15 +23,15 @@ $(document).ready(function() {
         // Locking logic for the other rows
         if (checkedBoxes.length === 0) {
             // If nothing is checked, unlock everything
-            $(".check_link_doc").prop("disabled", false);
-            $(".doc_row").removeClass("opacitymedium");
+            modalForm.find(".check_link_doc").prop("disabled", false);
+            modalForm.find(".doc_row").removeClass("opacitymedium");
         } else {
             // If at least one checkbox is checked, retrieve its attributes
             let firstChecked = checkedBoxes.first();
             let docType = firstChecked.data("doctype");
             let thirdParty = firstChecked.data("thirdparty");
 
-            $(".check_link_doc").each(function() {
+            modalForm.find(".check_link_doc").each(function() {
                 if (!$(this).prop("checked")) {
                     let thisType = $(this).data("doctype");
                     let thisThirdParty = $(this).data("thirdparty");
