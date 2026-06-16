@@ -384,19 +384,19 @@ class QontoMatching
 								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
 								if ($run < 0) { $error++; }
 							} else {
-								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, LOG_ERR);
+								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
 								$error++;
 							}
 						} else {
-							dol_syslog("QontoMatching::update: Error fetching bank line: " . $line->error, LOG_ERR);
+							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
 							$error++;
 						}
 					} else {
-						dol_syslog("QontoMatching::update: Error pushing payment to the bank: ".$payment->error, LOG_ERR);
+						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
 						$error++;
 					}
 				} else {
-					dol_syslog("QontoMatching::update: Error creating the payment: ".$payment->error, LOG_ERR);
+					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
 					$error++;
 				}
 				
@@ -456,19 +456,19 @@ class QontoMatching
 								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
 								if ($run < 0) { $error++; }
 							} else {
-								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, LOG_ERR);
+								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
 								$error++;
 							}
 						} else {
-							dol_syslog("QontoMatching::update: Error fetching bank line: " . $line->error, LOG_ERR);
+							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
 							$error++;
 						}
 					} else {
-						dol_syslog("QontoMatching::update: Error pushing payment to the bank: ".$payment->error, LOG_ERR);
+						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
 						$error++;
 					}
 				} else {
-					dol_syslog("QontoMatching::update: Error creating the payment: ".$payment->error, LOG_ERR);
+					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
 					$error++;
 				}
 				
@@ -535,19 +535,19 @@ class QontoMatching
 								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
 								if ($run < 0) { $error++; }
 							} else {
-								dol_syslog("QontoMatching::update: Error updating bank line: " . $line->error, LOG_ERR);
+								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
 								$error++;
 							}
 						} else {
-							dol_syslog("QontoMatching::update: Error fetching bank line: " . $line->error, LOG_ERR);
+							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
 							$error++;
 						}
 					} else {
-						dol_syslog("QontoMatching::update: Error pushing payment to the bank: ".$payment->error, LOG_ERR);
+						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
 						$error++;
 					}
 				} else {
-					dol_syslog("QontoMatching::update: Error creating the payment: ".$payment->error, LOG_ERR);
+					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
 					$error++;
 				}
 				
@@ -560,7 +560,7 @@ class QontoMatching
 		// Finalizing the transaction
 		if ($error === 0) {
 			$this->db->commit();
-			dol_syslog("QontoMatching::update: Transaction Qonto ID (".$qonto_trx['id'].") successfully matched with target ".$target, LOG_INFO);
+			dol_syslog(__METHOD__ . ": Transaction Qonto ID (".$qonto_trx['id'].") successfully matched with target ".$target, LOG_INFO);
 			return 1;
 		} else {
 			$this->db->rollback();
