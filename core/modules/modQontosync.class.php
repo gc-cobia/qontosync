@@ -74,14 +74,19 @@ class modQontosync extends DolibarrModules
 
 		// Constants
 		$this->const = array(
+		    // API configuration
 			array('QONTOSYNC_API_KEY', 'chaine', '', 'Qonto API Key', 0),
 			array('QONTOSYNC_SLUG', 'chaine', '', 'Qonto Login/Slug', 0),
+			// Sandbox
 			array('QONTOSYNC_SANDBOX', 'chaine', '0', 'Qonto Sandbox Mode', 0),
 			array('QONTOSYNC_SANDBOX_TOKEN', 'chaine', '', 'Qonto Sandbox Token', 0),
+			// Payment mode
 			array('QONTOSYNC_PM_TRANSFER', 'chaine', '', 'Payment Mode for Transfer', 0),
 			array('QONTOSYNC_PM_CARD', 'chaine', '', 'Payment Mode for Card', 0),
 			array('QONTOSYNC_PM_DD', 'chaine', '', 'Payment Mode for Direct Debit', 0),
 			array('QONTOSYNC_PM_CHECK', 'chaine', '', 'Payment Mode for Check', 0),
+			// Tolerance for bank matching (date +/7 days by default)
+			array('QONTOSYNC_TOLERANCE_DAYS', 'chaine', '7', 'Tolerance in days for bank matching', 0),
 		);
 
 		// Permissions
