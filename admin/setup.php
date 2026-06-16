@@ -1,9 +1,9 @@
 <?php
 /*
- *  QontoSync dolibarr module 
- *  @file       setup.php
- *  @author     Gaëtan COURTOIS
- *  @license    GPLv3
+ * QontoSync dolibarr module 
+ * @file       setup.php
+ * @author     Gaëtan COURTOIS
+ * @license    GPLv3
  */
 
 $res = 0;
@@ -16,8 +16,7 @@ dol_include_once('/core/lib/admin.lib.php');
 dol_include_once('/core/class/html.form.class.php');
 dol_include_once('/qontosync/class/qontoapi.class.php');
 
-$langs->loadLangs(array("admin", "qontosync@qontosync"));
-
+$langs->loadLangs(array("admin", "qontosync@qontosync", "bills", "banks", "compta"));
 
 // Check if user is admin
 if (!$user->admin) {
@@ -51,19 +50,19 @@ if ($action == 'update') {
 		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
 		$action = '';
 	} else {
-	dolibarr_set_const($db, 'QONTOSYNC_API_KEY', $apikey, 'chaine', 0, '', $conf->entity);
-	dolibarr_set_const($db, 'QONTOSYNC_SLUG', $slug, 'chaine', 0, '', $conf->entity);
-	dolibarr_set_const($db, 'QONTOSYNC_SANDBOX', $sandbox, 'chaine', 0, '', $conf->entity);
-	dolibarr_set_const($db, 'QONTOSYNC_SANDBOX_TOKEN', $sandbox_token, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'QONTOSYNC_API_KEY', $apikey, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'QONTOSYNC_SLUG', $slug, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'QONTOSYNC_SANDBOX', $sandbox, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'QONTOSYNC_SANDBOX_TOKEN', $sandbox_token, 'chaine', 0, '', $conf->entity);
 
-	dolibarr_set_const($db, 'QONTOSYNC_PM_TRANSFER', $pm_transfer, 'chaine', 0, '', $conf->entity);
-	dolibarr_set_const($db, 'QONTOSYNC_PM_CARD', $pm_card, 'chaine', 0, '', $conf->entity);
-	dolibarr_set_const($db, 'QONTOSYNC_PM_DD', $pm_dd, 'chaine', 0, '', $conf->entity);
-	dolibarr_set_const($db, 'QONTOSYNC_PM_CHECK', $pm_check, 'chaine', 0, '', $conf->entity);
-	
-	dolibarr_set_const($db, 'QONTOSYNC_TOLERANCE_DAYS', $tolerance_days, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'QONTOSYNC_PM_TRANSFER', $pm_transfer, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'QONTOSYNC_PM_CARD', $pm_card, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'QONTOSYNC_PM_DD', $pm_dd, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'QONTOSYNC_PM_CHECK', $pm_check, 'chaine', 0, '', $conf->entity);
+		
+		dolibarr_set_const($db, 'QONTOSYNC_TOLERANCE_DAYS', $tolerance_days, 'chaine', 0, '', $conf->entity);
 
-	setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
+		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
 	}
 }
 
@@ -75,15 +74,15 @@ if ($action == 'test') {
 		$action = '';
 	} else {
 		if (empty($apikey) || empty($slug)) {
-		setEventMessages($langs->trans("NoParameters"), null, 'warnings');
-	} else {
-		$api = new QontoApi($apikey, $slug, $sandbox, $sandbox_token);
-		if ($api->testConnection() === false) {
-			setEventMessages($langs->trans("ConnectionError"), null, 'errors');
+			setEventMessages($langs->trans("NoParameters"), null, 'warnings');
 		} else {
-			setEventMessages($langs->trans("Connected"), null, 'mesgs');
+			$api = new QontoApi($apikey, $slug, $sandbox, $sandbox_token);
+			if ($api->testConnection() === false) {
+				setEventMessages($langs->trans("ConnectionError"), null, 'errors');
+			} else {
+				setEventMessages($langs->trans("Connected"), null, 'mesgs');
+			}
 		}
-	}
 	}
 }
 
@@ -92,9 +91,20 @@ $sql = "SELECT id, code, libelle FROM " . MAIN_DB_PREFIX . "c_paiement WHERE act
 $resql = $db->query($sql);
 $payment_modes = array();
 $payment_modes[''] = '-- ' . $langs->trans("Select") . ' --';
+
 if ($resql) {
 	while ($obj = $db->fetch_object($resql)) {
-		$payment_modes[$obj->id] = $obj->libelle . ' (' . $obj->code . ')';
+		$trans_key = "PaymentTypeShort" . $obj->code;
+		$translated_label = $langs->trans($trans_key);
+		
+		if ($translated_label == $trans_key) {
+			$translated_label = $langs->trans($obj->code);
+			if ($translated_label == $obj->code) {
+				$translated_label = $obj->libelle;
+			}
+		}
+		
+		$payment_modes[$obj->id] = $translated_label . ' (' . $obj->code . ')';
 	}
 	$db->free($resql);
 }
@@ -169,7 +179,7 @@ print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSyncToleranceDays").'<br><span class="opacitymedium small">'.$langs->trans("QontoSyncToleranceDaysTooltip").'</span></td>';
 // if empty, set 7 by default
 $val_tolerance = getDolGlobalString('QONTOSYNC_TOLERANCE_DAYS') !== '' ? getDolGlobalString('QONTOSYNC_TOLERANCE_DAYS') : '7';
-print '<td><input type="number" min="0" max="365" size="5" name="QONTOSYNC_TOLERANCE_DAYS" value="'.$val_tolerance.'"> jours</td>';
+print '<td><input type="number" min="0" max="365" size="5" name="QONTOSYNC_TOLERANCE_DAYS" value="'.$val_tolerance.'"></td>';
 print '</tr>';
 
 print '</table>';
