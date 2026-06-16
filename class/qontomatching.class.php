@@ -679,4 +679,350 @@ class QontoMatching
 			return -1;
 		}
 	}
+	
+	/**
+	 * Update selected entries with the Qonto transaction (Multiple documents)
+	 *
+	 * @param string $type            Document type ('cinv', 'sinv', 'vat')
+	 * @param array  $amounts_array   Array of document ID => imputed amount
+	 * @param array  $qonto_trx       Qonto transaction data
+	 * @param int    $bank_account_id Bank account ID
+	 * @return int 1 on success, -1 on error
+	 */
+	public function updateAdvanced($type, $amounts_array, $qonto_trx, $bank_account_id = 0)
+	{
+		global $conf, $user;
+	
+		if (empty($type) || empty($amounts_array) || !is_array($amounts_array) || empty($qonto_trx) || !is_array($qonto_trx)) {
+			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
+			return -1;
+		}
+
+		// Init SQL transaction
+		$this->db->begin();
+
+		// Real-time check to explicitly bypass cache
+		if ($this->isLinked($qonto_trx['id'], $bank_account_id, false) !== 0) {
+			$this->db->rollback();
+			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
+			return -1;
+		}
+
+		$error = 0;
+
+		// Lazy load QontoRepository functions
+		if (!class_exists('QontoRepository')) {
+			dol_include_once('/qontosync/class/qontorepository.class.php');
+		}
+		
+		$qontoRepo = new QontoRepository($this->db);
+		
+		$op_type = isset($qonto_trx['operation_type']) ? $qonto_trx['operation_type'] : '';
+		$mop = $qontoRepo->getPaymentModeId($op_type, isset($qonto_trx['side']) ? $qonto_trx['side'] : '');
+		
+		// Extract bank identifier based on operation type
+		$emitter_name = '';
+		$emitter_bank_name = '';
+		if (!empty($op_type) && isset($qonto_trx[$op_type]['counterparty_bank_identifier'])) {
+			$emitter_bank_name = $qonto_trx[$op_type]['counterparty_bank_identifier'];
+		}
+
+		// Extract transfer/check number if available
+		$num_chq = '';
+		if ($op_type == 'check') {
+			$num_chq = isset($qonto_trx['check']['check_number']) ? $qonto_trx['check']['check_number'] : '';
+		} elseif ($op_type == 'direct_debit_collection') {
+			$num_chq = isset($qonto_trx['direct_debit_collection']['unique_mandate_reference']) ? $qonto_trx['direct_debit_collection']['unique_mandate_reference'] : '';
+		} else {
+			$num_chq = isset($qonto_trx['reference']) ? $qonto_trx['reference'] : '';
+		}
+
+		// Extract statement reference
+		$ref_releve = '';
+		if (isset($qonto_trx['settled_at'])) {
+			$ref_releve = date('Y-m', strtotime($qonto_trx['settled_at']));
+		}
+		
+		$first_socid = 0;
+		$payment_label_ref = '';
+
+		switch ($type) {
+			case 'cinv':
+				if (empty($conf->facture->enabled)) {
+					dol_syslog(__METHOD__ . ": Customer Invoice module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
+
+				if (!class_exists('Paiement')) dol_include_once('/compta/paiement/class/paiement.class.php');
+				if (!class_exists('Facture')) dol_include_once('/compta/facture/class/facture.class.php');
+				
+				$payment = new Paiement($this->db);
+				$payment->datepaye      = strtotime($qonto_trx['settled_at']);
+				$payment->fk_account    = $bank_account_id;
+				$payment->paiementid    = $mop;
+				$payment->num_payment   = $num_chq;
+				
+				$valid_amounts = array();
+				
+				foreach ($amounts_array as $doc_id => $amount) {
+					$invoice = new Facture($this->db);
+					if ($invoice->fetch($doc_id) > 0) {
+						
+						// Retrieve thirdparty info for the first document to populate the bank line
+						if ($first_socid == 0) {
+							$first_socid = $invoice->fk_soc;
+							$invoice->fetch_thirdparty();
+							$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
+						} 
+
+						// Handle Credit Notes by applying a negative sign to the payment amount
+						$pay_amount = abs((float)$amount);
+						if ($invoice->type == 2 || $invoice->total_ttc < 0) {
+							$pay_amount = -$pay_amount;
+						}
+						
+						$valid_amounts[$doc_id] = $pay_amount;
+						$payment_label_ref .= $invoice->ref . ', ';
+					} else {
+						$error++;
+					}
+				}
+				
+				if ($error > 0) break;
+				
+				$payment->amounts = $valid_amounts;
+				$payment_label_ref = rtrim($payment_label_ref, ', ');
+				
+				// Attempt to create a payment on the invoices (arg 1 = auto close)
+				$run = $payment->create($user, 1);
+				if ($run > 0) {
+					// Attempt to push the payment to the bank					
+					$bank_line = $payment->addPaymentToBank(
+						$user,
+						'payment',
+						'(Payment) ' . $payment_label_ref,
+						$bank_account_id,
+						$emitter_name,
+						$emitter_bank_name
+					);
+					
+					if($bank_line > 0) {
+						if (!class_exists('AccountLine')) dol_include_once('/compta/bank/class/account.class.php');
+						$line = new AccountLine($this->db);				
+						
+						if ($line->fetch($bank_line) > 0) {
+							$line->label = isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $payment_label_ref;
+							$line->datev = strtotime($qonto_trx['settled_at']);
+							$line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
+							
+							$update = $line->update($user);
+							if ($update > 0) {
+								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
+								if ($run < 0) { $error++; }
+							} else {
+								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
+								$error++;
+							}
+						} else {
+							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
+							$error++;
+						}
+					} else {
+						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
+						$error++;
+					}
+				} else {
+					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
+					$error++;
+				}
+				break;
+				
+			case 'sinv':
+				if (empty($conf->fournisseur->enabled)) {
+					dol_syslog(__METHOD__ . ": Supplier Invoice module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
+
+				if (!class_exists('PaiementFourn')) dol_include_once('/fourn/class/paiementfourn.class.php');
+				if (!class_exists('FactureFournisseur')) dol_include_once('/fourn/class/fournisseur.facture.class.php');
+				
+				$payment = new PaiementFourn($this->db);
+				$payment->datepaye      = strtotime($qonto_trx['settled_at']);
+				$payment->fk_account    = $bank_account_id;
+				$payment->paiementid    = $mop;
+				$payment->num_payment   = $num_chq;
+				
+				$valid_amounts = array();
+				
+				foreach ($amounts_array as $doc_id => $amount) {
+					$invoice = new FactureFournisseur($this->db);
+					if ($invoice->fetch($doc_id) > 0) {
+						if ($first_socid == 0) {
+							$first_socid = $invoice->fk_soc;
+							$invoice->fetch_thirdparty();
+							$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
+						}
+
+						$pay_amount = abs((float)$amount);
+						if ($invoice->type == 2 || $invoice->total_ttc < 0) {
+							$pay_amount = -$pay_amount;
+						}
+						
+						$valid_amounts[$doc_id] = $pay_amount;
+						$payment_label_ref .= $invoice->ref . ', ';
+					} else {
+						$error++;
+					}
+				}
+				
+				if ($error > 0) break;
+				
+				$payment->amounts = $valid_amounts;
+				$payment_label_ref = rtrim($payment_label_ref, ', ');
+				
+				$run = $payment->create($user, 1);
+				if ($run > 0) {
+					$bank_line = $payment->addPaymentToBank(
+						$user,
+						'payment_supplier',
+						'(Payment) ' . $payment_label_ref,
+						$bank_account_id,
+						$emitter_name,
+						$emitter_bank_name
+					);
+					
+					if($bank_line > 0) {
+						if (!class_exists('AccountLine')) dol_include_once('/compta/bank/class/account.class.php');
+						$line = new AccountLine($this->db);				
+						
+						if ($line->fetch($bank_line) > 0) {
+							$line->label = isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $payment_label_ref;
+							$line->datev = strtotime($qonto_trx['settled_at']);
+							$line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
+							
+							$update = $line->update($user);
+							if ($update > 0) {
+								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
+								if ($run < 0) { $error++; }
+							} else {
+								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
+								$error++;
+							}
+						} else {
+							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
+							$error++;
+						}
+					} else {
+						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
+						$error++;
+					}
+				} else {
+					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
+					$error++;
+				}
+				break;
+			
+			case 'vat':
+				if (empty($conf->tax->enabled)) {
+					dol_syslog(__METHOD__ . ": Tax/VAT module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
+
+				if (!class_exists('PaymentVat')) dol_include_once('/compta/tva/class/paymentvat.class.php');
+				if (!class_exists('Tva')) dol_include_once('/compta/tva/class/tva.class.php');
+				
+				$payment = new PaymentVat($this->db);
+				$payment->datepaye      = strtotime($qonto_trx['settled_at']);
+				$payment->fk_bank       = $bank_account_id;
+				$payment->paiementtype  = $mop;
+				$payment->num_payment   = $num_chq;
+				
+				$valid_amounts = array();
+				
+				foreach ($amounts_array as $doc_id => $amount) {
+					$vat = new Tva($this->db);
+					if ($vat->fetch($doc_id) > 0) {
+						$pay_amount = abs((float)$amount);
+						if ($vat->amount < 0) {
+							$pay_amount = -$pay_amount;
+						}
+						$valid_amounts[$doc_id] = $pay_amount;
+						$payment_label_ref .= $vat->ref . ', ';
+					} else {
+						$error++;
+					}
+				}
+				
+				if ($error > 0) break;
+				
+				$payment->amounts = $valid_amounts;
+				// VAT payment assigns main reference to the first item
+				reset($valid_amounts);
+				$payment->chid = key($valid_amounts);
+				$payment_label_ref = rtrim($payment_label_ref, ', ');
+				
+				$run = $payment->create($user, 1);
+				if ($run > 0) {
+					$bank_line = $payment->addPaymentToBank(
+						$user,
+						'payment_vat',
+						'(VATPayment) ' . $payment_label_ref,
+						$bank_account_id,
+						$emitter_name,
+						$emitter_bank_name
+					);
+					
+					// Workaround: PaymentVAT::addPaymentToBank() always returns 1 on success instead of bank_line_id
+					if ($bank_line > 0) {
+						$payment->fetch($payment->id);
+						$bank_line = $payment->fk_bank;
+					}
+					
+					if($bank_line > 0) {
+						if (!class_exists('AccountLine')) dol_include_once('/compta/bank/class/account.class.php');
+						$line = new AccountLine($this->db);
+						
+						if ($line->fetch($bank_line) > 0) {
+							$line->label = isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $payment_label_ref;
+							$line->datev = strtotime($qonto_trx['settled_at']);
+							$line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
+							
+							$update = $line->update($user);
+							if ($update > 0) {
+								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
+								if ($run < 0) { $error++; }
+							} else {
+								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
+								$error++;
+							}
+						} else {
+							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
+							$error++;
+						}
+					} else {
+						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
+						$error++;
+					}
+				} else {
+					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
+					$error++;
+				}
+				break;
+			
+			default:
+				break;
+		}
+	
+		if ($error === 0) {
+			$this->db->commit();
+			dol_syslog(__METHOD__ . ": Multiple transaction matched successfully.", LOG_INFO);
+			return 1;
+		} else {
+			$this->db->rollback();
+			return -1;
+		}
+	}
 }
