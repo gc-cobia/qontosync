@@ -9,7 +9,7 @@
 class QontoMatching
 {
 	public $db;
-	private $links_cache = array();
+	private $links_cache = array(); // PHP cache to store already linked Qonto IDs
 
 	public function __construct($db)
 	{
@@ -17,11 +17,11 @@ class QontoMatching
 	}
 	
     /**
-	 * Fonction unique pour interroger la base de données (DRY)
-	 * Si $qonto_id est fourni, on cherche un ID précis. Sinon on charge tout le compte.
+	 * Single function to query the database (DRY principle).
+	 * If $qonto_id is provided, it searches for a specific ID. Otherwise, it loads the entire account.
 	 * * @param int $bank_id
 	 * @param string|null $qonto_id
-	 * @return array Tableau associatif [qonto_id => fk_object]
+	 * @return array Associative array [qonto_id => fk_object]
 	 */
 	private function _fetchLinksFromDB($bank_id, $qonto_id = null)
 	{
@@ -41,6 +41,7 @@ class QontoMatching
 		
 		if ($resql) {
 			while ($obj = $this->db->fetch_object($resql)) {
+				// Handle duplicates in the database to prevent linking errors
 				if (!isset($results[$obj->qonto_id])) {
 					$results[$obj->qonto_id] = $obj->fk_object;
 				} else {
@@ -54,7 +55,7 @@ class QontoMatching
 	}
 
     /**
-	 * Charge les liaisons dans le cache PHP pour un compte donné
+	 * Load existing links into the PHP cache for a given bank account.
 	 * * @param int $bank_id
 	 * @param bool $force_reload
 	 */
@@ -66,10 +67,11 @@ class QontoMatching
 	}
 
 	/**
-	 * Verify if a transaction is already linked
+	 * Verify if a transaction is already linked.
 	 *
 	 * @param string $qonto_id Qonto transaction ID
 	 * @param int $bank_id Bank account id
+	 * @param bool $cache Set to false to force a real-time database query
 	 * @return int linked_rowid if linked, 0 if not linked, -1 if error (too many links)
 	 */
 	public function isLinked($qonto_id, $bank_id, $cache = true)
@@ -79,12 +81,12 @@ class QontoMatching
 			return 0;
 		}
 		
-		// Mode CACHE
+		// CACHE Mode: Used for batch processing and listing to avoid N+1 query overhead
 		if ($cache) {
 			$this->loadLinksCache($bank_id);
 			return isset($this->links_cache[$bank_id][$qonto_id]) ? $this->links_cache[$bank_id][$qonto_id] : 0;
 		
-		// Mode REALTIME
+		// REALTIME Mode: Used during insert/update to strictly avoid race conditions
 	    } else {
 			$result = $this->_fetchLinksFromDB($bank_id, $qonto_id);
 			return isset($result[$qonto_id]) ? $result[$qonto_id] : 0;
@@ -105,7 +107,7 @@ class QontoMatching
 			return array();
 		}
 
-		# Tempory fast mode: only not fast
+		# Temporary fast mode: only not fast
 		
 		// Load utils functions
 		$qontoRepo = new QontoRepository($this->db);
@@ -120,8 +122,10 @@ class QontoMatching
 		
 		$entries = array();
 		
+		// 1. Pre-load the links cache for the whole account
 		$this->loadLinksCache($bank_id);
 		
+		// 2. Pre-fetch unlinked bank lines to prevent N+1 queries in the loop
 		$unlinked_bank_lines = array();
 		$sql_bank = "SELECT b.rowid, b.amount, b.label, b.datev ";
 		$sql_bank .= "FROM " . MAIN_DB_PREFIX . "bank as b ";
@@ -147,12 +151,12 @@ class QontoMatching
 			
 			$t['amount'] = isset($t['amount']) ? (float)$t['amount'] : 0.0;
 			
-			// Correct the sign amount due to the side mouvement
+			// Correct the sign amount due to the side movement
 			if (isset($t['side']) && $t['side'] == 'debit') {
 				$t['amount'] = -$t['amount'];
 			}
 
-			// Verify if transaction is already linked in the selected bank account using cache
+			// Verify if transaction is already linked using the cached data
 			$link_status = $this->isLinked($t['id'], $bank_id);
 			
 			if ($link_status === -1) {
@@ -163,7 +167,7 @@ class QontoMatching
 			} else {
 				$t["trx_status"] = "unlinked";
 				
-				// Load unpaid items ONCE if not already loaded
+				// Lazy load unpaid items ONCE if not already loaded
 				if (!$items_loaded) {
 					$unpaid_docs = $qontoRepo->getUnpaidDocuments('all');
 		
@@ -174,8 +178,10 @@ class QontoMatching
 					$items_loaded = true;
 				}
 				
+				// Search for matching amounts within the pre-fetched unlinked bank lines
 				$qonto_amount_bank = (float)$t['amount'];
                 foreach ($unlinked_bank_lines as $b_line) {
+					// Use Dolibarr's price2num function to safely compare floats
                     if (price2num((float)$b_line->amount, 'MT') == price2num($qonto_amount_bank, 'MT')) {
                         $t["trx"][] = clone $b_line;
                     }
@@ -192,21 +198,21 @@ class QontoMatching
 				// Compare transactions amount with unpaid customers invoices amount
 				foreach ($unpaid_c_invoices as $c_inv) {
 					if (price2num(abs((float)$c_inv->amount), 'MT') == price2num($qonto_amount, 'MT')) {
-						$t["c_invoices"][] = $c_inv;
+						$t["c_invoices"][] = clone $c_inv;
 					}
 				}
 				
 				// Compare transactions amount with unpaid suppliers invoices amount
 				foreach ($unpaid_s_invoices as $s_inv) {
 					if (price2num(abs((float)$s_inv->amount), 'MT') == price2num($qonto_amount, 'MT')) {
-						$t["s_invoices"][] = $s_inv;
+						$t["s_invoices"][] = clone $s_inv;
 					}
 				}
 
 				// Compare transactions amount with unpaid VAT
 				foreach ($unpaid_vat as $vat) {
 					if (price2num(abs((float)$vat->amount), 'MT') == price2num($qonto_amount, 'MT')) {
-						$t["vat"][] = $vat;
+						$t["vat"][] = clone $vat;
 					}
 				}
 			}
@@ -220,7 +226,7 @@ class QontoMatching
 	}
 
 	/**
-	 * Link a Qonto transaction ID to a Dolibarr bank entrie
+	 * Link a Qonto transaction ID to a Dolibarr bank entry
 	 *
 	 * @param int $bank_line_id
 	 * @param string $qonto_id
@@ -236,8 +242,7 @@ class QontoMatching
 			return -1;
 		}
 		
-		
-		// Verify if the bank line exists
+		// Lazy load AccountLine class if needed
 		if (!class_exists('AccountLine')) {
 			dol_include_once('/compta/bank/class/account.class.php');
 		}
@@ -245,11 +250,12 @@ class QontoMatching
 		$bank = new AccountLine($this->db);
 		$res = $bank->fetch($bank_line_id);
 		
+		// Verify if the bank line exists
 		if ($res <= 0) {
 			return -1;
 		}
 		
-		// Load extrafields definitions
+		// Lazy load ExtraFields class
 		if (!class_exists('ExtraFields')) {
 			dol_include_once('/core/class/extrafields.class.php');
 		}	
@@ -258,15 +264,15 @@ class QontoMatching
 		$extrafields->fetch_name_optionals_label($bank->table_element);
 		$bank->fetch_optionals();
 		
-		// Assign the value to the extrafield
+		// Assign the Qonto ID to the target extrafield
 		$bank->array_options['options_qonto_id'] = $qonto_id;
 	
-		// Try to update the specific field
+		// Try to update the specific extrafield
 		$res = $bank->updateExtraField('qonto_id');
 		
-		// If the result is 0 (the line does not exist yet in the extrafields table) or < 0 (error)
+		// If the result is 0 (the row does not exist yet in the extrafields table) or < 0 (error)
 		if ($res <= 0) {
-			// Force the creation of the complete line
+			// Force the creation of the complete row
 			$res = $bank->insertExtraFields();
 			
 			if ($res <= 0) {
@@ -275,7 +281,7 @@ class QontoMatching
 			}
 		}
 		
-		// Update the bank line with the statement rapprochement
+		// Update the bank line with the statement reference
 		$bank->num_releve = $ref_releve;
 		$res = $bank->update_conciliation($user, null, 1);
 		if ($res <= 0) {
@@ -287,7 +293,7 @@ class QontoMatching
 	}
 	
 	/**
-	* Updating selected entrie with the qonto transaction
+	* Update selected entry with the Qonto transaction
 	*
 	* @param string $target
 	* @param array $qonto_trx
@@ -303,7 +309,7 @@ class QontoMatching
 			return false;
 		}
 
-		// Explode target type & rowid
+		// Explode target string into type & rowid
 		$parts = explode('_', $target, 2);
 		if (count($parts) == 2) {
 			$type = $parts[0];
@@ -315,7 +321,7 @@ class QontoMatching
 		// Init SQL transaction
 		$this->db->begin();
 
-		// Check if Qonto ID already exists (REALTIME)
+		// Check if Qonto ID already exists (REALTIME check, explicitly bypass cache)
         if ($this->isLinked($qonto_trx['id'], $bank_account_id, false) !== 0) {
 			$this->db->rollback();
 			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
@@ -325,7 +331,7 @@ class QontoMatching
 		// Init error counter
 		$error = 0;
 
-		// Load utils functions
+		// Lazy load QontoRepository functions
 		if (!class_exists('QontoRepository')) {
 			dol_include_once('/qontosync/class/qontorepository.class.php');
 		}
@@ -366,7 +372,7 @@ class QontoMatching
 		
 		switch ($type) {
 			case 'bank':
-				// Trying to link the transaction
+				// Attempt to link the transaction directly
 				$run = $this->linkTransaction($rowid, $qonto_trx['id'], $ref_releve);
 				if ($run < 0) {
 					dol_syslog(__METHOD__ . ": Error, can not link the transaction", LOG_ERR);
@@ -402,7 +408,7 @@ class QontoMatching
 				$payment->num_payment	= $num_chq;
 				$payment->amounts		= array($invoice->id => $pay_amount);
 				
-				// Trying to create a payment on the invoice (arg 1 = auto close)
+				// Attempt to create a payment on the invoice (arg 1 = auto close)
 				$run = $payment->create($user, 1);
 				if ($run > 0) {
 					$invoice->fetch($rowid);
@@ -411,7 +417,7 @@ class QontoMatching
 					$invoice->fetch_thirdparty();
 					$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
 
-					// Trying to push the payment to bank					
+					// Attempt to push the payment to the bank					
 					$bank_line = $payment->addPaymentToBank(
 						$user,
 						'payment',
@@ -489,7 +495,7 @@ class QontoMatching
 				$payment->num_payment	= $num_chq;
 				$payment->amounts		= array($invoice->id => $pay_amount);
 				
-				// Trying to create a payment on the supplier invoice (arg 1 = auto close)
+				// Attempt to create a payment on the supplier invoice (arg 1 = auto close)
 				$run = $payment->create($user, 1);
 				if ($run > 0) {
 					$invoice->fetch($rowid);
@@ -500,7 +506,7 @@ class QontoMatching
 						$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
 					}
 					
-					// Trying to push the payment to bank
+					// Attempt to push the payment to the bank
 					$bank_line = $payment->addPaymentToBank(
 						$user,
 						'payment_supplier',
@@ -578,7 +584,7 @@ class QontoMatching
 				$payment->amounts			= array($vat->id => $pay_amount);
 				$payment->chid				= $rowid;
 				
-				// Trying to create a payment on the vat (arg 1 = auto close)
+				// Attempt to create a payment on the vat (arg 1 = auto close)
 				$run = $payment->create($user, 1);
 				if ($run > 0) {
 					$vat->fetch($rowid);
@@ -589,7 +595,7 @@ class QontoMatching
 						$emitter_name = is_object($vat->thirdparty) ? $vat->thirdparty->name : '';
 					}
 					
-					// Trying to push the payment to bank
+					// Attempt to push the payment to the bank
 					$bank_line = $payment->addPaymentToBank(
 						$user,
 						'payment_vat',
