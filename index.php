@@ -1,9 +1,9 @@
 <?php
 /*
- *  QontoSync dolibarr module 
- *  @file       index.php
- *  @author     Gaëtan COURTOIS
- *  @license    GPLv3
+ * QontoSync dolibarr module 
+ * @file       index.php
+ * @author     Gaëtan COURTOIS
+ * @license    GPLv3
  */
 
 $res = 0;
@@ -18,7 +18,6 @@ dol_include_once('/qontosync/class/qontomatching.class.php');
 dol_include_once('/qontosync/lib/qontosync.lib.php');
 
 $matching = new QontoMatching($db);
-
 
 $langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compta"));
 
@@ -43,9 +42,8 @@ $bank_rowid = GETPOST('bank_rowid','int');
 $month = GETPOST('month', 'int') ? GETPOST('month', 'int') : date('m');
 $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 
-
 // Fetch transactions before processing link or displaying search
-if (!empty($bank_rowid) && $bank_rowid > 0 && ($action == 'search' || $action == 'batch_link')) {
+if (!empty($bank_rowid) && $bank_rowid > 0 && ($action == 'search' || $action == 'batch_link' || $action == 'process_advanced_match')) {
     
 	// Init variables
 	$transactions = null;
@@ -66,9 +64,98 @@ if (!empty($bank_rowid) && $bank_rowid > 0 && ($action == 'search' || $action ==
 	$transactions = $api->getTransactions($selected_iban, $dateStart, $dateEnd);
 }
 
-// Link transaction if form has been submitted
-if ($action == 'batch_link') {
+// Process advanced match from modal
+if ($action == 'process_advanced_match') {
+	// Check CSRF token
+	if (GETPOST('token', 'alpha') !== currentToken()) {
+		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
+	} else {
+		$qonto_id = GETPOST('qonto_id', 'alphanohtml');
+		$link_docs = GETPOST('link_doc', 'array');
+		
+		if (empty($qonto_id) || empty($bank_rowid) || empty($link_docs) || !is_array($link_docs)) {
+			setEventMessages($langs->trans("NoTransactionToLink"), null, 'warnings');
+		} else {
+			// Find the correct transaction securely from the API payload
+			$selected_trx = null;
+			if (is_array($transactions)) {
+				foreach ($transactions as $t) {
+					if ($t['id'] === $qonto_id) {
+						$selected_trx = $t;
+						break;
+					}
+				}
+			}
+			
+			if (empty($selected_trx)) {
+				setEventMessages($langs->trans("ErrorFetchingTransactions"), null, 'errors');
+			} else {
+				$qonto_amount = (float)$selected_trx['amount'];
+				if (isset($selected_trx['side']) && $selected_trx['side'] == 'debit') {
+					$qonto_amount = -$qonto_amount;
+				}
+				$qonto_amount_abs = abs($qonto_amount);
+				
+				$amounts_array = array();
+				$doc_type = '';
+				$total_imputed = 0.0;
+				$error = 0;
+				
+				// Iterate through submitted documents
+				foreach ($link_docs as $doc) {
+					$parts = explode('_', $doc, 2);
+					if (count($parts) == 2) {
+						$current_type = $parts[0];
+						$doc_id = (int)$parts[1];
+						
+						// Ensure strict accounting logic: only one family of document per bank line
+						if (empty($doc_type)) {
+							$doc_type = $current_type;
+						} elseif ($doc_type !== $current_type) {
+							setEventMessages($langs->trans("ErrorMixedDocumentTypes"), null, 'errors');
+							$error++;
+							break;
+						}
+						
+						// Retrieve the input amount associated to the checked document
+						$input_name = 'amount_' . $current_type . '_' . $doc_id;
+						$imputed_amount = (float)price2num(GETPOST($input_name, 'alphanohtml'));
+						
+						if ($imputed_amount > 0) {
+							$amounts_array[$doc_id] = $imputed_amount;
+							$total_imputed += $imputed_amount;
+						}
+					}
+				}
+				
+				if ($error == 0 && empty($amounts_array)) {
+					setEventMessages($langs->trans("ErrorNoAmountSpecified"), null, 'errors');
+					$error++;
+				}
+				
+				// Verify coherence: sum of payments must not exceed Qonto transaction amount
+				if ($error == 0 && price2num($total_imputed, 'MT') > price2num($qonto_amount_abs, 'MT')) {
+					setEventMessages($langs->trans("ErrorImputedAmountExceeds"), null, 'errors');
+					$error++;
+				}
+				
+				if ($error == 0) {
+					// Call the advanced matching method
+					$res = $matching->updateAdvanced($doc_type, $amounts_array, $selected_trx, $bank_rowid);
+					
+					if ($res > 0) {
+						setEventMessages($langs->trans("TransactionSuccessfullyLinked"), null, 'mesgs');
+					} else {
+						setEventMessages($langs->trans("FailedToLinkTransaction"), null, 'errors');
+					}
+				}
+			}
+		}
+	}
+}
 
+// Link transaction if form has been submitted (Standard batch link)
+if ($action == 'batch_link') {
 	// Check CSRF token
 	if (GETPOST('token', 'alpha') !== currentToken()) {
 		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
@@ -101,7 +188,7 @@ if ($action == 'batch_link') {
                 }
 
                 if ($selected_trx) {
-                    // Trying to Link
+                    // Attempt to link
                     $res = $matching->update($target, $selected_trx, $bank_rowid);
                     if ($res > 0) {
                         $success_count++;
@@ -110,7 +197,6 @@ if ($action == 'batch_link') {
                     }
                 }
             }
-
 
             // Global notification to the user
             if ($success_count > 0 || $error_count > 0) {
@@ -133,7 +219,7 @@ QontoSyncLib::printPageBegin();
 QontoSyncLib::printSearchForm($month, $year, $bank_rowid);
 
 // Print search results table if form has been submitted
-if (($action == 'search' || $action == 'batch_link')) {
+if (($action == 'search' || $action == 'batch_link' || $action == 'process_advanced_match')) {
 	if (!empty($bank_rowid) && $bank_rowid > 0) {
 		if ($transactions === false) {
 			setEventMessages($langs->trans("ErrorFetchingTransactions"), null, 'errors');
