@@ -6,25 +6,63 @@
  * @license    GPLv3
  */
 
-dol_include_once('/core/class/extrafields.class.php');
-dol_include_once('/compta/bank/class/account.class.php');
-dol_include_once('/compta/facture/class/facture.class.php');
-dol_include_once('/compta/paiement/class/paiement.class.php');
-dol_include_once('/compta/tva/class/tva.class.php');
-dol_include_once('/compta/tva/class/paymentvat.class.php');
-dol_include_once('/fourn/class/fournisseur.facture.class.php');
-dol_include_once('/fourn/class/paiementfourn.class.php');
-
-dol_include_once('/qontosync/class/qontorepository.class.php');
-
-
 class QontoMatching
 {
 	public $db;
+	private $links_cache = array();
 
 	public function __construct($db)
 	{
 		$this->db = $db;
+	}
+	
+    /**
+	 * Fonction unique pour interroger la base de données (DRY)
+	 * Si $qonto_id est fourni, on cherche un ID précis. Sinon on charge tout le compte.
+	 * * @param int $bank_id
+	 * @param string|null $qonto_id
+	 * @return array Tableau associatif [qonto_id => fk_object]
+	 */
+	private function _fetchLinksFromDB($bank_id, $qonto_id = null)
+	{
+		$sql = "SELECT ef.qonto_id, ef.fk_object ";
+		$sql .= "FROM " . MAIN_DB_PREFIX . "bank_extrafields as ef ";
+		$sql .= "JOIN " . MAIN_DB_PREFIX . "bank as b ON ef.fk_object = b.rowid ";
+		$sql .= "WHERE b.fk_account = " . (int) $bank_id . " ";
+		
+        if ($qonto_id !== null) {
+			$sql .= "AND ef.qonto_id = '" . $this->db->escape($qonto_id) . "'";
+		} else {
+			$sql .= "AND ef.qonto_id IS NOT NULL AND ef.qonto_id != ''";
+		}
+
+		$resql = $this->db->query($sql);
+		$results = array();
+		
+		if ($resql) {
+			while ($obj = $this->db->fetch_object($resql)) {
+				if (!isset($results[$obj->qonto_id])) {
+					$results[$obj->qonto_id] = $obj->fk_object;
+				} else {
+					$results[$obj->qonto_id] = -1; 
+				}
+			}
+			$this->db->free($resql);
+		}
+		
+		return $results;
+	}
+
+    /**
+	 * Charge les liaisons dans le cache PHP pour un compte donné
+	 * * @param int $bank_id
+	 * @param bool $force_reload
+	 */
+	public function loadLinksCache($bank_id, $force_reload = false)
+	{
+		if ($force_reload || !isset($this->links_cache[$bank_id])) {
+			$this->links_cache[$bank_id] = $this->_fetchLinksFromDB($bank_id);
+		}
 	}
 
 	/**
@@ -34,37 +72,23 @@ class QontoMatching
 	 * @param int $bank_id Bank account id
 	 * @return int linked_rowid if linked, 0 if not linked, -1 if error (too many links)
 	 */
-	public function isLinked($qonto_id, $bank_id)
+	public function isLinked($qonto_id, $bank_id, $cache = true)
 	{
 		if (empty($qonto_id) || empty($bank_id)) {
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return 0;
 		}
 		
-		$sql = "SELECT ef.fk_object ";
-		$sql .= "FROM " . MAIN_DB_PREFIX . "bank_extrafields as ef ";
-		$sql .= "JOIN " . MAIN_DB_PREFIX . "bank as b ON ef.fk_object = b.rowid ";
-		$sql .= "WHERE ef.qonto_id = '" . $this->db->escape($qonto_id) . "' ";
-		$sql .= "AND b.fk_account = " . (int) $bank_id;
+		// Mode CACHE
+		if ($cache) {
+			$this->loadLinksCache($bank_id);
+			return isset($this->links_cache[$bank_id][$qonto_id]) ? $this->links_cache[$bank_id][$qonto_id] : 0;
 		
-		$resql = $this->db->query($sql);
-		
-		if ($resql) {
-			$num_rows = $this->db->num_rows($resql);
-			
-			if ($num_rows == 1) {
-				$obj = $this->db->fetch_object($resql);
-				$linked_id = $obj->fk_object;
-				$this->db->free($resql);
-				return $linked_id;
-			} elseif ($num_rows > 1) {
-				$this->db->free($resql);
-				return -1;
-			}
-			$this->db->free($resql);
+		// Mode REALTIME
+	    } else {
+			$result = $this->_fetchLinksFromDB($bank_id, $qonto_id);
+			return isset($result[$qonto_id]) ? $result[$qonto_id] : 0;
 		}
-		
-		return 0;
 	}
 
 	/**
@@ -95,6 +119,23 @@ class QontoMatching
 		$items_loaded = false;
 		
 		$entries = array();
+		
+		$this->loadLinksCache($bank_id);
+		
+		$unlinked_bank_lines = array();
+		$sql_bank = "SELECT b.rowid, b.amount, b.label, b.datev ";
+		$sql_bank .= "FROM " . MAIN_DB_PREFIX . "bank as b ";
+		$sql_bank .= "LEFT JOIN " . MAIN_DB_PREFIX . "bank_extrafields as ef ON ef.fk_object = b.rowid ";
+		$sql_bank .= "WHERE b.fk_account = " . (int)$bank_id . " ";
+		$sql_bank .= "AND (ef.qonto_id IS NULL OR ef.qonto_id = '')";
+		
+		$resql_bank = $this->db->query($sql_bank);
+		if ($resql_bank) {
+			while ($obj = $this->db->fetch_object($resql_bank)) {
+				$unlinked_bank_lines[] = clone $obj;
+			}
+			$this->db->free($resql_bank);
+		}
 
 		foreach($transaction as $t) {
 			if (empty($t['id'])) {
@@ -111,7 +152,7 @@ class QontoMatching
 				$t['amount'] = -$t['amount'];
 			}
 
-			// Verify if transaction is already linked in the selected bank account
+			// Verify if transaction is already linked in the selected bank account using cache
 			$link_status = $this->isLinked($t['id'], $bank_id);
 			
 			if ($link_status === -1) {
@@ -133,21 +174,12 @@ class QontoMatching
 					$items_loaded = true;
 				}
 				
-				// Looking for bank line with same amout and not linked
-				$sql_bank = "SELECT b.rowid, b.amount, b.label, b.datev ";
-				$sql_bank .= "FROM " . MAIN_DB_PREFIX . "bank as b ";
-				$sql_bank .= "LEFT JOIN " . MAIN_DB_PREFIX . "bank_extrafields as ef ON ef.fk_object = b.rowid ";
-				$sql_bank .= "WHERE b.amount = " . (float)$t['amount'] . " ";
-				$sql_bank .= "AND b.fk_account = " . (int)$bank_id . " ";
-				$sql_bank .= "AND (ef.qonto_id IS NULL OR ef.qonto_id = '')";
-
-				$resql_bank = $this->db->query($sql_bank);
-				if ($resql_bank) {
-					while ($obj = $this->db->fetch_object($resql_bank)) {
-						$t["trx"][] = $obj;
-					}
-					$this->db->free($resql_bank);
-				}
+				$qonto_amount_bank = (float)$t['amount'];
+                foreach ($unlinked_bank_lines as $b_line) {
+                    if (price2num((float)$b_line->amount, 'MT') == price2num($qonto_amount_bank, 'MT')) {
+                        $t["trx"][] = clone $b_line;
+                    }
+                }
 			}
 			
 			$t["c_invoices"] = array();
@@ -204,15 +236,24 @@ class QontoMatching
 			return -1;
 		}
 		
+		
+		// Verify if the bank line exists
+		if (!class_exists('AccountLine')) {
+			dol_include_once('/compta/bank/class/account.class.php');
+		}
+		
 		$bank = new AccountLine($this->db);
 		$res = $bank->fetch($bank_line_id);
 		
-		// Verify if the bank line exists
 		if ($res <= 0) {
 			return -1;
 		}
 		
 		// Load extrafields definitions
+		if (!class_exists('ExtraFields')) {
+			dol_include_once('/core/class/extrafields.class.php');
+		}	
+
 		$extrafields = new ExtraFields($this->db);
 		$extrafields->fetch_name_optionals_label($bank->table_element);
 		$bank->fetch_optionals();
@@ -274,8 +315,8 @@ class QontoMatching
 		// Init SQL transaction
 		$this->db->begin();
 
-		// Check if Qonto ID already exists
-		if ($this->isLinked($qonto_trx['id'], $bank_account_id) !== 0) {
+		// Check if Qonto ID already exists (REALTIME)
+        if ($this->isLinked($qonto_trx['id'], $bank_account_id, false) !== 0) {
 			$this->db->rollback();
 			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
 			return -1;
@@ -285,6 +326,10 @@ class QontoMatching
 		$error = 0;
 
 		// Load utils functions
+		if (!class_exists('QontoRepository')) {
+			dol_include_once('/qontosync/class/qontorepository.class.php');
+		}
+		
 		$qontoRepo = new QontoRepository($this->db);
 		
 		// Define operation type string for legacy code use below
@@ -331,7 +376,16 @@ class QontoMatching
 				break;
 
 			case 'cinv':
+	        	if (!class_exists('Paiement')) {
+                    dol_include_once('/compta/paiement/class/paiement.class.php');
+            	}
+            	
 				$payment = new Paiement($this->db);
+            	
+            	if (!class_exists('Facture')) {
+	        	    dol_include_once('/compta/facture/class/facture.class.php');
+            	}
+            	
 				$invoice = new Facture($this->db);
 				
 				if ($invoice->fetch($rowid) <= 0) { $error++; break; }
@@ -369,8 +423,13 @@ class QontoMatching
 					
 					
 					if($bank_line > 0) {
+					    
+                		if (!class_exists('AccountLine')) {
+                			dol_include_once('/compta/bank/class/account.class.php');
+                		}
 					
-						$line = new AccountLine($this->db);						
+						$line = new AccountLine($this->db);				
+						
 						if ($line->fetch($bank_line) > 0) {
 							
 							// Complete bank line with Qonto data
@@ -403,7 +462,17 @@ class QontoMatching
 				break;
 				
 			case 'sinv':
+			    
+        		if (!class_exists('PaiementFourn')) {
+        			dol_include_once('/fourn/class/paiementfourn.class.php');
+        		}
+        		
 				$payment = new PaiementFourn($this->db);
+        		
+        		if (!class_exists('FactureFournisseur')) {
+        			dol_include_once('/fourn/class/fournisseur.facture.class.php');
+        		}
+        		
 				$invoice = new FactureFournisseur($this->db);
 				
 				if ($invoice->fetch($rowid) <= 0) { $error++; break; }
@@ -442,7 +511,13 @@ class QontoMatching
 					);
 					
 					if($bank_line > 0) {
+					    
+                		if (!class_exists('AccountLine')) {
+                			dol_include_once('/compta/bank/class/account.class.php');
+                		}
+                		
 						$line = new AccountLine($this->db);
+						
 						if ($line->fetch($bank_line) > 0) {
 							
 							// Complete bank line with Qonto data
@@ -475,7 +550,17 @@ class QontoMatching
 				break;
 			
 			case 'vat':
+			    
+        		if (!class_exists('PaymentVat')) {
+        			dol_include_once('/compta/tva/class/paymentvat.class.php');
+        		}
+        		
 				$payment = new PaymentVat($this->db);
+			    
+        		if (!class_exists('Tva')) {
+        			dol_include_once('/compta/tva/class/tva.class.php');
+        		}
+
 				$vat = new Tva($this->db);
 
 				if ($vat->fetch($rowid) <= 0) { $error++; break; }
@@ -521,7 +606,13 @@ class QontoMatching
 					}
 					
 					if($bank_line > 0) {
+					    
+                		if (!class_exists('AccountLine')) {
+                			dol_include_once('/compta/bank/class/account.class.php');
+                		}
+                		
 						$line = new AccountLine($this->db);
+						
 						if ($line->fetch($bank_line) > 0) {
 							
 							// Complete bank line with Qonto data
