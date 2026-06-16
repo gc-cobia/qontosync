@@ -16,7 +16,7 @@ class QontoMatching
 		$this->db = $db;
 	}
 	
-    /**
+	/**
 	 * Single function to query the database (DRY principle).
 	 * If $qonto_id is provided, it searches for a specific ID. Otherwise, it loads the entire account.
 	 * * @param int $bank_id
@@ -30,7 +30,7 @@ class QontoMatching
 		$sql .= "JOIN " . MAIN_DB_PREFIX . "bank as b ON ef.fk_object = b.rowid ";
 		$sql .= "WHERE b.fk_account = " . (int) $bank_id . " ";
 		
-        if ($qonto_id !== null) {
+		if ($qonto_id !== null) {
 			$sql .= "AND ef.qonto_id = '" . $this->db->escape($qonto_id) . "'";
 		} else {
 			$sql .= "AND ef.qonto_id IS NOT NULL AND ef.qonto_id != ''";
@@ -54,7 +54,7 @@ class QontoMatching
 		return $results;
 	}
 
-    /**
+	/**
 	 * Load existing links into the PHP cache for a given bank account.
 	 * * @param int $bank_id
 	 * @param bool $force_reload
@@ -87,7 +87,7 @@ class QontoMatching
 			return isset($this->links_cache[$bank_id][$qonto_id]) ? $this->links_cache[$bank_id][$qonto_id] : 0;
 		
 		// REALTIME Mode: Used during insert/update to strictly avoid race conditions
-	    } else {
+		} else {
 			$result = $this->_fetchLinksFromDB($bank_id, $qonto_id);
 			return isset($result[$qonto_id]) ? $result[$qonto_id] : 0;
 		}
@@ -98,18 +98,22 @@ class QontoMatching
 	 *
 	 * @param array $transaction Qonto transactions array
 	 * @param int $bank_id Bank account id
+	 * @param bool $fast_mod
 	 * @return array Array transactions with trx status and linked_rowid or trx_status = "ErrorTooManyTrx" or trx_status = "unlinked" with trx array
 	 */
 	public function fetchTransactions($transaction, $bank_id, $fast_mod = false)
 	{
+		global $conf; // Required to read the tolerance setting from global configuration
+
 		if (empty($transaction) || !is_array($transaction) || empty($bank_id)) {
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return array();
 		}
-
-		# Temporary fast mode: only not fast
 		
-		// Load utils functions
+		// Lazy load utils functions
+		if (!class_exists('QontoRepository')) {
+			dol_include_once('/qontosync/class/qontorepository.class.php');
+		}
 		$qontoRepo = new QontoRepository($this->db);
 		
 		/**
@@ -121,6 +125,9 @@ class QontoMatching
 		$items_loaded = false;
 		
 		$entries = array();
+		
+		// Load tolerance setting from configuration (default to 7 days if not set)
+		$tolerance_days = isset($conf->global->QONTOSYNC_TOLERANCE_DAYS) ? (int)$conf->global->QONTOSYNC_TOLERANCE_DAYS : 7;
 		
 		// 1. Pre-load the links cache for the whole account
 		$this->loadLinksCache($bank_id);
@@ -178,14 +185,24 @@ class QontoMatching
 					$items_loaded = true;
 				}
 				
-				// Search for matching amounts within the pre-fetched unlinked bank lines
+				// Search for matching amounts AND dates within the pre-fetched unlinked bank lines
 				$qonto_amount_bank = (float)$t['amount'];
-                foreach ($unlinked_bank_lines as $b_line) {
-					// Use Dolibarr's price2num function to safely compare floats
-                    if (price2num((float)$b_line->amount, 'MT') == price2num($qonto_amount_bank, 'MT')) {
-                        $t["trx"][] = clone $b_line;
-                    }
-                }
+				
+				// Normalize Qonto date to midnight to calculate full days difference
+				$qonto_time = strtotime(date('Y-m-d', strtotime($t['settled_at'])));
+				
+				foreach ($unlinked_bank_lines as $b_line) {
+					// Normalize Dolibarr bank line date to midnight
+					$bank_time = strtotime(date('Y-m-d', $this->db->jdate($b_line->datev)));
+					
+					// Calculate the absolute difference in days (86400 seconds = 1 day)
+					$diff_days = abs($qonto_time - $bank_time) / 86400;
+					
+					// Check if the amount matches AND if it falls within the tolerance range
+					if ($diff_days <= $tolerance_days && price2num((float)$b_line->amount, 'MT') == price2num($qonto_amount_bank, 'MT')) {
+						$t["trx"][] = clone $b_line;
+					}
+				}
 			}
 			
 			$t["c_invoices"] = array();
@@ -322,7 +339,7 @@ class QontoMatching
 		$this->db->begin();
 
 		// Check if Qonto ID already exists (REALTIME check, explicitly bypass cache)
-        if ($this->isLinked($qonto_trx['id'], $bank_account_id, false) !== 0) {
+		if ($this->isLinked($qonto_trx['id'], $bank_account_id, false) !== 0) {
 			$this->db->rollback();
 			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
 			return -1;
@@ -346,7 +363,6 @@ class QontoMatching
 			isset($qonto_trx['side']) ? $qonto_trx['side'] : ''
 		);
 		
-
 		// Extract bank identifier based on operation type (e.g., 'transfer', 'income', etc.)
 		$emitter_name = '';
 		$emitter_bank_name = '';
@@ -378,7 +394,6 @@ class QontoMatching
 					dol_syslog(__METHOD__ . ": Error, can not link the transaction", LOG_ERR);
 					$error++;
 				}
-				
 				break;
 
 			case 'cinv':
@@ -389,16 +404,14 @@ class QontoMatching
 					break;
 				}
 
-	        	if (!class_exists('Paiement')) {
-                    dol_include_once('/compta/paiement/class/paiement.class.php');
-            	}
-            	
+				if (!class_exists('Paiement')) {
+					dol_include_once('/compta/paiement/class/paiement.class.php');
+				}
 				$payment = new Paiement($this->db);
-            	
-            	if (!class_exists('Facture')) {
-	        	    dol_include_once('/compta/facture/class/facture.class.php');
-            	}
-            	
+				
+				if (!class_exists('Facture')) {
+					dol_include_once('/compta/facture/class/facture.class.php');
+				}
 				$invoice = new Facture($this->db);
 				
 				if ($invoice->fetch($rowid) <= 0) { $error++; break; }
@@ -434,17 +447,13 @@ class QontoMatching
 						$emitter_bank_name
 					);
 					
-					
 					if($bank_line > 0) {
-					    
-                		if (!class_exists('AccountLine')) {
-                			dol_include_once('/compta/bank/class/account.class.php');
-                		}
-					
+						if (!class_exists('AccountLine')) {
+							dol_include_once('/compta/bank/class/account.class.php');
+						}
 						$line = new AccountLine($this->db);				
 						
 						if ($line->fetch($bank_line) > 0) {
-							
 							// Complete bank line with Qonto data
 							$line->label	= isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $invoice->ref;
 							$line->datev	= strtotime($qonto_trx['settled_at']);
@@ -471,7 +480,6 @@ class QontoMatching
 					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
 					$error++;
 				}
-				
 				break;
 				
 			case 'sinv':
@@ -481,17 +489,15 @@ class QontoMatching
 					$error++;
 					break;
 				}
-			    
-        		if (!class_exists('PaiementFourn')) {
-        			dol_include_once('/fourn/class/paiementfourn.class.php');
-        		}
-        		
+				
+				if (!class_exists('PaiementFourn')) {
+					dol_include_once('/fourn/class/paiementfourn.class.php');
+				}
 				$payment = new PaiementFourn($this->db);
-        		
-        		if (!class_exists('FactureFournisseur')) {
-        			dol_include_once('/fourn/class/fournisseur.facture.class.php');
-        		}
-        		
+				
+				if (!class_exists('FactureFournisseur')) {
+					dol_include_once('/fourn/class/fournisseur.facture.class.php');
+				}
 				$invoice = new FactureFournisseur($this->db);
 				
 				if ($invoice->fetch($rowid) <= 0) { $error++; break; }
@@ -530,15 +536,12 @@ class QontoMatching
 					);
 					
 					if($bank_line > 0) {
-					    
-                		if (!class_exists('AccountLine')) {
-                			dol_include_once('/compta/bank/class/account.class.php');
-                		}
-                		
+						if (!class_exists('AccountLine')) {
+							dol_include_once('/compta/bank/class/account.class.php');
+						}
 						$line = new AccountLine($this->db);
 						
 						if ($line->fetch($bank_line) > 0) {
-							
 							// Complete bank line with Qonto data
 							$line->label	= isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $invoice->ref;
 							$line->datev	= strtotime($qonto_trx['settled_at']);
@@ -565,7 +568,6 @@ class QontoMatching
 					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
 					$error++;
 				}
-				
 				break;
 			
 			case 'vat':
@@ -576,16 +578,14 @@ class QontoMatching
 					break;
 				}
 
-        		if (!class_exists('PaymentVat')) {
-        			dol_include_once('/compta/tva/class/paymentvat.class.php');
-        		}
-        		
+				if (!class_exists('PaymentVat')) {
+					dol_include_once('/compta/tva/class/paymentvat.class.php');
+				}
 				$payment = new PaymentVat($this->db);
-			    
-        		if (!class_exists('Tva')) {
-        			dol_include_once('/compta/tva/class/tva.class.php');
-        		}
-
+				
+				if (!class_exists('Tva')) {
+					dol_include_once('/compta/tva/class/tva.class.php');
+				}
 				$vat = new Tva($this->db);
 
 				if ($vat->fetch($rowid) <= 0) { $error++; break; }
@@ -631,15 +631,12 @@ class QontoMatching
 					}
 					
 					if($bank_line > 0) {
-					    
-                		if (!class_exists('AccountLine')) {
-                			dol_include_once('/compta/bank/class/account.class.php');
-                		}
-                		
+						if (!class_exists('AccountLine')) {
+							dol_include_once('/compta/bank/class/account.class.php');
+						}
 						$line = new AccountLine($this->db);
 						
 						if ($line->fetch($bank_line) > 0) {
-							
 							// Complete bank line with Qonto data
 							$line->label	= isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $vat->ref;
 							$line->datev	= strtotime($qonto_trx['settled_at']);
@@ -666,7 +663,6 @@ class QontoMatching
 					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
 					$error++;
 				}
-				
 				break;
 			
 			default:
