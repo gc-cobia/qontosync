@@ -395,7 +395,7 @@ class QontoSyncLib
 		print '</div>';
 	}
 
-	/**
+    /**
 	 * Print unpaid documents table
 	 *
 	 * @param array $qonto_trx Transaction data from Qonto API
@@ -406,7 +406,6 @@ class QontoSyncLib
 		global $langs, $conf;
 		
 		print '<br>';
-		// Use language keys for translations
 		print load_fiche_titre($langs->trans("PendingDocuments"), '', 'bill');
 		print '<div class="clearboth"></div>';
 		
@@ -420,7 +419,7 @@ class QontoSyncLib
 		print '<table class="liste centpercent">';
 		
 		print '<tr class="liste_titre">';
-		print '<th class="liste_titre center" style="width: 40px;"><input type="checkbox" id="checkall" title="'.$langs->trans("CheckAll").'"></th>';
+		print '<th class="liste_titre center" style="width: 40px;">#</th>';
 		print '<th class="liste_titre">'.$langs->trans("Type").'</th>';
 		print '<th class="liste_titre">'.$langs->trans("Ref").'</th>';
 		print '<th class="liste_titre">'.$langs->trans("ThirdParty").'</th>';
@@ -434,13 +433,14 @@ class QontoSyncLib
 		if (!empty($documents['c_invoices'])) {
 			$has_data = true;
 			foreach ($documents['c_invoices'] as $d) {
-				print '<tr class="oddeven">';
-				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_' . $d->rowid . '"></td>';
+				$soc_name = dol_escape_htmltag($d->thirdparty);
+				print '<tr class="oddeven doc_row">';
+				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_' . $d->rowid . '" data-doctype="cinv" data-thirdparty="'.$soc_name.'"></td>';
 				print '<td>'.$langs->trans("CustomersInvoices").'</td>';
 				print '<td>' . $d->label . '</td>';
 				print '<td>' . $d->thirdparty . '</td>';
 				print '<td class="right amount">' . price($d->amount) . '</td>';
-				print '<td class="right"><input type="text" class="flat right maxwidth75" name="amount_cinv_' . $d->rowid . '" value="" placeholder="0.00"></td>';
+				print '<td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_cinv_' . $d->rowid . '" value="" placeholder="0.00" disabled></td>';
 				print '</tr>';
 			}
 		}
@@ -449,13 +449,14 @@ class QontoSyncLib
 		if (!empty($documents['s_invoices'])) {
 			$has_data = true;
 			foreach ($documents['s_invoices'] as $d) {
-				print '<tr class="oddeven">';
-				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_' . $d->rowid . '"></td>';
+				$soc_name = dol_escape_htmltag($d->thirdparty);
+				print '<tr class="oddeven doc_row">';
+				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_' . $d->rowid . '" data-doctype="sinv" data-thirdparty="'.$soc_name.'"></td>';
 				print '<td>'.$langs->trans("SupplierInvoices").'</td>';
 				print '<td>' . $d->label . ' <span class="opacitymedium small">(' . $d->ref_supplier . ')</span></td>';
 				print '<td>' . $d->thirdparty . '</td>';
 				print '<td class="right amount">' . price($d->amount) . '</td>';
-				print '<td class="right"><input type="text" class="flat right maxwidth75" name="amount_sinv_' . $d->rowid . '" value="" placeholder="0.00"></td>';
+				print '<td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_sinv_' . $d->rowid . '" value="" placeholder="0.00" disabled></td>';
 				print '</tr>';
 			}
 		}
@@ -464,18 +465,17 @@ class QontoSyncLib
 		if (!empty($documents['vat'])) {
 			$has_data = true;
 			foreach ($documents['vat'] as $d) {
-				print '<tr class="oddeven">';
-				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="vat_' . $d->rowid . '"></td>';
+				print '<tr class="oddeven doc_row">';
+				print '<td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="vat_' . $d->rowid . '" data-doctype="vat" data-thirdparty="VAT"></td>';
 				print '<td>'.$langs->trans("VAT").'</td>';
 				print '<td>' . $d->label . '</td>';
 				print '<td>-</td>';
 				print '<td class="right amount">' . price($d->amount) . '</td>';
-				print '<td class="right"><input type="text" class="flat right maxwidth75" name="amount_vat_' . $d->rowid . '" value="" placeholder="0.00"></td>';
+				print '<td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_vat_' . $d->rowid . '" value="" placeholder="0.00" disabled></td>';
 				print '</tr>';
 			}
 		}
 
-		// If no documents are found
 		if (!$has_data) {
 			print '<tr><td colspan="6" class="center opacitymedium">'.$langs->trans("NoPendingDocumentsFound").'</td></tr>';
 		}
@@ -483,7 +483,6 @@ class QontoSyncLib
 		print '</table>';
 		print '</div>';
 		
-		// Dolibarr action bar for modal submission
 		print '<div class="tabsAction">';
 		print '<div class="inline-block marginleftonly marginrightonly">';
 		print '<input type="submit" class="button button-save" value="'.$langs->trans("Validate").'">';
@@ -494,13 +493,5 @@ class QontoSyncLib
 		print '</div>';
 		
 		print '</form>';
-
-		print '<script>
-			$(document).ready(function() {
-				$("#checkall").click(function() {
-					$(".check_link_doc").prop("checked", $(this).prop("checked"));
-				});
-			});
-		</script>';
 	}
 }
