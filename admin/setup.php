@@ -42,6 +42,7 @@ $pm_transfer = GETPOST('QONTOSYNC_PM_TRANSFER', 'int');
 $pm_card = GETPOST('QONTOSYNC_PM_CARD', 'int');
 $pm_dd = GETPOST('QONTOSYNC_PM_DD', 'int');
 $pm_check = GETPOST('QONTOSYNC_PM_CHECK', 'int');
+$tolerance_days = GETPOST('QONTOSYNC_TOLERANCE_DAYS', 'int');
 
 // Update constants
 if ($action == 'update') {
@@ -59,6 +60,8 @@ if ($action == 'update') {
 	dolibarr_set_const($db, 'QONTOSYNC_PM_CARD', $pm_card, 'chaine', 0, '', $conf->entity);
 	dolibarr_set_const($db, 'QONTOSYNC_PM_DD', $pm_dd, 'chaine', 0, '', $conf->entity);
 	dolibarr_set_const($db, 'QONTOSYNC_PM_CHECK', $pm_check, 'chaine', 0, '', $conf->entity);
+	
+	dolibarr_set_const($db, 'QONTOSYNC_TOLERANCE_DAYS', $tolerance_days, 'chaine', 0, '', $conf->entity);
 
 	setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
 	}
@@ -160,6 +163,13 @@ print '</tr>';
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSyncPMCheck").'</td>';
 print '<td>' . $form->selectarray('QONTOSYNC_PM_CHECK', $payment_modes, getDolGlobalString('QONTOSYNC_PM_CHECK')) . '</td>';
+print '</tr>';
+
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans("QontoSyncToleranceDays").'<br><span class="opacitymedium small">'.$langs->trans("QontoSyncToleranceDaysTooltip").'</span></td>';
+// if empty, set 7 by default
+$val_tolerance = getDolGlobalString('QONTOSYNC_TOLERANCE_DAYS') !== '' ? getDolGlobalString('QONTOSYNC_TOLERANCE_DAYS') : '7';
+print '<td><input type="number" min="0" max="365" size="5" name="QONTOSYNC_TOLERANCE_DAYS" value="'.$val_tolerance.'"> jours</td>';
 print '</tr>';
 
 print '</table>';
