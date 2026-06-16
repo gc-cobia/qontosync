@@ -85,7 +85,7 @@ class modQontosync extends DolibarrModules
 			array('QONTOSYNC_PM_CARD', 'chaine', '', 'Payment Mode for Card', 0),
 			array('QONTOSYNC_PM_DD', 'chaine', '', 'Payment Mode for Direct Debit', 0),
 			array('QONTOSYNC_PM_CHECK', 'chaine', '', 'Payment Mode for Check', 0),
-			// Tolerance for bank matching (date +/7 days by default)
+			// Tolerance for bank matching (date +/- 7 days by default)
 			array('QONTOSYNC_TOLERANCE_DAYS', 'chaine', '7', 'Tolerance in days for bank matching', 0),
 		);
 
