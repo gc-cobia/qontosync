@@ -1,16 +1,16 @@
 <?php
 /*
- *  QontoSync dolibarr module 
- *  @file       modQontosync.class.php
- *  @author     Gaëtan COURTOIS
- *  @license    GPLv3
+ * QontoSync dolibarr module 
+ * @file       modQontosync.class.php
+ * @author     Gaëtan COURTOIS
+ * @license    GPLv3
  */
 
 
 include_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
 
 /**
- *  Description and activation class for module Qontosync
+ * Description and activation class for module Qontosync
  */
 class modQontosync extends DolibarrModules
 {
@@ -41,7 +41,8 @@ class modQontosync extends DolibarrModules
 		$this->config_page_url = array("setup.php@qontosync");
 
 		// Dependencies
-		$this->depends = array('modBanque', 'modFacture', 'modFournisseur', 'modTax');
+		// Only 'modBanque' is strictly required. Invoices and VAT are dynamically checked in the code.
+		$this->depends = array('modBanque');
 		$this->requiredby = array();
 		$this->langfiles = array("qontosync@qontosync");
 
@@ -49,7 +50,8 @@ class modQontosync extends DolibarrModules
 		$this->phpmin = array(7, 2);
 		$this->need_dolibarr_version = array(18, -3);
 		$this->max_dolibarr_version = array(23, -3);
-		$this->need_javascript_ajax = 0;
+		// Changed to 1 because the module relies on JS (Select2, Modal boxes, UI interactions)
+		$this->need_javascript_ajax = 1;
 
 		// Define some features supported by module (triggers, login, substitutions, menus, css, etc...)
 		$this->module_parts = array(
@@ -116,10 +118,10 @@ class modQontosync extends DolibarrModules
 	}
 
 	/**
-	 *  Function called when module is enabled.
+	 * Function called when module is enabled.
 	 *
-	 *  @param string $options Options when enabling module
-	 *  @return int 1 if OK, 0 if KO
+	 * @param string $options Options when enabling module
+	 * @return int 1 if OK, 0 if KO
 	 */
 	public function init($options = '')
 	{
@@ -136,10 +138,10 @@ class modQontosync extends DolibarrModules
 	}
 
 	/**
-	 *  Function called when module is disabled.
+	 * Function called when module is disabled.
 	 *
-	 *  @param string $options Options when enabling module
-	 *  @return int 1 if OK, 0 if KO
+	 * @param string $options Options when enabling module
+	 * @return int 1 if OK, 0 if KO
 	 */
 	public function remove($options = '')
 	{
