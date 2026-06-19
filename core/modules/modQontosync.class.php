@@ -6,7 +6,6 @@
  * @license    GPLv3
  */
 
-
 include_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
 
 /**
@@ -85,21 +84,29 @@ class modQontosync extends DolibarrModules
 			array('QONTOSYNC_PM_CARD', 'chaine', '', 'Payment Mode for Card', 0),
 			array('QONTOSYNC_PM_DD', 'chaine', '', 'Payment Mode for Direct Debit', 0),
 			array('QONTOSYNC_PM_CHECK', 'chaine', '', 'Payment Mode for Check', 0),
-			// Tolerance for bank matching (date +/- 7 days by default)
+			// Tolerance for bank matching (date +/7 days by default)
 			array('QONTOSYNC_TOLERANCE_DAYS', 'chaine', '7', 'Tolerance in days for bank matching', 0),
 		);
 
-		// Permissions
+        // Permissions
 		$this->rights = array();
 		$this->rights_class = 'qontosync';
 		
 		$r = 0;
+
 		$r++;
-		$this->rights[$r][0] = 4567891;
-		$this->rights[$r][1] = 'Read qontosync';
+		$this->rights[$r][0] = ($this->numero * 10) + 1;
+		$this->rights[$r][1] = 'PermissionReadQontoSync';
 		$this->rights[$r][2] = 'r';
 		$this->rights[$r][3] = 1;
 		$this->rights[$r][4] = 'read';
+
+		$r++;
+		$this->rights[$r][0] = ($this->numero * 10) + 2;
+		$this->rights[$r][1] = 'PermissionWriteQontoSync';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 1;
+		$this->rights[$r][4] = 'write';
 
 		// Main menu entries
 		$this->menu = array();
