@@ -41,7 +41,9 @@ print dol_htmloutput_events();
                     <td><?php print dol_print_date(strtotime($t['settled_at']), 'day'); ?></td>
                     <td>
                         <strong><?php print dol_escape_htmltag($t['label']); ?></strong>
+                        <?php if (!empty($t['reference'])) : ?>
                         <span class="badge badge-info badge-inline"><?php print dol_escape_htmltag($t['reference']); ?></span>
+                        <?php endif; ?>
                         <br>
                         <code class="opacitymedium small" style="font-size:0.8em;">ID: <?php print $q_id; ?></code>
                     </td>
