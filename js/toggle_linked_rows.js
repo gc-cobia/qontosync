@@ -1,6 +1,6 @@
 /*
  *  QontoSync dolibarr module 
- *  @file       toggle_linked_rows.js
+ *  @file       js/toggle_linked_rows.js
  *  @author     Gaëtan COURTOIS
  *  @license    GPLv3
  */
