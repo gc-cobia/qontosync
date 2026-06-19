@@ -1,11 +1,17 @@
 QontoSync=QontoSync
 QontoSyncSetup=QontoSync Setup
 
+# Permissions
+PermissionReadQontoSync=Read QontoSync transactions
+PermissionWriteQontoSync=Link and validate Qonto transactions
+
 # Parameters
 QontoAPIKey=Qonto API Key (Secret Key)
 QontoSlug=Qonto Login (Slug)
 QontoSandboxMode=Sandbox Mode
 QontoSandboxToken=Sandbox Token (Staging Token)
+QontoSyncToleranceDays=Date tolerance for matching
+QontoSyncToleranceDaysTooltip=Number of days before and after the Qonto transaction to search for a corresponding bank entry (e.g., 7).
 QontoSyncPMTransfer=Payment mode for Transfers (Incoming / Outgoing)
 QontoSyncPMCard=Payment mode for Cards
 QontoSyncPMDD=Payment mode for Direct Debits
@@ -55,3 +61,21 @@ Parameter=Parameter
 Value=Value
 Save=Save
 Test=Test
+
+# Advanced Modal
+AdvancedSearch=Advanced Search
+QontoTransactionDetails=Qonto Transaction Details
+Type=Type
+Ref=Ref.
+PendingDocuments=Pending Documents
+ThirdParty=Third Party
+RemainToPay=Remain to pay
+AmountToImpute=Amount to impute
+ErrorMixedDocumentTypes=Error: You cannot mix different document types (e.g., invoices and VAT).
+ErrorNoAmountSpecified=Error: No amount specified.
+ErrorImputedAmountExceeds=Error: The total imputed amount exceeds the transaction amount.
+NoPendingDocumentsFound=No pending documents found
+TransactionAlreadyLinked=This transaction is %s to a bank entry in Dolibarr (Bank Ref: %s).
+AlreadyLinked=already linked
+ErrorMultipleLinks=Error: This transaction has %s in the database.
+MultipleLinks=multiple links
