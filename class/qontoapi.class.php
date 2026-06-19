@@ -129,7 +129,7 @@ class QontoApi
 			dol_syslog(__METHOD__ . ": Request successful (200). Trace-ID: " . $this->traceId, LOG_DEBUG);
 			return $response;
 		} else {
-			// Tenter d'extraire le Trace-ID depuis l'en-tête HTTP
+			// Try to extract the Trace-ID from the HTTP header
 			if (!empty($responseHeaders['x-tyk-trace-id'])) {
 				$this->traceId = $responseHeaders['x-tyk-trace-id'];
 			} else {

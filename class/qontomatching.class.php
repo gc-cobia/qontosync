@@ -98,56 +98,6 @@ class QontoMatching
 	}
 
 	/**
-     * Filter documents based on Qonto transaction amount sign.
-     * Prevents matching an outgoing transfer with a standard customer invoice, etc.
-     *
-     * @param array $documents Array of unpaid documents from QontoRepository
-     * @param float $qonto_amount The Qonto transaction amount
-     * @return array Filtered documents compatible with the transaction side
-     */
-    public function getCompatibleDocuments($documents, $qonto_amount)
-    {
-        $filtered = array(
-            'c_invoices' => array(),
-            's_invoices' => array(),
-            'vat'        => array()
-        );
-
-        $qonto_amount = (float)$qonto_amount;
-
-        // 1. CustomerInvoices (Same sign)
-        if (!empty($documents['c_invoices'])) {
-            foreach ($documents['c_invoices'] as $doc) {
-                if (($qonto_amount > 0 && $doc->amount > 0) || ($qonto_amount < 0 && $doc->amount < 0)) {
-                    $filtered['c_invoices'][] = clone $doc;
-                }
-            }
-        }
-
-        // 2. Supplier Invoices (Opposite sign)
-        if (!empty($documents['s_invoices'])) {
-            foreach ($documents['s_invoices'] as $doc) {
-                $inv_amount = -((float)$doc->amount);
-                if (($qonto_amount > 0 && $inv_amount > 0) || ($qonto_amount < 0 && $inv_amount < 0)) {
-                    $filtered['s_invoices'][] = clone $doc;
-                }
-            }
-        }
-
-        // 3. VAT (Opposite sign)
-        if (!empty($documents['vat'])) {
-            foreach ($documents['vat'] as $doc) {
-                $vat_amount = -((float)$doc->amount);
-                if (($qonto_amount > 0 && $vat_amount > 0) || ($qonto_amount < 0 && $vat_amount < 0)) {
-                    $filtered['vat'][] = clone $doc;
-                }
-            }
-        }
-
-        return $filtered;
-    }
-
-	/**
 	 * Get transactions linked or to link to the extrafield qonto_id
 	 *
 	 * @param array $transaction Qonto transactions array
