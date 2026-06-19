@@ -41,7 +41,7 @@ The following modules are optional (the module checks if they are enabled before
 ## Useful Links & Resources
 
 To use this module, you need Qonto API credentials. You can manage them on the official Qonto platforms:
-- **Qonto Developer Portal**: [https://developer.qonto.com/](https://developer.qonto.com/) (To create your API Keys and Login/Slug).
+- **Qonto Developer Portal**: [https://developers.qonto.com/](https://developers.qonto.com/) (To create your API Keys and Login/Slug).
 - **API Documentation**: [https://api-doc.qonto.com/](https://api-doc.qonto.com/) (Technical details on endpoints and Sandbox mode).
 - **Qonto Help Center**: For any questions regarding your business account permissions.
 
