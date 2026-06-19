@@ -1,3 +1,17 @@
+<?php
+/*
+ * QontoSync dolibarr module 
+ * @file       core/tpl/search.tpl.php
+ * @author     Gaëtan COURTOIS
+ * @license    GPLv3
+ */
+
+if (!defined('DOL_DOCUMENT_ROOT')) {
+    exit('Access Forbidden');
+}
+
+?>
+
 <div style="display: flex; flex-direction: column; height: calc(100vh - 160px); gap: 15px;">
     
     <form id="qontosync_search_form" method="post" style="margin: 0; flex-shrink: 0;">
@@ -72,6 +86,7 @@
     	</div>
     </form>
     
+    <!-- Container for AJAX view -->
     <div id="qontosync_results_container"></div>
 
 </div>

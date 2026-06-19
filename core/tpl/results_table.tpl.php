@@ -1,12 +1,32 @@
+<?php
+/*
+ * QontoSync dolibarr module 
+ * @file       core/tpl/results_table.tpl.php
+ * @author     Gaëtan COURTOIS
+ * @license    GPLv3
+ */
+ 
+if (!defined('DOL_DOCUMENT_ROOT')) {
+    exit('Access Forbidden');
+}
+
+// Style for badges and selects
+$fixed_width = "100%";
+$style_badge = "width: {$fixed_width}; display: inline-block; text-align: center; box-sizing: border-box; padding: 6px; white-space: normal;";
+$style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: border-box;";
+
+print dol_htmloutput_events();
+?>
+
 <div style="flex: 1 1 auto; overflow-y: auto; background: var(--colorbackbody, #fff);">
-    <form id="form_batch_link" method="post" action="<?php echo $_SERVER["PHP_SELF"]; ?>" style="margin: 0;">
-        <input type="hidden" name="token" value="<?php echo newToken(); ?>">
+    <form id="form_batch_link" method="post" action="<?php print $_SERVER["PHP_SELF"]; ?>" style="margin: 0;">
+        <input type="hidden" name="token" value="<?php print newToken(); ?>">
         <input type="hidden" name="action" value="batch_link">
-        <input type="hidden" name="bank_rowid" value="<?php echo $bank_rowid; ?>">
+        <input type="hidden" name="bank_rowid" value="<?php print $bank_rowid; ?>">
         
         <table class="noborder centpercent" style="margin: 0;">
             <tr class="liste_titre">
-                <td style="width: 1%; white-space: nowrap;"><?php echo $langs->trans('Date'); ?></td>
+                <td style="width: 1%; white-space: nowrap;"><?php print $langs->trans('Date'); ?></td>
                 <td><?php print $langs->trans('Label'); ?></td>
                 <td><?php print $langs->trans('Amount'); ?></td>
                 <td><?php print $langs->trans('Correspondence'); ?></td>
@@ -61,7 +81,7 @@
                             <?php if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat):
                                 $select_id = 'form_select_' . md5($q_id); ?>
             
-                                <select name="target_val[<?php print $q_id; ?>]" id="<?php print $select_id; ?>" form="form_batch_link" class="flat" style="<?php print $style_select; ?>">
+                                <select name="target_val[<?php print $q_id; ?>]" id="<?php print 'form_select_' . md5($q_id); ?>" form="form_batch_link" class="flat" style="<?php print $style_select; ?>">
                                     <option value="">-- <?php print $langs->trans('Select'); ?> --</option>
                                     
                                         <!-- insert bank entries -->
@@ -124,13 +144,6 @@
                                             </optgroup>
                                         <?php endif; ?>
                                 </select>
-
-                                <!-- call select2 JS script for entries list -->
-                                <script>
-                                    $(function() {
-                                        $("#<?php print $select_id; ?>").select2();
-                                    });
-                                </script>
                                 
                             <!-- if no entries found print -->
                             <?php else: ?>
@@ -148,7 +161,7 @@
                         $btn_html = '<span class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;"><span class="fa fa-search"></span></span>';
                         	
                         // Generate dynamic URL
-                        $url_modal = dol_buildpath('/qontosync/ajax/advancedBox.php', 1) . '?qonto_id=' . urlencode($q_id) . '&bank_rowid=' . $bank_rowid;
+                        $url_modal = dol_buildpath('/qontosync/advanced_match.php', 1) . '?qonto_id=' . urlencode($q_id) . '&bank_rowid=' . $bank_rowid . '&token=' . newToken();
                         
                         print dolButtonToOpenUrlInDialogPopup(
                             'btn_adv_match_' . md5($q_id),
@@ -156,7 +169,8 @@
                             $btn_html,
                             $url_modal,
                             '',
-                            ''
+                            '',
+                            
                         );
                         ?>
                     </td>
