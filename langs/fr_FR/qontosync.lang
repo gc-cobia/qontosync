@@ -1,11 +1,17 @@
 QontoSync=QontoSync
 QontoSyncSetup=Configuration de QontoSync
 
+# Permissions
+PermissionReadQontoSync=Consulter les transactions QontoSync
+PermissionWriteQontoSync=Lier et valider les transactions Qonto
+
 # Parameters
 QontoAPIKey=Clé API Qonto (Secret Key)
 QontoSlug=Identifiant Qonto (Slug)
 QontoSandboxMode=Mode Bac à sable (Sandbox)
 QontoSandboxToken=Jeton Sandbox (Staging Token)
+QontoSyncToleranceDays=Tolérance de date pour le rapprochement
+QontoSyncToleranceDaysTooltip=Nombre de jours avant et après la transaction Qonto pour chercher une écriture bancaire correspondante (ex: 7).
 QontoSyncPMTransfer=Mode de paiement pour les Virements (Virements reçus / émis)
 QontoSyncPMCard=Mode de paiement pour les Cartes (Paiements CB)
 QontoSyncPMDD=Mode de paiement pour les Prélèvements (Direct Debit)
@@ -55,3 +61,21 @@ Parameter=Paramètre
 Value=Valeur
 Save=Enregistrer
 Test=Tester
+
+# Advanced Modal
+AdvancedSearch=Recherche avancée
+QontoTransactionDetails=Détails de la transaction Qonto
+Type=Type
+Ref=Réf.
+PendingDocuments=Documents en attente
+ThirdParty=Tiers
+RemainToPay=Reste à payer
+AmountToImpute=Montant à imputer
+ErrorMixedDocumentTypes=Erreur : Vous ne pouvez pas mélanger différents types de documents (ex: factures et TVA).
+ErrorNoAmountSpecified=Erreur : Aucun montant n'a été spécifié.
+ErrorImputedAmountExceeds=Erreur : Le montant total imputé dépasse le montant de la transaction.
+NoPendingDocumentsFound=Aucun document en attente trouvé
+TransactionAlreadyLinked=Cette transaction est %s avec une écriture bancaire dans Dolibarr (Réf Bancaire : %s).
+AlreadyLinked=déjà rapprochée
+ErrorMultipleLinks=Erreur : Cette transaction possède %s en base de données.
+MultipleLinks=plusieurs rapprochements
