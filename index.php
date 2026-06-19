@@ -12,12 +12,19 @@ if (! $res && file_exists("../../../main.inc.php")) $res = @include "../../../ma
 if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../../../main.inc.php";
 if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
-dol_include_once('/compta/bank/class/account.class.php');
-dol_include_once('/qontosync/class/qontoapi.class.php');
-dol_include_once('/qontosync/class/qontomatching.class.php');
-dol_include_once('/qontosync/lib/qontosync.lib.php');
+require_once DOL_DOCUMENT_ROOT .'/compta/bank/class/account.class.php';
+if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
+if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
+if (!class_exists('QontoSyncLib')) dol_include_once('/qontosync/lib/qontosync.lib.php');
 
-$matching = new QontoMatching($db);
+$qontoMatching = new QontoMatching($db);
+$qontoUpdater = new QontoUpdater($db);
+
+
+ // Style for badges and selects
+$fixed_width = "100%";
+$style_badge = "width: {$fixed_width}; display: inline-block; text-align: center; box-sizing: border-box; padding: 6px; white-space: normal;";
+$style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: border-box;";
 
 $langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compta"));
 
@@ -30,7 +37,10 @@ if (!$user->hasRight('qontosync', 'read')) {
 }
 
 // Load javascript files
-$arrayofjs = array('/qontosync/js/toggle_linked_rows.js');
+$arrayofjs = array(
+    '/qontosync/js/toggle_linked_rows.js',
+    '/qontosync/js/ajax_search.js' 
+);
 
 llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
 
@@ -60,6 +70,7 @@ if (!empty($bank_rowid) && $bank_rowid > 0 && ($action == 'search' || $action ==
 	$selected_iban = $account->iban;
 
 	// Single API call for both the link processing and the table display
+	if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
 	$api = new QontoApi();
 	$transactions = $api->getTransactions($selected_iban, $dateStart, $dateEnd);
 }
@@ -141,7 +152,7 @@ if ($action == 'process_advanced_match') {
 				
 				if ($error == 0) {
 					// Call the advanced matching method
-					$res = $matching->updateAdvanced($doc_type, $amounts_array, $selected_trx, $bank_rowid);
+					$res = $qontoUpdater->updateAdvanced($doc_type, $amounts_array, $selected_trx, $bank_rowid);
 					
 					if ($res > 0) {
 						setEventMessages($langs->trans("TransactionSuccessfullyLinked"), null, 'mesgs');
@@ -189,7 +200,7 @@ if ($action == 'batch_link') {
 
                 if ($selected_trx) {
                     // Attempt to link
-                    $res = $matching->update($target, $selected_trx, $bank_rowid);
+                    $res = $qontoUpdater->update($target, $selected_trx, $bank_rowid);
                     if ($res > 0) {
                         $success_count++;
                     } else {
@@ -212,33 +223,14 @@ if ($action == 'batch_link') {
     }
 }
 
-// Print page begin flexbox container
-QontoSyncLib::printPageBegin();
 
 // Print search form
-QontoSyncLib::printSearchForm($month, $year, $bank_rowid);
+if (!class_exists('Form')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+$form = new Form($db);
+$bank_rowid = $bank_rowid > 0 ? $bank_rowid : '';
+$select_comptes_html = $form->select_comptes($bank_rowid, 'bank_rowid', 0, '', 2, '', 0, '', 1);
 
-// Print search results table if form has been submitted
-if (($action == 'search' || $action == 'batch_link' || $action == 'process_advanced_match')) {
-	if (!empty($bank_rowid) && $bank_rowid > 0) {
-		if ($transactions === false) {
-			setEventMessages($langs->trans("ErrorFetchingTransactions"), null, 'errors');
-		} else if (empty($transactions)) {
-			setEventMessages($langs->trans("NoTransactionsFound"), null, 'warnings');
-		} else {
-			// Check if there are transactions to link
-			$f_trx = $matching->fetchTransactions($transactions, $bank_rowid);
-
-			// Render table results
-			QontoSyncLib::printResultsTable($f_trx, $db, $bank_rowid, $month, $year);
-		}
-
-	} else {
-		setEventMessages($langs->trans("NoBankSelected"), null, 'warnings');
-	}
-}
-
-// Print page end flexbox container
-QontoSyncLib::printPageEnd();
+        		
+include dol_buildpath('/qontosync/core/tpl/search.tpl.php');
 
 llxFooter();
