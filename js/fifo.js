@@ -1,6 +1,6 @@
 /*
  * QontoSync dolibarr module 
- * @file       fifo.js
+ * @file       js/fifo.js
  * @author     Gaëtan COURTOIS
  * @license    GPLv3
  */
