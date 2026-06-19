@@ -9,6 +9,8 @@ Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionn
 - **Tableau de réconciliation** :
     - Affichage des données Qonto (Date, Libellé avec vignette de référence, ID de transaction).
     - Suggestion dynamique dans une liste déroulante des écritures bancaires, factures, et déclarations de TVA Dolibarr ayant le **montant exact**.
+- **Rapprochement avancé** : Fenêtre modale permettant d'associer manuellement une transaction à plusieurs documents (factures clients/fournisseurs, TVA) d'un même tiers et de gérer des paiements partiels. 
+- **Traitement par lot (FIFO)** : Imputation des montant semi-automatique via sélection de plusieurs documents simultanément. Les rapprochements sont effectués dans l'ordre de sélection (FIFO) sur les opérations du même signe (ex: toutes les dépenses, puis toutes les recettes). Calcul à la volée du solde restant disponible à l'imputation et allocation automatique du montant complet du document sélectionné (s'il est de même signe).
 - **Correspondance des modes de paiement** : Associez les types d'opérations Qonto (Virements, Cartes, Prélèvements, Chèques) à vos modes de paiement Dolibarr.
 - **Liaison manuelle** : Bouton permettant de lier une transaction Qonto à une écriture Dolibarr existante via l'injection de l'ID Qonto dans un `extrafield`.
 - **Mode Sandbox** : Testez vos intégrations en toute sécurité grâce au support du mode Sandbox de Qonto.
@@ -27,8 +29,10 @@ Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionn
 
 ## Prérequis
 
-Les modules natifs suivants de Dolibarr doivent être activés :
+Le module natif suivant de Dolibarr doit être activé :
 - **Banques et Caisses** (`modBanque`)
+
+Les modules suivants sont optionnels (le module vérifie s'ils sont activés avant de proposer leurs documents) :
 - **Factures clients** (`modFacture`)
 - **Factures fournisseurs** (`modFournisseur`)
 - **Taxes, charges sociales et dividendes** (`modTax`)
