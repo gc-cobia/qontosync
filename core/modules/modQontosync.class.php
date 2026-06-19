@@ -63,7 +63,7 @@ class modQontosync extends DolibarrModules
 			'models' => 0,
 			'printing' => 0,
 			'theme' => 0,
-			'css' => array(),
+			'css' => array('/qontosync/css/qontosync.css'),
 			'js' => array(),
 			'hooks' => array(),
 			'moduleforexternal' => 0,
