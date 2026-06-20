@@ -84,4 +84,18 @@
             }
         }
     });
+    
+    // TOGGLE SWITCH TO HIDE LINKED TRANSACTIONS
+    $(document).on('click', '[id*="QONTOSYNC_HIDE_LINKED"]', function () {
+        // Hiding transactions
+        $('.trx-linked').toggle();
+        
+        // Icon statement
+        let eyeIcon = $('#qontosync_eye_icon');
+        if (eyeIcon.hasClass('fa-eye-slash')) {
+            eyeIcon.removeClass('fa-eye-slash').addClass('fa-eye');
+        } else {
+            eyeIcon.removeClass('fa-eye').addClass('fa-eye-slash');
+        }
+    });
 });
