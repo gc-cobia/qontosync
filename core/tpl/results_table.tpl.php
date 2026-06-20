@@ -166,7 +166,7 @@ print dol_htmloutput_events();
                         
                         print dolButtonToOpenUrlInDialogPopup(
                             'btn_adv_match_' . md5($q_id),
-                            $langs->trans("AdvancedSearch"),
+                            $langs->transnoentities("AdvancedSearch"),
                             $btn_html,
                             $url_modal,
                             '',
