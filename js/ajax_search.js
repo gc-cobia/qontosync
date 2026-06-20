@@ -1,7 +1,7 @@
 /*
  * QontoSync dolibarr module 
  * @file       js/ajax_search.js
- * @author     Gaëtan COURTOIS
+ * @author     Ga毛tan COURTOIS
  * @license    GPLv3
  */
  
@@ -18,10 +18,14 @@
 
         $.post(fetchUrl, $(this).serialize(), function (htmlContent) {
             container.html(htmlContent);
-            container.find('select.flat').select2();
+            container.find('select.flat').select2({
+                width: 'resolve',
+                dropdownAutoWidth: false,
+                minimumResultsForSearch: 5
+            });
             
         }).fail(function (xhr, status, error) {
-            // INTERCEPTION RÉSEAU PROPRE (HTTP 401)
+            // CLEAN NETWORK INTERCEPTION (HTTP 401)
             if (xhr.status === 401) {
                 window.location.reload(); 
                 return;
