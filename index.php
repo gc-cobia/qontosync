@@ -21,15 +21,12 @@ if (!$user->hasRight('qontosync', 'read')) {
     accessforbidden();
 }
 
+$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compta"));
+
 // Load javascript files
 $arrayofjs = array(
-    '/qontosync/js/toggle_linked_rows.js',
     '/qontosync/js/ajax_search.js' 
 );
-
-require_once DOL_DOCUMENT_ROOT .'/compta/bank/class/account.class.php';
-
-$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compta"));
 
 llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
 
