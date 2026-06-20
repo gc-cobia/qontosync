@@ -46,10 +46,10 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
         <div class="info">
             <?php if ($linked > 0): ?>
                 <span class="fa fa-check-circle" style="color: green; font-size: 1.5em; vertical-align: middle; margin-right: 10px;"></span>
-                <span style="vertical-align: middle;"><?php print $langs->trans("TransactionAlreadyLinked", "<strong>" . $langs->trans("AlreadyLinked") . "</strong>", $linked); ?></span>
+                <span style="vertical-align: middle;"><?php print $langs->transnoentities("TransactionAlreadyLinked", "<strong>" . $langs->trans("AlreadyLinked") . "</strong>", $linked); ?></span>
             <?php else: ?>
                 <span class="fa fa-exclamation-triangle" style="color: orange; font-size: 1.5em; vertical-align: middle; margin-right: 10px;"></span>
-                <span style="vertical-align: middle;"><?php print $langs->trans("ErrorMultipleLinks", "<strong>" . $langs->trans("MultipleLinks") . "</strong>"); ?></span>
+                <span style="vertical-align: middle;"><?php print $langs->transnoentities("ErrorMultipleLinks", "<strong>" . $langs->trans("MultipleLinks") . "</strong>"); ?></span>
             <?php endif; ?>
         </div>
         
