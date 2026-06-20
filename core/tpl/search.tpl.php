@@ -56,24 +56,15 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     	            <input type="submit" class="button" value="<?php print $langs->trans("Search"); ?>">
     	        </div>
     
-    	        <!-- JavaScript filter - Toggle switch style -->
-    	        <style>
-            		.qonto-switch { position: relative; display: inline-block; width: 34px; height: 20px; margin-right: 8px; vertical-align: middle; }
-            		.qonto-switch input { opacity: 0; width: 0; height: 0; }
-            		.qonto-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 20px; }
-            		.qonto-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-            		.qonto-switch input:checked + .qonto-slider { background-color: #2196F3; } 
-            		.qonto-switch input:checked + .qonto-slider:before { transform: translateX(14px); }
-            		.qonto-filter-wrapper { display: inline-flex; align-items: center; background: #fff; border: 1px solid #ddd; padding: 4px 12px; border-radius: 20px; font-size: 0.95em; color: #555; box-shadow: 0 1px 2px rgba(0,0,0,0.05); user-select: none; }
-            		.qonto-filter-wrapper:hover { border-color: #bbb; background: #fdfdfd; }
-            	</style>
-    
-    	        <div class="qonto-filter-wrapper">
-    	            <label class="qonto-switch" style="margin-bottom: 0;">
-    	                <input type="checkbox" id="filter_linked">
-    	                <span class="qonto-slider"></span>
-    	            </label>
-    	            <span style="cursor: pointer;" onclick="document.getElementById(\'filter_linked\').click()">Masquer les opérations déjà rapprochées</span>
+    	        <!-- Toggle switch to hide linked transactions-->
+                <div class="inline-block valignmiddle marginleftonly qontosync-toggle-wrapper">
+    	            <span class="classfortooltip valignmiddle qontosync-tooltip-trigger" title="<?php print dol_escape_htmltag($langs->trans("HideLinked")); ?>">
+                        <?php $eye_icon = getDolGlobalString('QONTOSYNC_HIDE_LINKED') ? 'fa-eye-slash' : 'fa-eye'; ?>
+                        <span id="qontosync_eye_icon" class="fa <?php print $eye_icon; ?> qontosync-eye-icon"></span>
+                    </span>
+    	            <div class="inline-block valignmiddle qontosync-switch-container">
+                        <?php print ajax_constantonoff('QONTOSYNC_HIDE_LINKED'); ?>
+                    </div>
                 </div>
     	
             </div>
