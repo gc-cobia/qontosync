@@ -85,7 +85,11 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                             <?php $soc_name = dol_escape_htmltag($d->thirdparty); ?>
                             <tr class="oddeven doc_row">
                                 <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_<?php print $d->rowid; ?>" data-doctype="cinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $d->amount; ?>"></td>
-                                <td><?php print $langs->trans("CustomersInvoices"); ?></td>
+                                <td><?php print $langs->trans("CustomersInvoices"); ?>
+                                <?php if ($d->inv_type == 2) : ?>
+                                    <span class="badge badge-info""><?php print $langs->trans("CreditNote"); ?></span>
+                                <?php endif; ?>
+                                </td>
                                 <td><?php print $d->label; ?></td>
                                 <td><?php print $d->thirdparty; ?></td>
                                 <td class="right amount"><?php print price($d->amount); ?></td>
@@ -100,7 +104,11 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                             <?php $soc_name = dol_escape_htmltag($d->thirdparty); ?>
                             <tr class="oddeven doc_row">
                                 <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_<?php print $d->rowid; ?>" data-doctype="sinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print -$d->amount; ?>"></td>
-                                <td><?php print $langs->trans("SupplierInvoices"); ?></td>
+                                <td><?php print $langs->trans("SupplierInvoices"); ?>
+                                <?php if ($d->inv_type == 2) : ?>
+                                    <span class="badge badge-info""><?php print $langs->trans("CreditNote"); ?></span>
+                                <?php endif; ?>
+                                </td>
                                 <td><?php print $d->label; ?> <span class="opacitymedium small">(<?php print $d->ref_supplier; ?>)</span></td>
                                 <td><?php print $d->thirdparty; ?></td>
                                 <td class="right amount"><?php print price($d->amount); ?></td>
