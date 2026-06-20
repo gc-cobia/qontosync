@@ -36,8 +36,10 @@ print dol_htmloutput_events();
             <!-- For each transaction -->
             <?php foreach ($transactions as $t):
                  $q_id = dol_escape_htmltag($t['id']);
+                 
+                 $row_style = (getDolGlobalString('QONTOSYNC_HIDE_LINKED') && !empty($t['linked_rowid'])) ? 'style="display: none;"' : '';
                 ?>
-                <tr class="oddeven <?php print !empty($t['linked_rowid']) ? 'trx-linked' : 'trx-unlinked'; ?>">
+                <tr class="oddeven <?php print !empty($t['linked_rowid']) ? 'trx-linked' : 'trx-unlinked'; ?>" <?php print $row_style; ?>>
                     <td><?php print dol_print_date(strtotime($t['settled_at']), 'day'); ?></td>
                     <td>
                         <strong><?php print dol_escape_htmltag($t['label']); ?></strong>
@@ -96,9 +98,9 @@ print dol_htmloutput_events();
                                                         $trans_label = '(' . $langs->trans($reg[1]) . ')' . $reg[2];
                                                     } else {
                                                         $trans_label = $langs->trans($trans_label);
-                                                    }
-                                                    $json_val = json_encode(array('type' => 'bank', 'id' => $de->rowid)); ?>
-                                                    <option value='<?php print $json_val; ?>'>
+                                                    } ?>
+                                                    
+                                                    <option value="bank_<?php print $de->rowid; ?>">
                                                         <?php print dol_print_date($db->jdate($de->datev), 'day'); ?> - <?php print dol_escape_htmltag($trans_label); ?> (<?php print price($de->amount); ?>)
                                                     </option>
                                                 <?php endforeach; ?>
@@ -111,8 +113,7 @@ print dol_htmloutput_events();
                                             <optgroup label="<?php print $langs->trans('CustomersInvoices'); ?>">
                                                 
                                                 <?php foreach ($t['c_invoices'] as $cinv): ?>
-                                                    <?php $json_val = json_encode(array('type' => 'cinv', 'id' => $cinv->rowid)); ?>
-                                                    <option value='<?php print $json_val; ?>'>
+                                                    <option value="cinv_<?php print $cinv->rowid; ?>">
                                                         <?php print dol_print_date($cinv->datev, 'day'); ?> - <?php print dol_escape_htmltag($cinv->label); ?> (<?php print price($cinv->amount); ?>) - <?php print dol_escape_htmltag($cinv->thirdparty); ?>
                                                     </option>
                                                 <?php endforeach; ?>
@@ -125,8 +126,7 @@ print dol_htmloutput_events();
                                             <optgroup label="<?php print $langs->trans('SupplierInvoices'); ?>">
                                                 
                                                 <?php foreach ($t['s_invoices'] as $sinv): ?>
-                                                    <?php $json_val = json_encode(array('type' => 'sinv', 'id' => $sinv->rowid)); ?>
-                                                    <option value='<?php print $json_val; ?>'>
+                                                    <option value="sinv_<?php print $sinv->rowid; ?>">
                                                         <?php print dol_print_date($sinv->datev, 'day'); ?> - <?php print dol_escape_htmltag($sinv->label); ?> (<?php print dol_escape_htmltag($sinv->ref_supplier); ?>) - <?php print dol_escape_htmltag($sinv->thirdparty); ?> (<?php print price($sinv->amount); ?>)
                                                     </option>
                                                 <?php endforeach; ?>
@@ -139,8 +139,7 @@ print dol_htmloutput_events();
                                             <optgroup label="<?php print $langs->trans('VAT'); ?>">
                                                 
                                                 <?php foreach ($t['vat'] as $vat): ?>
-                                                    <?php $json_val = json_encode(array('type' => 'vat', 'id' => $vat->rowid)); ?>
-                                                    <option value='<?php print $json_val; ?>'>
+                                                    <option value="vat_<?php print $vat->rowid; ?>">
                                                         <?php print dol_print_date($vat->datev, 'day'); ?> - <?php print dol_escape_htmltag($vat->label); ?> (<?php print price($vat->amount); ?>)
                                                     </option>
                                                 <?php endforeach; ?>
