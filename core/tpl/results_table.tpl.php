@@ -78,14 +78,13 @@ print dol_htmloutput_events();
                         $has_vat          = (!empty($t['vat']) && is_array($t['vat']));
                         ?>
 
-                        <td>
+                        <td style="width: 350px; min-width: 350px; max-width: 350px;">
                             <!-- print select list with entries found -->
-                            <?php if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat):
-                                $select_id = 'form_select_' . md5($q_id); ?>
+                            <?php if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat): ?>
             
                                 <select name="target_val[<?php print $q_id; ?>]" id="<?php print 'form_select_' . md5($q_id); ?>" form="form_batch_link" class="flat" style="<?php print $style_select; ?>">
-                                    <option value="">-- <?php print $langs->trans('Select'); ?> --</option>
-                                    
+                                    <option value="">&nbsp;</option>
+
                                         <!-- insert bank entries -->
                                         <?php if ($has_bank_entries): ?>
                                             <optgroup label="<?php print $langs->trans('BankTransactions'); ?>">
