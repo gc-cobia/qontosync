@@ -1,7 +1,7 @@
 <?php
 /*
  * QontoSync dolibarr module 
- * @file       modQontosync.class.php
+ * @file       core/modules/modQontosync.class.php
  * @author     Gaëtan COURTOIS
  * @license    GPLv3
  */
@@ -86,6 +86,8 @@ class modQontosync extends DolibarrModules
 			array('QONTOSYNC_PM_CHECK', 'chaine', '', 'Payment Mode for Check', 0),
 			// Tolerance for bank matching (date +/7 days by default)
 			array('QONTOSYNC_TOLERANCE_DAYS', 'chaine', '7', 'Tolerance in days for bank matching', 0),
+			// Hide linked transactions
+			array('QONTOSYNC_HIDE_LINKED', 'chaine', '0', 'Hide already linked transactions by default', 0),
 		);
 
         // Permissions
