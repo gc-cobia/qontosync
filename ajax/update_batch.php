@@ -62,27 +62,54 @@ $target_vals = GETPOST('target_val', 'array');
 if ($action == 'batch_link' && is_array($target_vals) && $bank_rowid > 0) {
     
     if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
-    $qontoUpdater = new QontoUpdater($db);
-    
     if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
+    
     $api = new QontoApi();
+    $qontoUpdater = new QontoUpdater($db);
     
     $success_count = 0;
     $error_count = 0;
 
     foreach ($target_vals as $qonto_id => $target) {
+        
+        // Keep the dashes of the Qonto ID
         $qonto_id = sanitizeVal($qonto_id, 'alphanohtml');
-        $target = sanitizeVal($target, 'alphanohtml');
 
         if (empty($target)) continue;
+        
+        // Convert the string (e.g. "cinv_123") to an array using explode!
+        if (count($parts = explode('_', strip_tags($target), 2)) != 2) {
+            $error_count++;
+            continue;
+        }
+        $type = sanitizeVal($parts[0], 'alpha');
+        $doc_id = (int)$parts[1];
 
-        // We need to retrieve the transaction details for the update
+        // Fetch the transaction from Qonto
         $selected_trx = $api->getTransaction($qonto_id);
 
         if ($selected_trx) {
-            $res = $qontoUpdater->update($target, $selected_trx, $bank_rowid);
+            
+            // Retrieve the amount
+    		$amount = (float)$selected_trx['amount'];
+    		
+    		// Calculate the real amount with its sign
+    		if (isset($selected_trx['side']) && $selected_trx['side'] == 'debit') {
+    			$amount = -$amount;
+    		}
+    		
+			// Adapt sign to the document type
+	    	$amount = ($type === 'sinv' || $type === 'vat') ? -$amount : $amount;
+            
+            // Build the array for the updater
+            $amounts_array = array($doc_id => $amount);
+            
+            // Send the array to update()
+            $res = $qontoUpdater->update($type, $amounts_array, $selected_trx, $bank_rowid);
+            
             if ($res > 0) $success_count++;
             else $error_count++;
+            
         } else {
             $error_count++;
         }
