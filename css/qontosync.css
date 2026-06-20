@@ -3,3 +3,26 @@
         filter: invert(1);
     }
 }
+
+.qontosync-toggle-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 28px;
+    box-sizing: border-box;
+}
+
+.qontosync-tooltip-trigger {
+    cursor: help;
+    display: inline-flex;
+    align-items: center;
+}
+
+.qontosync-eye-icon {
+    font-size: 1.2em;
+}
+
+.qontosync-switch-container {
+    display: inline-flex;
+    align-items: center;
+}
