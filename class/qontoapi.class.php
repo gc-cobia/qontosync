@@ -1,9 +1,9 @@
 <?php
 /*
- *  QontoSync dolibarr module 
- *  @file       qontoapi.class.php
- *  @author     Gaëtan COURTOIS
- *  @license    GPLv3
+ * QontoSync dolibarr module 
+ * @file       class/qontoapi.class.php
+ * @author     Gaëtan COURTOIS
+ * @license    GPLv3
  */
 
 class QontoApi
@@ -89,8 +89,22 @@ class QontoApi
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_TIMEOUT, 15);
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+		// Security
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+		
+		if (defined('CURLOPT_PROTOCOLS_STR')) {
+			curl_setopt($ch, CURLOPT_PROTOCOLS_STR, 'HTTPS');
+		} else {
+			curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+		}
+
+		// Timeouts
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
 		// 4.1 Capture trace ID in headers
 		$responseHeaders = array();
@@ -221,7 +235,7 @@ class QontoApi
 		$data = json_decode($response, true);
 		
 		if (isset($data['transaction'])) {
-        dol_syslog(__METHOD__ . ": retrieve transaction " . $transaction_id . " from Qonto.", LOG_DEBUG);
+			dol_syslog(__METHOD__ . ": retrieve transaction " . $transaction_id . " from Qonto.", LOG_DEBUG);
 			return $data['transaction'];
 		}
 
@@ -236,7 +250,7 @@ class QontoApi
 	public function testConnection()
 	{
 		$response = $this->sendRequest("/v2/organization");
-        dol_syslog(__METHOD__ . ": Testing the Qonto connection.", LOG_DEBUG);
+		dol_syslog(__METHOD__ . ": Testing the Qonto connection.", LOG_DEBUG);
 		return $response !== false;
 	}
 }
