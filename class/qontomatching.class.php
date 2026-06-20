@@ -1,7 +1,7 @@
 <?php
 /*
  * QontoSync dolibarr module 
- * @file       qontomatching.class.php
+ * @file       class/qontomatching.class.php
  * @author     Gaëtan COURTOIS
  * @license    GPLv3
  */
