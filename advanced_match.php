@@ -27,6 +27,8 @@ register_shutdown_function(function() use (&$session_is_valid) {
 $res = 0;
 if (! $res && file_exists("../../main.inc.php")) $res = @include "../../main.inc.php";
 if (! $res && file_exists("../../../main.inc.php")) $res = @include "../../../main.inc.php";
+if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../../../main.inc.php";
+if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
 /** NO INCEPTION SCRIPT **/
 $session_is_valid = true;
@@ -34,19 +36,12 @@ ob_end_clean();
 /*************************/
 
 // Security check
-if (GETPOST('token', 'alpha') !== currentToken()) {
-    accessforbidden();
+if (GETPOST('token', 'alpha') !== currentToken() || $user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
+    echo '<script type="text/javascript">window.parent.location.reload();</script>';
+    exit;
 }
 
-if ($user->socid > 0) {
-    accessforbidden();
-}
-
-if (!$user->hasRight('qontosync', 'read')) {
-    accessforbidden();
-}
-
-$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "compta"));
+$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "compta", "salaries"));
 
 $conf->dol_hide_topmenu = 1;
 $conf->dol_hide_leftmenu = 1;
@@ -63,39 +58,54 @@ llxHeader('', $langs->trans("AdvancedSearch"), '', '', 0, 0, $arrayofjs);
 $qonto_id = GETPOST('qonto_id', 'alphanohtml');
 $bank_rowid = GETPOST('bank_rowid', 'int');
 
+// If no transaction ID
 if (empty($qonto_id)) {
     print "<div class='error'>ID de transaction manquant.</div>";
     llxFooter();
     exit;
 }
 
+// Try to get transaction informations
 if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
 $api = new QontoApi();
 $raw_trx = $api->getTransaction($qonto_id);
 
+// If transaction does not exist
 if (empty($raw_trx)) {
     print "<div class='error'>Impossible de récupérer les détails de la transaction depuis Qonto.</div>";
     llxFooter();
     exit;
 }
 
+// Calculate the real Qonto amount with its sign
 $processed_trx = $raw_trx;
 $processed_trx['amount'] = (float)$raw_trx['amount'];
 if (isset($processed_trx['side']) && $processed_trx['side'] == 'debit') {
     $processed_trx['amount'] = -$processed_trx['amount'];
 }
 
+// Verify if the transaction is linked with a bank entrie
 if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
 $qontoMatching = new QontoMatching($db);
 $linked = $qontoMatching->isLinked($qonto_id, $bank_rowid, false); 
 
+// Single instantiation of the Repository
+if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+$qontoRepo = new QontoRepository($db);
+
 $filtered_documents = array();
-if ($linked === 0) {
-    if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
-    $qontoRepo = new QontoRepository($db);
+$linked_details = array();
+
+if ($linked > 0) {
+    // If the transaction is already linked, we will retrieve the details (Payments -> Invoices)
+    $linked_details = $qontoRepo->getLinkedDetails($linked);
+} elseif ($linked === 0) {
+    // Get unpaid documents
     $filtered_documents = $qontoRepo->getUnpaidDocuments('all');
 }
 
+
+// Get payment label
 $op_type = isset($processed_trx['operation_type']) ? $processed_trx['operation_type'] : '';
 $mop = $qontoMatching->getPaymentModeId($op_type, isset($processed_trx['side']) ? $processed_trx['side'] : '');
 $payment_label = '';
