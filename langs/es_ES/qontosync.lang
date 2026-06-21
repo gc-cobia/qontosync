@@ -16,6 +16,13 @@ QontoSyncPMTransfer=Modo de pago para Transferencias (Entrantes / Salientes)
 QontoSyncPMCard=Modo de pago para Tarjetas
 QontoSyncPMDD=Modo de pago para Domiciliaciones (Direct Debit)
 QontoSyncPMCheck=Modo de pago para Cheques
+QontoSyncMaxMonths=Historial máximo de facturas (en meses)
+QontoSyncMaxMonthsTooltip=Número de meses de historial a analizar para la búsqueda de facturas impagadas (ej. 24). Un número elevado puede ralentizar la carga.
+QontoSyncStatementFormat=Bank statement format
+QontoSyncStatementFormatTooltip=Define the name of the bank statements (num_releve). Everything inside {} is parsed using standard PHP date() tokens (e.g., Y=4-digit year, y=2-digit year, m=Month with zero, d=Day). Ex: QONTO-{Y}-{m} or {Y-m} or STATEMENT-{Y}
+BankStatementFormat=Formato de extractos bancarios
+QontoSyncStatementFormat=Máscara de formato libre
+QontoSyncStatementFormatTooltip=Defina el nombre de los extractos (num_releve). Todo lo que esté entre {} se interpreta con las etiquetas nativas de date() de PHP (ej: Y=Año 4 díg., y=Año 2 díg., m=Mes con cero, d=Día). Ej: QONTO-{Y}-{m} o {Y-m}
 
 # Messages
 SetupSaved=La configuración se ha guardado.
@@ -23,6 +30,12 @@ NoParameters=Por favor, introduzca su Clave API y Usuario (Slug) de Qonto.
 ConnectionError=Error al conectar con la API de Qonto. Verifique sus credenciales.
 Connected=Conectado con éxito a la API de Qonto.
 BatchProcessingCompleted=Procesamiento por lotes completado: %s transacción(es) vinculada(s) con éxito, %s fallida(s).
+QontoSyncAjaxError=Error del sistema
+QontoSyncProcessingBatch=Procesamiento en curso...
+QontoSyncProcessingAdvanced=Procesamiento de conciliación avanzada en curso...
+QontoSyncErrorMainWindow=Error: la ventana principal no está lista.
+QontoSyncInitialMessage=Seleccione un período y una cuenta bancaria, luego inicie la búsqueda.
+QontoSyncSearching=Buscando transacciones...
 
 # Actions & Results
 InvalidToken=Token de seguridad no válido
@@ -46,6 +59,7 @@ NoCorrespondenceFound=No se encontró correspondencia
 Validate=Validar
 Select=Seleccionar
 Parameters=Parámetros
+HideLinked=Ocultar operaciones ya conciliadas
 
 # Core Fallbacks
 Month=Mes
