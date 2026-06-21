@@ -44,7 +44,7 @@ print dol_htmloutput_events();
                     <td>
                         <strong><?php print dol_escape_htmltag($t['label']); ?></strong>
                         <?php if (!empty($t['reference'])) : ?>
-                        <span class="badge badge-info badge-inline"><?php print dol_escape_htmltag($t['reference']); ?></span>
+                        <span class="badge qonto-badge-info badge-inline"><?php print dol_escape_htmltag($t['reference']); ?></span>
                         <?php endif; ?>
                         <br>
                         <code class="opacitymedium small" style="font-size:0.8em;">ID: <?php print $q_id; ?></code>
