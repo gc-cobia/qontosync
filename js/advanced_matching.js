@@ -31,13 +31,17 @@ $(document).ready(function () {
             let docType = firstChecked.data("doctype");
             let thirdParty = firstChecked.data("thirdparty");
 
+            // Definition of strictly "1 to 1" document types
+            let isStrictlyOneToOne = ['vat', 'social', 'salary', 'expense'].includes(docType);
+
             modalForm.find(".check_link_doc").each(function () {
                 if (!$(this).prop("checked")) {
                     let thisType = $(this).data("doctype");
                     let thisThirdParty = $(this).data("thirdparty");
 
-                    // If the document type OR the third party is different, gray out and disable
-                    if (thisType !== docType || thisThirdParty !== thirdParty) {
+                    // If it is a 1-to-1 document, disable all other cases.
+                    // Otherwise (ex: invoices), just check that it's the same type and same third party.
+                    if (isStrictlyOneToOne || thisType !== docType || thisThirdParty !== thirdParty) {
                         $(this).prop("disabled", true);
                         $(this).closest("tr").addClass("opacitymedium");
                     } else {
