@@ -84,10 +84,10 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 
     
     <!-- Container for AJAX view -->
-	<div id="qontosync_results_container">
-		<div style="text-align:center; padding:50px;" class="opacitymedium">
-			<i class="fa fa-info-circle fa-2x" style="margin-bottom: 10px;"></i><br>
-			<?php print $langs->trans("QontoSyncInitialMessage"); ?>
-		</div>
-	</div>
+    <div id="qontosync_results_container" style="flex: 1 1 auto; overflow-y: auto; width: 100%; min-height: 0; box-sizing: border-box;">
+        <div style="text-align:center; padding:50px;" class="opacitymedium">
+            <i class="fa fa-info-circle fa-2x" style="margin-bottom: 10px;"></i><br>
+            <?php print $langs->trans("QontoSyncInitialMessage"); ?>
+        </div>
+    </div>
 </div>
