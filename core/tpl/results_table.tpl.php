@@ -30,7 +30,7 @@ print dol_htmloutput_events();
                 <td><?php print $langs->trans('Label'); ?></td>
                 <td><?php print $langs->trans('Amount'); ?></td>
                 <td><?php print $langs->trans('Correspondence'); ?></td>
-	            <td style="width: 1%; white-space: nowrap;"><?php print $langs->trans('Action'); ?></td>
+	            <td style="width: 1%; white-space: nowrap;">&nbsp;</td>
             </tr>
  
             <!-- For each transaction -->
