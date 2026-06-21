@@ -182,7 +182,16 @@ class QontoUpdater
 		// Extract statement reference
 		$ref_releve = '';
 		if (isset($qonto_trx['settled_at'])) {
-			$ref_releve = date('Y-m', strtotime($qonto_trx['settled_at']));
+			$format_setting = getDolGlobalString('QONTOSYNC_STATEMENT_FORMAT') ?: '{Y}-{m}';
+			$time_trx = strtotime($qonto_trx['settled_at']);
+			
+			$raw_ref = preg_replace_callback('/\{([^}]+)\}/', function($matches) use ($time_trx) {
+				return date($matches[1], $time_trx);
+			}, $format_setting);
+
+			$clean_ref = preg_replace('/[^a-zA-Z0-9\-_.\/]/', '', $raw_ref);
+
+			$ref_releve = substr($clean_ref, 0, 50);
 		}
 		
 		switch ($type) {
@@ -227,83 +236,35 @@ class QontoUpdater
 				
 				// Initialize payment
 				$payment = new Paiement($this->db);
-				$payment->datepaye      = strtotime($qonto_trx['settled_at']);
-				$payment->fk_account    = $bank_account_id;
-				$payment->paiementid    = $mop;
-				$payment->num_payment   = $num_chq;
+                $payment_type_str = 'payment';
 				
 				$valid_amounts = array();
+                $first_socid = 0;
+                $payment_label_ref = '';
 				
 				foreach ($amounts_array as $doc_id => $amount) {
 					$invoice = new Facture($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
-						
-						// Retrieve thirdparty info for the first document to populate the bank line
+					    // Retrieve thirdparty info for the first document to populate the bank line
 						if ($first_socid == 0) {
 							$first_socid = $invoice->fk_soc;
 							$invoice->fetch_thirdparty();
 							$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
-						} 
-
-						// Handle Credit Notes by applying a negative sign to the payment amount
-						$pay_amount = abs((float)$amount);
-						if ($invoice->type == 2 || $invoice->total_ttc < 0) {
-							$pay_amount = -$pay_amount;
+						// Strict blocking if the third party is different for the following documents
+						} elseif ($first_socid != $invoice->fk_soc) {
+						    dol_syslog(__METHOD__ . ": Documents from different third parties detected.", LOG_ERR);
+							$error++; break;
 						}
+
+                        // Handle Credit Notes by applying a negative sign to the payment amount
+						$pay_amount = abs((float)$amount);
+						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
 						
 						$valid_amounts[$doc_id] = $pay_amount;
 						$payment_label_ref .= $invoice->ref . ', ';
 					} else {
 						$error++;
 					}
-				}
-				
-				if ($error > 0) break;
-				
-				$payment->amounts = $valid_amounts;
-				$payment_label_ref = rtrim($payment_label_ref, ', ');
-				
-				// Attempt to create a payment on the invoices (arg 1 = auto close)
-				$run = $payment->create($user, 1);
-				if ($run > 0) {
-					// Attempt to push the payment to the bank
-					$bank_line = $payment->addPaymentToBank(
-						$user,
-						'payment',
-						'(Payment) ' . $payment_label_ref,
-						$bank_account_id,
-						$emitter_name,
-						$emitter_bank_name
-					);
-					
-					if($bank_line > 0) {
-						if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
-						$line = new AccountLine($this->db);				
-						
-						if ($line->fetch($bank_line) > 0) {
-							$line->label = isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $payment_label_ref;
-							$line->datev = strtotime($qonto_trx['settled_at']);
-							$line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
-							
-							$update = $line->update($user);
-							if ($update > 0) {
-								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
-								if ($run < 0) { $error++; }
-							} else {
-								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
-								$error++;
-							}
-						} else {
-							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
-							$error++;
-						}
-					} else {
-						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
-						$error++;
-					}
-				} else {
-					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
-					$error++;
 				}
 				break;
 				
@@ -314,90 +275,42 @@ class QontoUpdater
 					$error++;
 					break;
 				}
-
+				
 				// Declare payment and invoice classes
 				if (!class_exists('PaiementFourn')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
 				if (!class_exists('FactureFournisseur')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 				
 				// Initialize payment
 				$payment = new PaiementFourn($this->db);
-				$payment->datepaye      = strtotime($qonto_trx['settled_at']);
-				$payment->fk_account    = $bank_account_id;
-				$payment->paiementid    = $mop;
-				$payment->num_payment   = $num_chq;
+                $payment_type_str = 'payment_supplier';
 				
 				$valid_amounts = array();
+                $first_socid = 0;
+                $payment_label_ref = '';
 				
 				foreach ($amounts_array as $doc_id => $amount) {
 					$invoice = new FactureFournisseur($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
-						
 						// Retrieve thirdparty info for the first document to populate the bank line
 						if ($first_socid == 0) {
 							$first_socid = $invoice->fk_soc;
 							$invoice->fetch_thirdparty();
 							$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
+						// Strict blocking if the third party is different for the following documents
+						} elseif ($first_socid != $invoice->fk_soc) {
+						    dol_syslog(__METHOD__ . ": Documents from different third parties detected.", LOG_ERR);
+							$error++; break;
 						}
 
-						// Handle Credit Notes by applying a negative sign to the payment amount
+                        // Handle Credit Notes by applying a negative sign to the payment amount
 						$pay_amount = abs((float)$amount);
-						if ($invoice->type == 2 || $invoice->total_ttc < 0) {
-							$pay_amount = -$pay_amount;
-						}
+						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
 						
 						$valid_amounts[$doc_id] = $pay_amount;
 						$payment_label_ref .= $invoice->ref . ', ';
 					} else {
 						$error++;
 					}
-				}
-				
-				if ($error > 0) break;
-				
-				$payment->amounts = $valid_amounts;
-				$payment_label_ref = rtrim($payment_label_ref, ', ');
-				
-				// Attempt to create a payment on the supplier invoices (arg 1 = auto close)
-				$run = $payment->create($user, 1);
-				if ($run > 0) {
-					// Attempt to push the payment to the bank
-					$bank_line = $payment->addPaymentToBank(
-						$user,
-						'payment_supplier',
-						'(Payment) ' . $payment_label_ref,
-						$bank_account_id,
-						$emitter_name,
-						$emitter_bank_name
-					);
-					
-					if($bank_line > 0) {
-						if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
-						$line = new AccountLine($this->db);				
-						
-						if ($line->fetch($bank_line) > 0) {
-							$line->label = isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $payment_label_ref;
-							$line->datev = strtotime($qonto_trx['settled_at']);
-							$line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
-							
-							$update = $line->update($user);
-							if ($update > 0) {
-								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
-								if ($run < 0) { $error++; }
-							} else {
-								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
-								$error++;
-							}
-						} else {
-							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
-							$error++;
-						}
-					} else {
-						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
-						$error++;
-					}
-				} else {
-					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
-					$error++;
 				}
 				break;
 			
@@ -415,88 +328,104 @@ class QontoUpdater
 				
 				// Initialize payment
 				$payment = new PaymentVat($this->db);
-				$payment->datepaye      = strtotime($qonto_trx['settled_at']);
-				$payment->fk_bank       = $bank_account_id;
-				$payment->paiementtype  = $mop;
-				$payment->num_payment   = $num_chq;
+                $payment_type_str = 'payment_vat';
+                $payment_label_prefix = '(VATPayment) ';
 				
 				$valid_amounts = array();
-				
+                $payment_label_ref = '';
+
 				foreach ($amounts_array as $doc_id => $amount) {
 					$vat = new Tva($this->db);
 					if ($vat->fetch($doc_id) > 0) {
 						$pay_amount = abs((float)$amount);
-						if ($vat->amount < 0) {
-							$pay_amount = -$pay_amount;
-						}
+						if ($vat->amount < 0) $pay_amount = -$pay_amount;
+						
 						$valid_amounts[$doc_id] = $pay_amount;
 						$payment_label_ref .= $vat->ref . ', ';
 					} else {
 						$error++;
 					}
 				}
-				
-				if ($error > 0) break;
-				
-				$payment->amounts = $valid_amounts;
-				
-				// VAT payment assigns main reference to the first item
-				reset($valid_amounts);
-				$payment->chid = key($valid_amounts);
-				$payment_label_ref = rtrim($payment_label_ref, ', ');
-				
-				// Attempt to create a payment on the tax (arg 1 = auto close)
-				$run = $payment->create($user, 1);
-				if ($run > 0) {
-					$bank_line = $payment->addPaymentToBank(
-						$user,
-						'payment_vat',
-						'(VATPayment) ' . $payment_label_ref,
-						$bank_account_id,
-						$emitter_name,
-						$emitter_bank_name
-					);
-					
-					// Workaround: PaymentVAT::addPaymentToBank() always returns 1 on success instead of bank_line_id
-					if ($bank_line > 0) {
-						$payment->fetch($payment->id);
-						$bank_line = $payment->fk_bank;
-					}
-					
-					if($bank_line > 0) {
-						if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
-						$line = new AccountLine($this->db);
-						
-						if ($line->fetch($bank_line) > 0) {
-							$line->label = isset($qonto_trx['label']) ? $qonto_trx['label'] : '(Payment) ' . $payment_label_ref;
-							$line->datev = strtotime($qonto_trx['settled_at']);
-							$line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
-							
-							$update = $line->update($user);
-							if ($update > 0) {
-								$run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
-								if ($run < 0) { $error++; }
-							} else {
-								dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
-								$error++;
-							}
-						} else {
-							dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
-							$error++;
-						}
-					} else {
-						dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
-						$error++;
-					}
-				} else {
-					dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
-					$error++;
-				}
 				break;
 			
 			default:
 				break;
 		}
+		
+        // Payment for customers/suppliers invoices & VAT
+        if ($error == 0 && $type !== 'bank' && is_object($payment)) {
+            
+            // Properties common to all payments
+            if ($type === 'vat') {
+                $payment->fk_bank = $bank_account_id;
+                $payment->paiementtype = $mop;
+            } else {
+                $payment->fk_account = $bank_account_id;
+                $payment->paiementid = $mop;
+            }
+            $payment->datepaye = strtotime($qonto_trx['settled_at']);
+            $payment->num_payment = $num_chq;
+            $payment->amounts = $valid_amounts;
+
+            $payment_label_ref = rtrim($payment_label_ref, ', ');
+
+            // VAT specificity (manual allocation of the CHID is mandatory)
+            if ($type === 'vat') {
+                reset($valid_amounts);
+				$payment->chid = key($valid_amounts);
+            }
+
+            // Dolibarr payment creation (arg 1 = auto close document)
+            $run = $payment->create($user, 1);
+            if ($run > 0) {
+                
+                // Push the newly created payment into the bank entries (AccountLine)
+                $bank_line = $payment->addPaymentToBank(
+                    $user,
+                    $payment_type_str,
+                    $payment_label_prefix . $payment_label_ref,
+                    $bank_account_id,
+                    $emitter_name,
+                    $emitter_bank_name
+                );
+                
+                // Workaround PaymentVAT::addPaymentToBank() returns '1' instead of the ID of the created bank line
+                if ($type === 'vat' && $bank_line > 0) {
+                    $payment->fetch($payment->id);
+                    $bank_line = $payment->fk_bank;
+                }
+                
+                // If the bank account is correctly created, we update it with the Qonto information and link it
+                if($bank_line > 0) {
+                    if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
+                    $line = new AccountLine($this->db);				
+                    
+                    if ($line->fetch($bank_line) > 0) {
+                        $line->label = isset($qonto_trx['label']) ? $qonto_trx['label'] : $payment_label_prefix . $payment_label_ref;
+                        $line->datev = strtotime($qonto_trx['settled_at']);
+                        $line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
+                        
+                        $update = $line->update($user);
+                        if ($update > 0) {
+                            $run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
+                            if ($run < 0) { $error++; }
+                        } else {
+                            dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
+                            $error++;
+                        }
+                    } else {
+                        dol_syslog(__METHOD__ . ": Error fetching bank line: " . $line->error, LOG_ERR);
+                        $error++;
+                    }
+                } else {
+                    dol_syslog(__METHOD__ . ": Error pushing payment to the bank: ".$payment->error, LOG_ERR);
+                    $error++;
+                }
+            } else {
+                dol_syslog(__METHOD__ . ": Error creating the payment: ".$payment->error, LOG_ERR);
+                $error++;
+            }
+        }
 	
         // Finalize the transaction
 		if ($error === 0) {
