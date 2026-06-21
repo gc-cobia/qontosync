@@ -16,6 +16,11 @@ QontoSyncPMTransfer=Zahlungsart für Überweisungen (Ein- / Ausgehend)
 QontoSyncPMCard=Zahlungsart für Kartenzahlungen
 QontoSyncPMDD=Zahlungsart für Lastschriften
 QontoSyncPMCheck=Zahlungsart für Schecks
+QontoSyncMaxMonths=Maximaler Rechnungsverlauf (in Monaten)
+QontoSyncMaxMonthsTooltip=Anzahl der Monate des Verlaufs, die bei der Suche nach unbezahlten Rechnungen analysiert werden sollen (z. B. 24). Eine hohe Zahl kann die Ladezeit verlangsamen.
+BankStatementFormat=Format der Bankauszüge
+QontoSyncStatementFormat=Freie Formatierungsmaske
+QontoSyncStatementFormatTooltip=Legen Sie den Namen der Bankauszüge (num_releve) fest. Alles innerhalb von {} wird mit den nativen PHP-date()-Tags interpretiert (z. B. Y=4-stelliges Jahr, y=2-stelliges Jahr, m=Monat mit Null, d=Tag). Z.B.: QONTO-{Y}-{m} oder {Y-m}
 
 # Messages
 SetupSaved=Einstellungen wurden gespeichert.
@@ -23,6 +28,12 @@ NoParameters=Bitte geben Sie Ihren Qonto API-Schlüssel und Login/Slug ein.
 ConnectionError=Verbindung zur Qonto-API fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten.
 Connected=Erfolgreich mit der Qonto-API verbunden.
 BatchProcessingCompleted=Stapelverarbeitung abgeschlossen: %s Transaktion(en) erfolgreich verknüpft, %s fehlgeschlagen.
+QontoSyncAjaxError=Systemfehler
+QontoSyncProcessingBatch=Verarbeitung läuft...
+QontoSyncProcessingAdvanced=Erweiterter Abgleich wird verarbeitet...
+QontoSyncErrorMainWindow=Fehler: Das Hauptfenster ist nicht bereit.
+QontoSyncInitialMessage=Bitte wählen Sie einen Zeitraum und ein Bankkonto aus und starten Sie dann die Suche.
+QontoSyncSearching=Suche nach Transaktionen...
 
 # Actions & Results
 InvalidToken=Ungültiges Sicherheits-Token
@@ -46,6 +57,7 @@ NoCorrespondenceFound=Keine Übereinstimmung gefunden
 Validate=Bestätigen
 Select=Auswählen
 Parameters=Parameter
+HideLinked=Bereits abgestimmte Transaktionen ausblenden
 
 # Core Fallbacks
 Month=Monat
