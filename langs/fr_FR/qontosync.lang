@@ -16,6 +16,11 @@ QontoSyncPMTransfer=Mode de paiement pour les Virements (Virements reçus / émi
 QontoSyncPMCard=Mode de paiement pour les Cartes (Paiements CB)
 QontoSyncPMDD=Mode de paiement pour les Prélèvements (Direct Debit)
 QontoSyncPMCheck=Mode de paiement pour les Chèques
+QontoSyncMaxMonths=Historique maximum des factures (en mois)
+QontoSyncMaxMonthsTooltip=Nombre de mois d'historique à analyser pour la recherche des factures impayées (ex: 24). Un nombre élevé peut ralentir le chargement.
+BankStatementFormat=Format des relevés bancaires
+QontoSyncStatementFormat=Masque de formatage libre
+QontoSyncStatementFormatTooltip=Définissez le nom des relevés (num_releve). Tout ce qui est entre {} est interprété avec les balises de la fonction PHP date() (ex: Y=Année 4 chiff., y=Année 2 chiff., m=Mois avec zéro, d=Jour). Ex: QONTO-{Y}-{m} ou {Y-m} ou RELEVE-{Y}
 
 # Messages
 SetupSaved=La configuration a été enregistrée.
@@ -23,6 +28,12 @@ NoParameters=Veuillez saisir votre clé API Qonto et votre identifiant (Slug).
 ConnectionError=Impossible de se connecter à l'API Qonto. Veuillez vérifier vos identifiants.
 Connected=Connexion réussie à l'API Qonto.
 BatchProcessingCompleted=Traitement de masse terminé : %s transaction(s) liée(s) avec succès, %s échec(s).
+QontoSyncAjaxError=Erreur système
+QontoSyncProcessingBatch=Traitement en cours...
+QontoSyncProcessingAdvanced=Traitement du rapprochement complexe en cours...
+QontoSyncErrorMainWindow=Erreur : la fenêtre principale n'est pas prête.
+QontoSyncInitialMessage=Veuillez sélectionner une période et un compte bancaire, puis lancer la recherche.
+QontoSyncSearching=Recherche des transactions en cours...
 
 # Actions & Results
 InvalidToken=Jeton de sécurité invalide
@@ -46,6 +57,7 @@ NoCorrespondenceFound=Aucune correspondance trouvée
 Validate=Valider
 Select=Sélectionner
 Parameters=Paramètres
+HideLinked=Masquer les opérations déjà rapprochées
 
 # Core Fallbacks
 Month=Mois
