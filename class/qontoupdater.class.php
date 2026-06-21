@@ -95,6 +95,13 @@ class QontoUpdater
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return -1;
 		}
+
+		// Security: Block multiple documents selection for 1-to-1 relation types
+        $one_to_one_types = array('bank', 'vat', 'social', 'salary', 'expense');
+        if (in_array($type, $one_to_one_types) && count($amounts_array) > 1) {
+            dol_syslog(__METHOD__ . ": Error, cannot link multiple documents for type " . $type, LOG_ERR);
+            return -1;
+        }
 		
 		// Resolve transaction data
 		$qonto_trx = array();
@@ -129,7 +136,7 @@ class QontoUpdater
 		}
 		
 		// Adapt sign to the document type
-		$total_imputed = ($type === 'sinv' || $type === 'vat') ? -$total_imputed : $total_imputed;
+		$total_imputed = ($type === 'sinv' || $type === 'vat' || $type === 'social' || $type === 'salary' || $type === 'expense') ? -$total_imputed : $total_imputed;
 			
 		// Strict verification
 		if (price2num($total_imputed, 'MT') != price2num($qonto_amount, 'MT')) {
@@ -196,12 +203,8 @@ class QontoUpdater
 		
 		switch ($type) {
 			case 'bank':
-				// Security check: ensure Bank module is enabled
-				if (empty($conf->banque->enabled)) {
-					dol_syslog(__METHOD__ . ": Bank module is disabled.", LOG_ERR);
-					$error++;
-					break;
-				}
+				// Security check: Bank module is enabled
+				if (empty($conf->banque->enabled)) { dol_syslog(__METHOD__ . ": Bank module is disabled.", LOG_ERR); $error++; break; }
 				
 				// Accounting security: 1 Qonto transaction = 1 single Dolibarr bank line
 				if (count($amounts_array) > 1) {
@@ -223,12 +226,8 @@ class QontoUpdater
 				break;
 
 			case 'cinv':
-				// Security check: ensure Customer Invoices module is enabled
-				if (empty($conf->facture->enabled)) {
-					dol_syslog(__METHOD__ . ": Customer Invoice module is disabled.", LOG_ERR);
-					$error++;
-					break;
-				}
+				// Security check: Customer Invoice module is enabled
+				if (empty($conf->facture->enabled)) { dol_syslog(__METHOD__ . ": Customer Invoice module is disabled.", LOG_ERR); $error++; break; }
 
                 // Declare payment and invoice classes
 				if (!class_exists('Paiement')) require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
@@ -237,11 +236,12 @@ class QontoUpdater
 				// Initialize payment
 				$payment = new Paiement($this->db);
                 $payment_type_str = 'payment';
-				
+
 				$valid_amounts = array();
                 $first_socid = 0;
                 $payment_label_ref = '';
-				
+
+				// Loop through amounts_array to validate and collect payment data	
 				foreach ($amounts_array as $doc_id => $amount) {
 					$invoice = new Facture($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
@@ -269,12 +269,8 @@ class QontoUpdater
 				break;
 				
 			case 'sinv':
-				// Security check: ensure Supplier Invoices module is enabled
-				if (empty($conf->fournisseur->enabled)) {
-					dol_syslog(__METHOD__ . ": Supplier Invoice module is disabled.", LOG_ERR);
-					$error++;
-					break;
-				}
+				// Security check: Supplier Invoice module is enabled
+				if (empty($conf->fournisseur->enabled)) { dol_syslog(__METHOD__ . ": Supplier Invoice module is disabled.", LOG_ERR); $error++; break; }
 				
 				// Declare payment and invoice classes
 				if (!class_exists('PaiementFourn')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
@@ -283,11 +279,12 @@ class QontoUpdater
 				// Initialize payment
 				$payment = new PaiementFourn($this->db);
                 $payment_type_str = 'payment_supplier';
-				
+
 				$valid_amounts = array();
                 $first_socid = 0;
                 $payment_label_ref = '';
-				
+
+				// Loop through amounts_array to validate and collect payment data
 				foreach ($amounts_array as $doc_id => $amount) {
 					$invoice = new FactureFournisseur($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
@@ -315,12 +312,8 @@ class QontoUpdater
 				break;
 			
 			case 'vat':
-				// Security check: ensure Tax module is enabled
-			    if (empty($conf->tax->enabled)) {
-					dol_syslog(__METHOD__ . ": Tax/VAT module is disabled.", LOG_ERR);
-					$error++;
-					break;
-				}
+				// Security check: Tax & Social module is enabled
+                if (empty($conf->tax->enabled)) { dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR); $error++; break; }
 
 				// Declare payment and tax classes
 				if (!class_exists('PaymentVat')) require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/paymentvat.class.php';
@@ -330,23 +323,118 @@ class QontoUpdater
 				$payment = new PaymentVat($this->db);
                 $payment_type_str = 'payment_vat';
                 $payment_label_prefix = '(VATPayment) ';
-				
-				$valid_amounts = array();
-                $payment_label_ref = '';
 
-				foreach ($amounts_array as $doc_id => $amount) {
-					$vat = new Tva($this->db);
-					if ($vat->fetch($doc_id) > 0) {
-						$pay_amount = abs((float)$amount);
-						if ($vat->amount < 0) $pay_amount = -$pay_amount;
-						
-						$valid_amounts[$doc_id] = $pay_amount;
-						$payment_label_ref .= $vat->ref . ', ';
-					} else {
-						$error++;
-					}
-				}
+                $valid_amounts = array();
+
+				// Get the unique VAT element
+                reset($amounts_array);
+                $doc_id = key($amounts_array);
+                $amount = current($amounts_array);
+
+                $vat = new Tva($this->db);
+                if ($vat->fetch($doc_id) > 0) {
+                    $pay_amount = abs((float)$amount);
+                    if ($vat->amount < 0) $pay_amount = -$pay_amount;
+                    
+                    $valid_amounts[$doc_id] = $pay_amount;
+                    $payment_label_ref = $vat->ref;
+                } else {
+                    $error++;
+                }
 				break;
+			
+			case 'social':
+                // Security check: Tax & Social module is enabled
+                if (empty($conf->tax->enabled)) { dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR); $error++; break; }
+
+                // Declare payment and social classes
+                if (!class_exists('PaymentSocialContribution')) require_once DOL_DOCUMENT_ROOT.'/compta/sociales/class/paymentsocialcontribution.class.php';
+                if (!class_exists('ChargeSociales')) require_once DOL_DOCUMENT_ROOT.'/compta/sociales/class/chargesociales.class.php';
+
+                // Initialize payment
+                $payment = new PaymentSocialContribution($this->db);
+                $payment_type_str = 'payment_sc';
+                $payment_label_prefix = '(SocialPayment) ';
+
+                $valid_amounts = array();
+
+                // Get the unique social element
+                reset($amounts_array);
+                $doc_id = key($amounts_array);
+                $amount = current($amounts_array);
+
+                $charge = new ChargeSociales($this->db);
+                if ($charge->fetch($doc_id) > 0) {
+                    $valid_amounts[$doc_id] = abs((float)$amount);
+                    $payment_label_ref = $charge->ref;
+                } else { 
+                    $error++; 
+                }
+                break;
+
+			case 'salary':
+                // Security check: Salaries module is enabled
+                if (empty($conf->salaries->enabled)) { dol_syslog(__METHOD__ . ": Salary module disabled.", LOG_ERR); $error++; break; }
+
+                // Declare payment and salary classes
+                if (!class_exists('PaymentSalary')) require_once DOL_DOCUMENT_ROOT.'/salaries/class/paymentsalary.class.php';
+                if (!class_exists('Salary')) require_once DOL_DOCUMENT_ROOT.'/salaries/class/salary.class.php';
+
+                // Initialize payment
+                $payment = new PaymentSalary($this->db);
+                $payment_type_str = 'payment_salary';
+                $payment_label_prefix = '(SalaryPayment) ';
+
+                $valid_amounts = array();
+
+                // Get the unique salary element
+                reset($amounts_array);
+                $doc_id = key($amounts_array);
+                $amount = current($amounts_array);
+
+                $salary = new Salary($this->db);
+                if ($salary->fetch($doc_id) > 0) {
+                    $valid_amounts[$doc_id] = abs((float)$amount);
+                    
+                    // Create the reference text for the bank line
+                    $start = dol_print_date($salary->datesp, 'day');
+                    $end = dol_print_date($salary->dateep, 'day');
+                    $period = $start . " - " . $end;
+                    
+                    $payment_label_ref = !empty($salary->label) ? $salary->label : "Sal. " . $period;
+                } else { 
+                    $error++; 
+                }
+                break;
+
+            case 'expense':
+                // Security check: Expense Report module is enabled
+                if (empty($conf->expensereport->enabled)) { dol_syslog(__METHOD__ . ": Expense Report module disabled.", LOG_ERR); $error++; break; }
+
+                // Declare payment and expense report classes
+                if (!class_exists('PaymentExpenseReport')) require_once DOL_DOCUMENT_ROOT.'/expensereport/class/paymentexpensereport.class.php';
+                if (!class_exists('ExpenseReport')) require_once DOL_DOCUMENT_ROOT.'/expensereport/class/expensereport.class.php';
+                
+                // Initialize payment
+                $payment = new PaymentExpenseReport($this->db);
+                $payment_type_str = 'payment_expensereport';
+                $payment_label_prefix = '(ExpensePayment) ';
+                
+                $valid_amounts = array();
+
+                // Get the unique expense report element
+                reset($amounts_array);
+                $doc_id = key($amounts_array);
+                $amount = current($amounts_array);
+
+                $expense = new ExpenseReport($this->db);
+                if ($expense->fetch($doc_id) > 0) {
+                    $valid_amounts[$doc_id] = abs((float)$amount);
+                    $payment_label_ref = $expense->ref;
+                } else { 
+                    $error++; 
+                }
+                break;
 			
 			default:
 				break;
@@ -356,24 +444,33 @@ class QontoUpdater
         if ($error == 0 && $type !== 'bank' && is_object($payment)) {
             
             // Properties common to all payments
-            if ($type === 'vat') {
-                $payment->fk_bank = $bank_account_id;
-                $payment->paiementtype = $mop;
-            } else {
-                $payment->fk_account = $bank_account_id;
-                $payment->paiementid = $mop;
-            }
+            
+            // 1. Bank account assignment (according to the classes)
+            $payment->fk_account = $bank_account_id;
+            $payment->fk_bank = $bank_account_id;
+
+            // 2. Massive assignment of payment method to counter "OperNotDefined"
+            $payment->paiementid = $mop;       // For Customer/Supplier Invoices
+            $payment->paiementtype = $mop;     // For VAT
+            $payment->fk_typepayment = $mop;   // For Salaries, Social Charges and Expense Reports
+            
             $payment->datepaye = strtotime($qonto_trx['settled_at']);
+            $payment->datep = strtotime($qonto_trx['settled_at']); // Specifically required by PaymentExpenseReport and PaymentSalary
             $payment->num_payment = $num_chq;
             $payment->amounts = $valid_amounts;
 
             $payment_label_ref = rtrim($payment_label_ref, ', ');
 
-            // VAT specificity (manual allocation of the CHID is mandatory)
-            if ($type === 'vat') {
-                reset($valid_amounts);
-				$payment->chid = key($valid_amounts);
+            // Specificity for single-document payment classes that ignore array keys in create()
+            reset($valid_amounts);
+            $first_doc_id = key($valid_amounts);
+            
+            if ($type === 'vat' || $type === 'social') {
+                $payment->chid = $first_doc_id;
+            } elseif ($type === 'expense') {
+                $payment->fk_expensereport = $first_doc_id;
             }
+			
 
             // Dolibarr payment creation (arg 1 = auto close document)
             $run = $payment->create($user, 1);
@@ -390,7 +487,7 @@ class QontoUpdater
                 );
                 
                 // Workaround PaymentVAT::addPaymentToBank() returns '1' instead of the ID of the created bank line
-                if ($type === 'vat' && $bank_line > 0) {
+                if (in_array($type, array('vat', 'salary', 'social', 'expense')) && $bank_line == 1) {
                     $payment->fetch($payment->id);
                     $bank_line = $payment->fk_bank;
                 }
@@ -409,6 +506,14 @@ class QontoUpdater
                         if ($update > 0) {
                             $run = $this->linkTransaction($bank_line, $qonto_trx['id'], $ref_releve);
                             if ($run < 0) { $error++; }
+                            
+                            // Expense payment: Dolibarr doesn't close it automatically, so we do it manually.
+                            if ($type === 'expense' && $error === 0) {
+                                if (!class_exists('ExpenseReport')) require_once DOL_DOCUMENT_ROOT.'/expensereport/class/expensereport.class.php';
+                                $expense_obj = new ExpenseReport($this->db);
+                                $res_paid = $expense_obj->setPaid($first_doc_id, $user);
+                                if ($res_paid < 0) { $error++; }
+                            }
                         } else {
                             dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
                             $error++;
