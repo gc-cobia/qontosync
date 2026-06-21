@@ -74,6 +74,7 @@ if ($action == 'process_advanced_match') {
     $api = new QontoApi();
     $qontoUpdater = new QontoUpdater($db);
     
+    // Fetch the transaction from Qonto
     $selected_trx = $api->getTransaction($qonto_id);
 
     if (empty($selected_trx)) {
@@ -82,11 +83,8 @@ if ($action == 'process_advanced_match') {
         exit;
     }
     
-    $qonto_amount = (float)$selected_trx['amount'];
-    if (isset($selected_trx['side']) && $selected_trx['side'] == 'debit') {
-        $qonto_amount = -$qonto_amount;
-    }
-    $qonto_amount_abs = abs($qonto_amount);
+    // Retrieve the amount
+    $amount = abs((float)$selected_trx['amount']);
     
     $amounts_array = array();
     $doc_type = '';
@@ -94,26 +92,29 @@ if ($action == 'process_advanced_match') {
     $error = 0;
     
     foreach ($link_docs as $doc) {
-        $parts = explode('_', $doc, 2);
-        if (count($parts) == 2) {
-            $current_type = $parts[0];
-            $doc_id = (int)$parts[1];
-            
-            if (empty($doc_type)) {
-                $doc_type = $current_type;
-            } elseif ($doc_type !== $current_type) {
-                setEventMessages($langs->trans("ErrorMixedDocumentTypes"), null, 'errors');
-                $error++;
-                break;
-            }
-            
-            $input_name = 'amount_' . $current_type . '_' . $doc_id;
-            $imputed_amount = (float)price2num(GETPOST($input_name, 'alphanohtml'));
-            
-            if ($imputed_amount > 0) {
-                $amounts_array[$doc_id] = $imputed_amount;
-                $total_imputed += $imputed_amount;
-            }
+        if (count($parts = explode('_', strip_tags($doc), 2)) != 2) {
+            $error++;
+            continue;
+        }
+        
+        $current_type = sanitizeVal($parts[0], 'alpha');
+        $doc_id = (int)$parts[1];
+        
+        if (empty($doc_type)) {
+            $doc_type = $current_type;
+        } elseif ($doc_type !== $current_type) {
+            setEventMessages($langs->trans("ErrorMixedDocumentTypes"), null, 'errors');
+            $error++;
+            break;
+        }
+        
+        $input_name = 'amount_' . $current_type . '_' . $doc_id;
+        $imputed_amount = (float)price2num(GETPOST($input_name, 'alphanohtml'));
+        
+        // Retrieves the entered gross amount (Invoice = Positive, Credit Note = Negative)
+        if ($imputed_amount != 0) {
+            $amounts_array[$doc_id] = $imputed_amount;
+            $total_imputed += $imputed_amount;
         }
     }
     
@@ -122,13 +123,15 @@ if ($action == 'process_advanced_match') {
         $error++;
     }
     
-    if ($error == 0 && price2num($total_imputed, 'MT') > price2num($qonto_amount_abs, 'MT')) {
+    // The total must EXACTLY match the transaction amount to be compatible with QontoUpdater::update()
+    if ($error == 0 && price2num($total_imputed, 'MT') != price2num($amount, 'MT')) {
         setEventMessages($langs->trans("ErrorImputedAmountExceeds"), null, 'errors');
         $error++;
     }
     
     if ($error == 0) {
-        $res = $qontoUpdater->updateAdvanced($doc_type, $amounts_array, $selected_trx, $bank_rowid);
+        // Send the array to update()
+        $res = $qontoUpdater->update($doc_type, $amounts_array, $selected_trx, $bank_rowid);
         
         if ($res > 0) {
             setEventMessages($langs->trans("TransactionSuccessfullyLinked"), null, 'mesgs');
@@ -137,6 +140,7 @@ if ($action == 'process_advanced_match') {
         }
     }
 
+    // Respond to JS that everything went well
     echo "OK";
     exit;
 }
