@@ -9,8 +9,8 @@ Manual bank reconciliation module between Qonto API and Dolibarr, operating with
 - **Bank Statement Format Customization**: Total freedom in defining your bank statement reference codes (`num_releve`) inside the settings using native PHP `date()` tokens enclosed in braces (e.g., `QONTO-{Y}-{m}` or `STATEMENT-{Y}`).
 - **Reconciliation Table**:
     - Display of Qonto data (Date, Label with reference badge, Transaction ID).
-    - Dynamic suggestion in a dropdown list of Dolibarr bank entries, invoices, and VAT declarations with the **exact matching amount**.
-- **Advanced Matching**: Modal interface to manually link a transaction to multiple documents (customer/supplier invoices, VAT) of the same third-party and handle partial payments. Features an elegant desktop-centered floating action button for quick, frictionless validation.
+    - Dynamic suggestion in a dropdown list of Dolibarr bank entries, invoices, VAT declarations, social contributions, salaries, and expense reports with the **exact matching amount**.
+- **Advanced Matching**: Modal interface to manually link a transaction to multiple documents (customer/supplier invoices, VAT, social contributions, salaries, expense reports) of the same third-party and handle partial payments. Features an elegant desktop-centered floating action button for quick, frictionless validation.
 - **Batch Processing (FIFO)**: Semi-automatic amount allocation via simultaneous selection of multiple documents. Reconciliations are processed in selection order (FIFO) on operations of the same sign (ex: all expenses, then all revenues). Calculates the remaining available balance on-the-fly and automatically allocates the full amount of the selected document (if it has the same sign).
 - **Payment Modes Mapping**: Map Qonto transaction types (Transfer, Card, Direct Debit, Check) directly to your Dolibarr payment modes in the module setup.
 - **Manual Linking**: Button to link a Qonto transaction to an existing Dolibarr entry by injecting the Qonto ID into an `extrafield`.
@@ -40,6 +40,8 @@ The following modules are optional (the module checks if they are enabled before
 - **Invoices** (`modFacture`)
 - **Supplier Invoices** (`modFournisseur`)
 - **Taxes** (`modTax`)
+- **Salaries** (`modSalaries`)
+- **Expense Reports** (`modExpenseReport`)
 
 ## Useful Links & Resources
 
