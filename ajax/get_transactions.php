@@ -36,17 +36,14 @@ ob_end_clean();
 
 // Security check
 if (GETPOST('token', 'alpha') !== currentToken()) {
-    print '<div class="error">' . $langs->trans("InvalidToken") . '</div>';
+    http_response_code(403);
+    echo "Invalid Token";
     exit;
 }
 
-if ($user->socid > 0) {
-    print '<div class="error">' . $langs->trans("NotAllowed") . '</div>';
-    exit;
-}
-
-if (!$user->hasRight('qontosync', 'read')) {
-    print '<div class="error">' . $langs->trans("NotAllowed") . '</div>';
+if ($user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
+    http_response_code(403);
+    echo "Permission Denied";
     exit;
 }
 
