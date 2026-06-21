@@ -99,7 +99,7 @@ if ($action == 'batch_link' && is_array($target_vals) && $bank_rowid > 0) {
     		}
     		
 			// Adapt sign to the document type
-	    	$amount = ($type === 'sinv' || $type === 'vat') ? -$amount : $amount;
+	    	$amount = ($type === 'sinv' || $type === 'vat' || $type === 'social' || $type === 'salary' || $type === 'expense') ? -$amount : $amount;
             
             // Build the array for the updater
             $amounts_array = array($doc_id => $amount);
