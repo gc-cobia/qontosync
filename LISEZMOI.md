@@ -9,8 +9,8 @@ Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionn
 - **Format libre des relevés bancaires** : Liberté totale pour définir la nomenclature de vos relevés (`num_releve`) depuis la configuration grâce à l'utilisation des balises de la fonction native PHP `date()` placées entre accolades (ex : `QONTO-{Y}-{m}`).
 - **Tableau de réconciliation** :
     - Affichage des données Qonto (Date, Libellé avec vignette de référence, ID de transaction).
-    - Suggestion dynamique dans une liste déroulante des écritures bancaires, factures, et déclarations de TVA Dolibarr ayant le **montant exact**.
-- **Rapprochement avancé** : Fenêtre modale permettant d'associer manuellement une transaction à plusieurs documents (factures clients/fournisseurs, TVA) d'un même tiers et de gérer des paiements partiels. Dispose d'un bouton de validation flottant centré moderne et optimisé pour l'utilisation sur ordinateur.
+    - Suggestion dynamique dans une liste déroulante des écritures bancaires, factures, déclarations de TVA, charges sociales, salaires et notes de frais Dolibarr ayant le **montant exact**.
+- **Rapprochement avancé** : Fenêtre modale permettant d'associer manuellement une transaction à plusieurs documents (factures clients/fournisseurs, TVA, charges sociales, salaires, notes de frais) d'un même tiers et de gérer des paiements partiels. Dispose d'un bouton de validation flottant centré moderne et optimisé pour l'utilisation sur ordinateur.
 - **Traitement par lot (FIFO)** : Imputation des montants semi-automatique via sélection de plusieurs documents simultanément. Les rapprochements sont effectués dans l'ordre de sélection (FIFO) sur les opérations du même signe (ex: toutes les dépenses, puis toutes les recettes). Calcul à la volée du solde restant disponible à l'imputation et allocation automatique du montant complet du document sélectionné (s'il est de même signe).
 - **Correspondance des modes de paiement** : Associez les types d'opérations Qonto (Virements, Cartes, Prélèvements, Chèques) à vos modes de paiement Dolibarr.
 - **Liaison manuelle** : Bouton permettant de lier une transaction Qonto à une écriture Dolibarr existante via l'injection de l'ID Qonto dans un `extrafield`.
@@ -40,6 +40,8 @@ Les modules suivants sont optionnels (le module vérifie s'ils sont activés ava
 - **Factures clients** (`modFacture`)
 - **Factures fournisseurs** (`modFournisseur`)
 - **Taxes, charges sociales et dividendes** (`modTax`)
+- **Salaires** (`modSalaries`)
+- **Notes de frais** (`modExpenseReport`)
 
 ## Liens utiles & Ressources
 
