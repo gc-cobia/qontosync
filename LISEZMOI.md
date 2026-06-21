@@ -44,7 +44,7 @@ Les modules suivants sont optionnels (le module vérifie s'ils sont activés ava
 ## Liens utiles & Ressources
 
 Pour utiliser ce module, vous devez posséder des identifiants API Qonto. Vous pouvez les gérer sur les plateformes officielles :
-- **Portail Développeur Qonto** : [https://developer.qonto.com/](https://developer.qonto.com/) (Pour créer vos clés API et votre Identifiant/Slug).
+- **Portail Développeur Qonto** : [https://developers.qonto.com/](https://developers.qonto.com/) (Pour créer vos clés API et votre Identifiant/Slug).
 - **Documentation API** : [https://api-doc.qonto.com/](https://api-doc.qonto.com/) (Détails techniques sur les points de terminaison et le mode Sandbox).
 - **Centre d'aide Qonto** : Pour toute question relative aux permissions de votre compte professionnel.
 
