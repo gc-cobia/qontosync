@@ -12,7 +12,8 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 
 ?>
 
-<div class="fiche" style="padding: 15px; display: flex; flex-direction: column; gap: 15px;">
+<div id="qontosync_advanced_wrapper" class="fiche" style="padding: 15px; display: flex; flex-direction: column; gap: 15px;"
+    data-lang-error-main="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncErrorMainWindow")); ?>">
 
     <?php print load_fiche_titre($langs->trans("QontoTransactionDetails"), '', 'bank'); ?>
     
@@ -41,18 +42,60 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     </div>
 
     <?php if ($linked !== 0): ?>
-        
-        <br>
-        <div class="info">
-            <?php if ($linked > 0): ?>
+    
+        <?php if ($linked > 0) : ?>
+    
+           <div class="info">
                 <span class="fa fa-check-circle" style="color: green; font-size: 1.5em; vertical-align: middle; margin-right: 10px;"></span>
                 <span style="vertical-align: middle;"><?php print $langs->transnoentities("TransactionAlreadyLinked", "<strong>" . $langs->trans("AlreadyLinked") . "</strong>", $linked); ?></span>
-            <?php else: ?>
-                <span class="fa fa-exclamation-triangle" style="color: orange; font-size: 1.5em; vertical-align: middle; margin-right: 10px;"></span>
-                <span style="vertical-align: middle;"><?php print $langs->transnoentities("ErrorMultipleLinks", "<strong>" . $langs->trans("MultipleLinks") . "</strong>"); ?></span>
+            </div>
+                    
+            <?php if (!empty($linked_details)): ?>
+                <div style="margin-top: 20px;">
+                    <?php print load_fiche_titre($langs->trans("Documents"), '', 'doc'); ?>
+                    <div class="div-table-responsive">
+                        <table class="liste centpercent">
+                            <tr class="liste_titre">
+                                <th><?php print $langs->trans("Type"); ?></th>
+                                <th class="center"><?php print $langs->trans("Payment"); ?></th>
+                                <th><?php print $langs->trans("Document"); ?></th>
+                                <th class="right"><?php print $langs->trans("Amount"); ?></th>
+                            </tr>
+                            <?php foreach($linked_details as $detail): ?>
+                                <tr class="oddeven">
+                                    <td>
+                                        <?php 
+                                            if ($detail->doc_type == 'cinv') print $langs->trans("CustomersInvoices"); 
+                                            elseif ($detail->doc_type == 'sinv') print $langs->trans("SupplierInvoices"); 
+                                            elseif ($detail->doc_type == 'vat') print $langs->trans("VAT"); 
+                                            elseif ($detail->doc_type == 'various') print $langs->trans("VariousPayment"); 
+                                            elseif ($detail->doc_type == 'salary') print $langs->trans("SalaryPayment"); 
+                                        ?>
+                                    </td>
+                                    <td class="center">
+                                        <span class="badge badge-info">ID: <?php print $detail->payment_id; ?></span>
+                                    </td>
+                                    <td>
+                                        <strong><?php print dol_escape_htmltag($detail->ref); ?></strong>
+                                        <?php if (!empty($detail->ref_supplier)): ?>
+                                            <br><span class="opacitymedium small"><?php print dol_escape_htmltag($detail->ref_supplier); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="right amount"><?php print price($detail->amount); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </table>
+                    </div>
+                </div>
             <?php endif; ?>
-        </div>
-        
+            
+        <?php else: ?>
+            <div class="info">
+                    <span class="fa fa-exclamation-triangle" style="color: orange; font-size: 1.5em; vertical-align: middle; margin-right: 10px;"></span>
+                    <span style="vertical-align: middle;"><?php print $langs->transnoentities("ErrorMultipleLinks", "<strong>" . $langs->trans("MultipleLinks") . "</strong>"); ?></span>
+            </div>
+        <?php endif; ?>
+
     <?php else: ?>
     
         <br>
@@ -66,7 +109,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
             <input type="hidden" name="bank_rowid" value="<?php print $bank_rowid; ?>">
             <input type="hidden" id="qonto_trx_amount" value="<?php print abs($processed_trx['amount']); ?>">
 
-            <div class="div-table-responsive">
+            <div class="div-table-responsive" style="margin-bottom: 60px;">
                 <table class="liste centpercent">
                     <tr class="liste_titre">
                         <th class="liste_titre center" style="width: 40px;">#</th>
@@ -87,7 +130,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                                 <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_<?php print $d->rowid; ?>" data-doctype="cinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $d->amount; ?>"></td>
                                 <td><?php print $langs->trans("CustomersInvoices"); ?>
                                 <?php if ($d->inv_type == 2) : ?>
-                                    <span class="badge badge-info""><?php print $langs->trans("CreditNote"); ?></span>
+                                    <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
                                 <?php endif; ?>
                                 </td>
                                 <td><?php print $d->label; ?></td>
@@ -103,10 +146,10 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                         <?php foreach ($filtered_documents['s_invoices'] as $d): ?>
                             <?php $soc_name = dol_escape_htmltag($d->thirdparty); ?>
                             <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_<?php print $d->rowid; ?>" data-doctype="sinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print -$d->amount; ?>"></td>
+                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_<?php print $d->rowid; ?>" data-doctype="sinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $d->amount; ?>"></td>
                                 <td><?php print $langs->trans("SupplierInvoices"); ?>
                                 <?php if ($d->inv_type == 2) : ?>
-                                    <span class="badge badge-info""><?php print $langs->trans("CreditNote"); ?></span>
+                                    <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
                                 <?php endif; ?>
                                 </td>
                                 <td><?php print $d->label; ?> <span class="opacitymedium small">(<?php print $d->ref_supplier; ?>)</span></td>
@@ -121,7 +164,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                         <?php $has_data = true; ?>
                         <?php foreach ($filtered_documents['vat'] as $d): ?>
                             <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="vat_<?php print $d->rowid; ?>" data-doctype="vat" data-thirdparty="VAT" data-remain="<?php print -$d->amount; ?>"></td>
+                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="vat_<?php print $d->rowid; ?>" data-doctype="vat" data-thirdparty="VAT" data-remain="<?php print $d->amount; ?>"></td>
                                 <td><?php print $langs->trans("VAT"); ?></td>
                                 <td><?php print $d->label; ?></td>
                                 <td>-</td>
@@ -136,11 +179,9 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                     <?php endif; ?>
                 </table>
             </div>
-            
-            <div class="tabsAction">
-                <div class="inline-block marginleftonly marginrightonly action-buttons">
-                    <input type="submit" class="button button-save" value="<?php print $langs->trans("Validate"); ?>">
-                </div>
+
+            <div class="qontosync-modal-footer action-buttons">
+                <input type="submit" class="button button-save qontosync-btn-full" value="<?php print $langs->trans("Validate"); ?>">
             </div>
             
         </form>
