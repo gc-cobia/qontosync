@@ -86,6 +86,10 @@ class modQontosync extends DolibarrModules
 			array('QONTOSYNC_PM_CHECK', 'chaine', '', 'Payment Mode for Check', 0),
 			// Tolerance for bank matching (date +/7 days by default)
 			array('QONTOSYNC_TOLERANCE_DAYS', 'chaine', '7', 'Tolerance in days for bank matching', 0),
+			// Max history for unpaid documents (24 months by default)
+			array('QONTOSYNC_MAX_MONTHS', 'chaine', '24', 'Max months of history to fetch for unpaid documents', 0),
+			// Format for bank statement reference (num_releve)
+			array('QONTOSYNC_STATEMENT_FORMAT', 'chaine', '{Y}-{m}', 'Format for bank statement reference', 0),
 			// Hide linked transactions
 			array('QONTOSYNC_HIDE_LINKED', 'chaine', '0', 'Hide already linked transactions by default', 0),
 		);
