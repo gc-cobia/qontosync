@@ -14,7 +14,12 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 
 <div style="display: flex; flex-direction: column; height: calc(100vh - 160px); gap: 15px;">
     
-    <form id="qontosync_search_form" method="post" style="margin: 0; flex-shrink: 0;">
+<form id="qontosync_search_form" method="post" style="margin: 0; flex-shrink: 0;"
+          data-lang-ajax-error="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncAjaxError")); ?>"
+          data-lang-processing-batch="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncProcessingBatch")); ?>"
+          data-lang-processing-advanced="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncProcessingAdvanced")); ?>"
+          data-lang-searching="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncSearching")); ?>">
+
         <input type="hidden" name="action" value="search">
         <input type="hidden" name="token" value="<?php print newToken(); ?>">
     	
@@ -76,8 +81,13 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     	
     	</div>
     </form>
+
     
     <!-- Container for AJAX view -->
-    <div id="qontosync_results_container"></div>
-
+	<div id="qontosync_results_container">
+		<div style="text-align:center; padding:50px;" class="opacitymedium">
+			<i class="fa fa-info-circle fa-2x" style="margin-bottom: 10px;"></i><br>
+			<?php print $langs->trans("QontoSyncInitialMessage"); ?>
+		</div>
+	</div>
 </div>
