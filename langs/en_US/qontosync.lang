@@ -16,6 +16,9 @@ QontoSyncPMTransfer=Payment mode for Transfers (Incoming / Outgoing)
 QontoSyncPMCard=Payment mode for Cards
 QontoSyncPMDD=Payment mode for Direct Debits
 QontoSyncPMCheck=Payment mode for Checks
+BankStatementFormat=Bank statement format
+QontoSyncStatementFormat=Custom formatting mask
+QontoSyncStatementFormatTooltip=Define the name of the bank statements (num_releve). Everything inside {} is parsed using standard PHP date() tokens (e.g., Y=4-digit year, y=2-digit year, m=Month with zero, d=Day). Ex: QONTO-{Y}-{m} or {Y-m} or STATEMENT-{Y}
 
 # Messages
 SetupSaved=Setup has been saved.
@@ -23,6 +26,12 @@ NoParameters=Please enter your Qonto API Key and Login/Slug.
 ConnectionError=Failed to connect to Qonto API. Please check your credentials.
 Connected=Successfully connected to Qonto API.
 BatchProcessingCompleted=Batch processing completed: %s transaction(s) successfully linked, %s failed.
+QontoSyncAjaxError=System Error
+QontoSyncProcessingBatch=Processing in progress...
+QontoSyncProcessingAdvanced=Processing advanced matching...
+QontoSyncErrorMainWindow=Error: the main window is not ready.
+QontoSyncInitialMessage=Please select a period and a bank account, then start the search.
+QontoSyncSearching=Searching for transactions...
 
 # Actions & Results
 InvalidToken=Invalid security token
@@ -46,6 +55,7 @@ NoCorrespondenceFound=No correspondence found
 Validate=Validate
 Select=Select
 Parameters=Parameters
+HideLinked=Hide already linked transactions
 
 # Core Fallbacks
 Month=Month
