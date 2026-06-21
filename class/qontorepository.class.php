@@ -27,10 +27,13 @@ class QontoRepository
 		global $conf;
 
 		$documents = array(
-			'c_invoices' => array(),
-			's_invoices' => array(),
-			'vat'        => array()
-		);
+            'c_invoices' => array(),
+            's_invoices' => array(),
+            'vat'        => array(),
+            'social'     => array(),
+            'salary'     => array(),
+            'expense'    => array()
+        );
 		
 		// Dynamic boundary recovery
 		$max_months = getDolGlobalInt('QONTOSYNC_MAX_MONTHS');
@@ -132,6 +135,78 @@ class QontoRepository
 				$this->db->free($resql_vat);
 			}
 		}
+
+        // 4. Fetch unpaid Social/Tax Charges
+        if (!empty($conf->tax->enabled) && ($type === 'all' || $type === 'social')) {
+            $sql_soc = "SELECT rowid, libelle as label, amount, date_ech FROM " . MAIN_DB_PREFIX . "chargesociales WHERE entity IN (" . getEntity('tax') . ") AND paye = 0 AND date_ech >= '" . $date_limit . "'";
+            $resql_soc = $this->db->query($sql_soc);
+            if ($resql_soc) {
+                while ($obj_soc = $this->db->fetch_object($resql_soc)) {
+                    $documents['social'][] = (object) array(
+                        'rowid' => $obj_soc->rowid,
+                        'label' => $obj_soc->label,
+                        'amount' => (float)$obj_soc->amount,
+                        'datev' => $this->db->jdate($obj_soc->date_ech),
+                        'inv_type' => 0);
+                }
+                $this->db->free($resql_soc);
+            }
+        }
+
+        // 5. Fetch unpaid Salaries
+        if (!empty($conf->salaries->enabled) && ($type === 'all' || $type === 'salary')) {
+            // Get datesp (start) and dateep (end)
+            $sql_sal = "SELECT s.rowid, s.label, s.amount, s.datesp, s.dateep, u.lastname, u.firstname ";
+            $sql_sal .= "FROM " . MAIN_DB_PREFIX . "salary as s ";
+            $sql_sal .= "LEFT JOIN " . MAIN_DB_PREFIX . "user as u ON s.fk_user = u.rowid ";
+            $sql_sal .= "WHERE s.entity IN (" . getEntity('salary') . ") AND s.paye = 0 AND s.dateep >= '" . $date_limit . "'";
+            
+            $resql_sal = $this->db->query($sql_sal);
+            if ($resql_sal) {
+                while ($obj_sal = $this->db->fetch_object($resql_sal)) {
+                    
+                    // date formatting
+                    $start = dol_print_date($this->db->jdate($obj_sal->datesp), 'day');
+                    $end = dol_print_date($this->db->jdate($obj_sal->dateep), 'day');
+                    
+                    $fallback_name = trim($obj_sal->firstname . ' ' . $obj_sal->lastname);
+                    
+                    // Base du libellé (celui saisi en base, ou "Salaire" par défaut)
+                    $base_label = !empty($obj_sal->label) ? $obj_sal->label : "Salaire";
+                    
+                    // Construction d'un libellé toujours clair : "Libellé - Prénom Nom (01/05/2026 - 31/05/2026)"
+                    $display_label = $base_label;
+                    if (!empty($fallback_name)) {
+                        $display_label .= " - " . $fallback_name;
+                    }
+                    $display_label .= " (" . $start . " - " . $end . ")";
+                    
+                    $documents['salary'][] = (object) array(
+                        'rowid' => $obj_sal->rowid, 
+                        'label' => $display_label, 
+                        'amount' => (float)$obj_sal->amount, 
+                        'datev' => $this->db->jdate($obj_sal->dateep), 
+                        'inv_type' => 0
+                    );
+                }
+                $this->db->free($resql_sal);
+            }
+        }
+
+        // 6. Fetch unpaid Expense Reports
+        if (!empty($conf->expensereport->enabled) && ($type === 'all' || $type === 'expense')) {
+            $sql_exp = "SELECT rowid, ref as label, total_ttc as amount, date_debut ";
+            $sql_exp .= "FROM " . MAIN_DB_PREFIX . "expensereport ";
+            $sql_exp .= "WHERE entity IN (" . getEntity('expensereport') . ") AND fk_statut = 5 AND date_debut >= '" . $date_limit . "'";
+            
+            $resql_exp = $this->db->query($sql_exp);
+            if ($resql_exp) {
+                while ($obj_exp = $this->db->fetch_object($resql_exp)) {
+                    $documents['expense'][] = (object) array('rowid' => $obj_exp->rowid, 'label' => $obj_exp->label, 'amount' => (float)$obj_exp->amount, 'datev' => $this->db->jdate($obj_exp->date_debut), 'inv_type' => 0);
+                }
+                $this->db->free($resql_exp);
+            }
+        }
 
 		return $documents;
 	}
@@ -266,6 +341,45 @@ class QontoRepository
                         }
                         $this->db->free($res2);
                     }
+                } elseif ($obj->type == 'payment_sc') {
+                    $sql2 = "SELECT c.rowid, c.ref, pc.amount, 'social' as doc_type, pc.rowid as payment_id 
+                             FROM " . MAIN_DB_PREFIX . "paiementcharge as pc 
+                             JOIN " . MAIN_DB_PREFIX . "chargesociales as c ON pc.fk_charge = c.rowid 
+                             WHERE pc.rowid = " . (int)$obj->url_id;
+                             
+                    $res2 = $this->db->query($sql2);
+                    if ($res2) {
+                        while ($doc = $this->db->fetch_object($res2)) {
+                            $details[] = clone $doc;
+                        }
+                        $this->db->free($res2);
+                    }
+                } elseif ($obj->type == 'payment_expensereport') {
+                    $sql2 = "SELECT e.rowid, e.ref, pe.amount, 'expense' as doc_type, pe.rowid as payment_id 
+                             FROM " . MAIN_DB_PREFIX . "payment_expensereport as pe 
+                             JOIN " . MAIN_DB_PREFIX . "expensereport as e ON pe.fk_expensereport = e.rowid 
+                             WHERE pe.rowid = " . (int)$obj->url_id;
+                             
+                    $res2 = $this->db->query($sql2);
+                    if ($res2) {
+                        while ($doc = $this->db->fetch_object($res2)) {
+                            $details[] = clone $doc;
+                        }
+                        $this->db->free($res2);
+                    }
+                } elseif ($obj->type == 'payment_salary') {
+                    $sql2 = "SELECT s.rowid, s.label as ref, ps.amount, 'salary' as doc_type, ps.rowid as payment_id 
+                             FROM " . MAIN_DB_PREFIX . "payment_salary as ps 
+                             JOIN " . MAIN_DB_PREFIX . "salary as s ON ps.fk_salary = s.rowid 
+                             WHERE ps.rowid = " . (int)$obj->url_id;
+                             
+                    $res2 = $this->db->query($sql2);
+                    if ($res2) {
+                        while ($doc = $this->db->fetch_object($res2)) {
+                            $details[] = clone $doc;
+                        }
+                        $this->db->free($res2);
+                    }
                 }
             }
             $this->db->free($res);
@@ -282,19 +396,6 @@ class QontoRepository
                 $details[] = clone $doc;
             }
             $this->db->free($res_var);
-        }
-        
-        // Looking for Salary Payments (Direct link via fk_bank)
-        $sql_sal = "SELECT rowid as payment_id, label as ref, amount, 'salary' as doc_type 
-                    FROM " . MAIN_DB_PREFIX . "payment_salary 
-                    WHERE fk_bank = " . (int)$bank_id;
-        $res_sal = $this->db->query($sql_sal);
-        
-        if ($res_sal) {
-            while ($doc = $this->db->fetch_object($res_sal)) {
-                $details[] = clone $doc;
-            }
-            $this->db->free($res_sal);
         }
         
         return $details;
