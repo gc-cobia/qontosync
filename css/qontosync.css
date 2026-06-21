@@ -37,15 +37,15 @@
     padding: 0;
     z-index: 999;
     box-sizing: border-box;
-
+    
     display: flex;
     justify-content: center;
 }
 
 .qontosync-btn-full {
     width: 100% !important;
-    max-width: 320px !important;
-
+    max-width: 320px !important; 
+    
     box-sizing: border-box;
     padding: 12px 24px !important;
     font-size: 1.15em !important;
@@ -54,8 +54,8 @@
     cursor: pointer;
     border: none !important;
     border-radius: 6px !important;
-
-    box-shadow: 0 4px 15px rgba(116, 93, 163, 0.4);
+    
+    box-shadow: 0 4px 15px rgba(116, 93, 163, 0.4); 
     transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
@@ -71,4 +71,18 @@
     font-weight: 600 !important;
     text-shadow: none !important;
     padding: 3px 7px !important;
+}
+
+#qontosync_results_container div.info,
+#qontosync_results_container div.warning,
+#qontosync_results_container div.error,
+#qontosync_results_container .info,
+#qontosync_results_container .warning,
+#qontosync_results_container .error {
+    box-sizing: border-box !important;
+    display: block !important;
+    width: auto !important;
+    max-width: 100% !important;
+    
+    margin-right:5px !important; 
 }
