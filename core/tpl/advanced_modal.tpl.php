@@ -174,6 +174,51 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                         <?php endforeach; ?>
                     <?php endif; ?>
 
+                    <!-- Social Charges -->
+                    <?php if (!empty($filtered_documents['social'])): ?>
+                        <?php $has_data = true; ?>
+                        <?php foreach ($filtered_documents['social'] as $d): ?>
+                            <tr class="oddeven doc_row">
+                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="social_<?php print $d->rowid; ?>" data-doctype="social" data-thirdparty="SOCIAL" data-remain="<?php print $d->amount; ?>"></td>
+                                <td><?php print $langs->trans("SocialContributions"); ?></td>
+                                <td><?php print $d->label; ?></td>
+                                <td>-</td>
+                                <td class="right amount"><?php print price($d->amount); ?></td>
+                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
+                    <!-- Salary Payments -->
+                    <?php if (!empty($filtered_documents['salary'])): ?>
+                        <?php $has_data = true; ?>
+                        <?php foreach ($filtered_documents['salary'] as $d): ?>
+                            <tr class="oddeven doc_row">
+                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="salary_<?php print $d->rowid; ?>" data-doctype="salary" data-thirdparty="SALARY" data-remain="<?php print $d->amount; ?>"></td>
+                                <td><?php print $langs->trans("SalaryPayment"); ?></td>
+                                <td><?php print $d->label; ?></td>
+                                <td>-</td>
+                                <td class="right amount"><?php print price($d->amount); ?></td>
+                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_salary_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
+                    <!-- Expense Reports -->
+                    <?php if (!empty($filtered_documents['expense'])): ?>
+                        <?php $has_data = true; ?>
+                        <?php foreach ($filtered_documents['expense'] as $d): ?>
+                            <tr class="oddeven doc_row">
+                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="expense_<?php print $d->rowid; ?>" data-doctype="expense" data-thirdparty="EXPENSE" data-remain="<?php print $d->amount; ?>"></td>
+                                <td><?php print $langs->trans("ExpenseReports"); ?></td>
+                                <td><?php print $d->label; ?></td>
+                                <td>-</td>
+                                <td class="right amount"><?php print price($d->amount); ?></td>
+                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
                     <?php if (!$has_data): ?>
                         <tr><td colspan="6" class="center opacitymedium"><?php print $langs->trans("NoPendingDocumentsFound"); ?></td></tr>
                     <?php endif; ?>
