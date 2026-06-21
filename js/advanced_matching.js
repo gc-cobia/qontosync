@@ -1,18 +1,18 @@
 /*
  * QontoSync dolibarr module 
- * @file       advanced_matching.js
+ * @file       js/advanced_matching.js
  * @author     Gaëtan COURTOIS
  * @license    GPLv3
  */
 
-$(document).ready(function() {
+$(document).ready(function () {
     // Event delegation is required because the modal content is loaded via AJAX
-    $(document).on("change", ".check_link_doc", function() {
+    $(document).on("change", ".check_link_doc", function () {
         let modalForm = $(this).closest("form");
         let checkedBoxes = modalForm.find(".check_link_doc:checked");
         let row = $(this).closest("tr");
         let amountInput = row.find(".amount_input");
-        
+
         // Enable/Disable the amount input field for the current row
         if ($(this).is(":checked")) {
             amountInput.prop("disabled", false);
@@ -31,7 +31,7 @@ $(document).ready(function() {
             let docType = firstChecked.data("doctype");
             let thirdParty = firstChecked.data("thirdparty");
 
-            modalForm.find(".check_link_doc").each(function() {
+            modalForm.find(".check_link_doc").each(function () {
                 if (!$(this).prop("checked")) {
                     let thisType = $(this).data("doctype");
                     let thisThirdParty = $(this).data("thirdparty");
