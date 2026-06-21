@@ -75,7 +75,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                                         ?>
                                     </td>
                                     <td class="center">
-                                        <span class="badge badge-info">ID: <?php print $detail->payment_id; ?></span>
+                                        <span class="badge qonto-badge-info">ID: <?php print $detail->payment_id; ?></span>
                                     </td>
                                     <td>
                                         <strong><?php print dol_escape_htmltag($detail->ref); ?></strong>
