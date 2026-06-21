@@ -41,13 +41,13 @@ class QontoMatching
 	 * @param string $qonto_id Qonto transaction ID
 	 * @param int $bank_id Bank account id
 	 * @param bool $cache Set to false to force a real-time database query
-	 * @return int linked_rowid if linked, 0 if not linked, -1 if error (too many links)
+	 * @return int linked_rowid if linked, 0 if not linked, -1 if error (ex. too many links)
 	 */
 	public function isLinked($qonto_id, $bank_id, $cache = true)
 	{
 		if (empty($qonto_id) || empty($bank_id)) {
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
-			return 0;
+			return -1;
 		}
 		
 		// CACHE Mode: Used for batch processing and listing to avoid N+1 query overhead
