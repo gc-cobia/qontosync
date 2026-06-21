@@ -31,13 +31,23 @@ class QontoRepository
 			's_invoices' => array(),
 			'vat'        => array()
 		);
-
+		
+		// Dynamic boundary recovery
+		$max_months = getDolGlobalInt('QONTOSYNC_MAX_MONTHS');
+		if (empty($max_months) || $max_months <= 0) {
+		    $max_months = 24; // Safety value (fallback)
+		}
+		
+		// Calculating the deadline (-X months from today)
+		$date_limit = $this->db->idate(strtotime("-" . $max_months . " months"));
+		
 		// 1. Fetch unpaid customers invoices
 		if (!empty($conf->facture->enabled) && ($type === 'all' || $type === 'cinv')) {
 			$sql_c_inv = "SELECT f.rowid, f.ref, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
 			$sql_c_inv .= "FROM " . MAIN_DB_PREFIX . "facture as f ";
 			$sql_c_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
-			$sql_c_inv .= "WHERE f.entity IN (" . getEntity('facture') . ") AND f.fk_statut = 1 AND f.paye = 0";
+			$sql_c_inv .= "WHERE f.entity IN (" . getEntity('facture') . ") AND f.fk_statut = 1 AND f.paye = 0 ";
+			$sql_c_inv .= "AND f.datef >= '" . $date_limit . "'";
 
 			$resql_c_inv = $this->db->query($sql_c_inv);
 			if ($resql_c_inv) {
@@ -72,7 +82,8 @@ class QontoRepository
 			$sql_s_inv = "SELECT f.rowid, f.ref, f.ref_supplier, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
 			$sql_s_inv .= "FROM " . MAIN_DB_PREFIX . "facture_fourn as f ";
 			$sql_s_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
-			$sql_s_inv .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") AND f.fk_statut = 1 AND f.paye = 0";
+			$sql_s_inv .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") AND f.fk_statut = 1 AND f.paye = 0 ";
+			$sql_s_inv .= "AND f.datef >= '" . $date_limit . "'";
 
 			$resql_s_inv = $this->db->query($sql_s_inv);
 			if ($resql_s_inv) {
@@ -197,5 +208,95 @@ class QontoRepository
         }
         
         return $results;
+    }
+    
+    /**
+     * Retrieve details of documents linked to a bank entry
+     *
+     * @param int $bank_id Bank account id
+     * @return array Array of linked documents details
+     */
+    public function getLinkedDetails($bank_id)
+    {
+        $details = array();
+        
+        // Searches for payments associated with this bank line
+        $sql = "SELECT url_id, type FROM " . MAIN_DB_PREFIX . "bank_url WHERE fk_bank = " . (int)$bank_id;
+        $res = $this->db->query($sql);
+        
+        if ($res) {
+            while ($obj = $this->db->fetch_object($res)) {
+                // Trace the payment back to the corresponding documents
+                if ($obj->type == 'payment') {
+                    $sql2 = "SELECT f.rowid, f.ref, pf.amount, 'cinv' as doc_type, pf.fk_paiement as payment_id 
+                             FROM " . MAIN_DB_PREFIX . "paiement_facture as pf 
+                             JOIN " . MAIN_DB_PREFIX . "facture as f ON pf.fk_facture = f.rowid 
+                             WHERE pf.fk_paiement = " . (int)$obj->url_id;
+                             
+                    $res2 = $this->db->query($sql2);
+                    if ($res2) {
+                        while ($doc = $this->db->fetch_object($res2)) {
+                            $details[] = clone $doc;
+                        }
+                        $this->db->free($res2);
+                    }
+                } elseif ($obj->type == 'payment_supplier') {
+                    $sql2 = "SELECT f.rowid, f.ref, f.ref_supplier, pf.amount, 'sinv' as doc_type, pf.fk_paiementfourn as payment_id 
+                             FROM " . MAIN_DB_PREFIX . "paiementfourn_facturefourn as pf 
+                             JOIN " . MAIN_DB_PREFIX . "facture_fourn as f ON pf.fk_facturefourn = f.rowid 
+                             WHERE pf.fk_paiementfourn = " . (int)$obj->url_id;
+                             
+                    $res2 = $this->db->query($sql2);
+                    if ($res2) {
+                        while ($doc = $this->db->fetch_object($res2)) {
+                            $details[] = clone $doc;
+                        }
+                        $this->db->free($res2);
+                    }
+                } elseif ($obj->type == 'payment_vat') {
+                    $sql2 = "SELECT t.rowid, t.label as ref, pv.amount, 'vat' as doc_type, pv.rowid as payment_id 
+                             FROM " . MAIN_DB_PREFIX . "payment_vat as pv 
+                             JOIN " . MAIN_DB_PREFIX . "tva as t ON pv.fk_tva = t.rowid 
+                             WHERE pv.rowid = " . (int)$obj->url_id;
+                             
+                    $res2 = $this->db->query($sql2);
+                    if ($res2) {
+                        while ($doc = $this->db->fetch_object($res2)) {
+                            $details[] = clone $doc;
+                        }
+                        $this->db->free($res2);
+                    }
+                }
+            }
+            $this->db->free($res);
+        }
+        
+        // Looking for Miscellaneous Payments (Direct link via fk_bank)
+        $sql_var = "SELECT rowid as payment_id, label as ref, amount, 'various' as doc_type 
+                    FROM " . MAIN_DB_PREFIX . "payment_various 
+                    WHERE fk_bank = " . (int)$bank_id;
+        $res_var = $this->db->query($sql_var);
+        
+        if ($res_var) {
+            while ($doc = $this->db->fetch_object($res_var)) {
+                $details[] = clone $doc;
+            }
+            $this->db->free($res_var);
+        }
+        
+        // Looking for Salary Payments (Direct link via fk_bank)
+        $sql_sal = "SELECT rowid as payment_id, label as ref, amount, 'salary' as doc_type 
+                    FROM " . MAIN_DB_PREFIX . "payment_salary 
+                    WHERE fk_bank = " . (int)$bank_id;
+        $res_sal = $this->db->query($sql_sal);
+        
+        if ($res_sal) {
+            while ($doc = $this->db->fetch_object($res_sal)) {
+                $details[] = clone $doc;
+            }
+            $this->db->free($res_sal);
+        }
+        
+        return $details;
     }
 }
