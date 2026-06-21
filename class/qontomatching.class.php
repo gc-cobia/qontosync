@@ -125,6 +125,9 @@ class QontoMatching
 		$unpaid_c_invoices = array();
 		$unpaid_s_invoices = array();
 		$unpaid_vat = array();
+		$unpaid_social = array();
+		$unpaid_salary = array();
+		$unpaid_expense = array();
 		$items_loaded = false;
 		
 		$entries = array();
@@ -163,15 +166,18 @@ class QontoMatching
 				
 				// Lazy load unpaid items ONCE if not already loaded only if unlinked transaction exist
 				if (!$items_loaded) {
-					$unlinked_bank_lines = $qontoRepo->getUnlinkedBankLines($bank_id);
-					$unpaid_docs = $qontoRepo->getUnpaidDocuments('all');
-		
-					$unpaid_c_invoices = $unpaid_docs['c_invoices'];
-					$unpaid_s_invoices = $unpaid_docs['s_invoices'];
-					$unpaid_vat        = $unpaid_docs['vat'];
-					
-					$items_loaded = true;
-				}
+                    $unlinked_bank_lines = $qontoRepo->getUnlinkedBankLines($bank_id);
+                    $unpaid_docs = $qontoRepo->getUnpaidDocuments('all');
+                  
+                    $unpaid_c_invoices = $unpaid_docs['c_invoices'];
+                    $unpaid_s_invoices = $unpaid_docs['s_invoices'];
+                    $unpaid_vat        = $unpaid_docs['vat'];
+                    $unpaid_social     = $unpaid_docs['social'];
+                    $unpaid_salary     = $unpaid_docs['salary'];  
+                    $unpaid_expense    = $unpaid_docs['expense']; 
+                  
+                    $items_loaded = true;
+                }
 								
 				// Normalize Qonto date to midnight to calculate full days difference
 				$qonto_time = strtotime(date('Y-m-d', strtotime($t['settled_at'])));
@@ -213,6 +219,28 @@ class QontoMatching
 						$t["vat"][] = clone $vat;
 					}
 				}
+
+				// Compare transactions amount with unpaid Social Charges (Negative)
+                $t["social"] = array();
+                foreach ($unpaid_social as $soc) {
+                    if (-(price2num((float) $soc->amount, 'MT')) == price2num($t['amount'], 'MT')) {
+                        $t["social"][] = clone $soc;
+                    }
+                }
+                // Compare transactions amount with unpaid Salaries (Negative)
+                $t["salary"] = array();
+                foreach ($unpaid_salary as $sal) {
+                    if (-(price2num((float) $sal->amount, 'MT')) == price2num($t['amount'], 'MT')) {
+                        $t["salary"][] = clone $sal;
+                    }
+                }
+                // Compare transactions amount with unpaid Expense Reports (Negative)
+                $t["expense"] = array();
+                foreach ($unpaid_expense as $exp) {
+                    if (-(price2num((float) $exp->amount, 'MT')) == price2num($t['amount'], 'MT')) {
+                        $t["expense"][] = clone $exp;
+                    }
+                }
 			}
 
 			// Add entries to the list
