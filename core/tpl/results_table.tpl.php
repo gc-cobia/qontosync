@@ -78,11 +78,14 @@ print dol_htmloutput_events();
                         $has_c_invoices   = (!empty($t['c_invoices']) && is_array($t['c_invoices']));
                         $has_s_invoices   = (!empty($t['s_invoices']) && is_array($t['s_invoices']));
                         $has_vat          = (!empty($t['vat']) && is_array($t['vat']));
+                        $has_social       = (!empty($t['social']) && is_array($t['social']));
+                        $has_salary       = (!empty($t['salary']) && is_array($t['salary']));
+                        $has_expense      = (!empty($t['expense']) && is_array($t['expense']));
                         ?>
 
                         <td style="width: 350px; min-width: 350px; max-width: 350px;">
                             <!-- print select list with entries found -->
-                            <?php if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat): ?>
+                            <?php if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat || $has_social || $has_salary || $has_expense): ?>
             
                                 <select name="target_val[<?php print $q_id; ?>]" id="<?php print 'form_select_' . md5($q_id); ?>" form="form_batch_link" class="flat" style="<?php print $style_select; ?>">
                                     <option value="">&nbsp;</option>
@@ -144,6 +147,39 @@ print dol_htmloutput_events();
                                                     </option>
                                                 <?php endforeach; ?>
                                                 
+                                            </optgroup>
+                                        <?php endif; ?>
+
+                                        <!-- insert social charges -->
+                                        <?php if ($has_social): ?>
+                                            <optgroup label="<?php print $langs->trans('SocialContributions'); ?>">
+                                                <?php foreach ($t['social'] as $soc): ?>
+                                                    <option value="social_<?php print $soc->rowid; ?>">
+                                                        <?php print dol_print_date($soc->datev, 'day'); ?> - <?php print dol_escape_htmltag($soc->label); ?> (<?php print price($soc->amount); ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </optgroup>
+                                        <?php endif; ?>
+
+                                        <!-- insert salaries -->
+                                        <?php if ($has_salary): ?>
+                                            <optgroup label="<?php print $langs->trans('Salaries'); ?>">
+                                                <?php foreach ($t['salary'] as $sal): ?>
+                                                    <option value="salary_<?php print $sal->rowid; ?>">
+                                                        <?php print dol_escape_htmltag($sal->label); ?> (<?php print price($sal->amount); ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </optgroup>
+                                        <?php endif; ?>
+
+                                        <!-- insert expense reports -->
+                                        <?php if ($has_expense): ?>
+                                            <optgroup label="<?php print $langs->trans('ExpenseReports'); ?>">
+                                                <?php foreach ($t['expense'] as $exp): ?>
+                                                    <option value="expense_<?php print $exp->rowid; ?>">
+                                                        <?php print dol_print_date($exp->datev, 'day'); ?> - <?php print dol_escape_htmltag($exp->label); ?> (<?php print price($exp->amount); ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
                                             </optgroup>
                                         <?php endif; ?>
                                 </select>
