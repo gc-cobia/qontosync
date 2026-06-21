@@ -6,24 +6,24 @@
  */
 
 $(document).ready(function () {
-    
-    // Simple function to parse an amount (handles French comma)
+
+    // Function to parse an amount (handles French comma)
     function getAmount(val) {
         if (!val) return 0;
         let clean = String(val).replace(/\s/g, '').replace(',', '.');
         return parseFloat(clean) || 0;
     }
 
-    // 1. AUTO-FILL ON CHECK
+    // 1. AUTO-FILL WHEN CHECKING THE BOX
     $(document).on("change", ".check_link_doc", function () {
         let amountInput = $(this).closest("tr").find(".amount_input");
         let modalForm = $(this).closest("form");
 
         if ($(this).is(":checked")) {
-            // The total amount of the bank transaction (can be + or -)
-            let totalBank = getAmount($("#qonto_trx_amount").val()); 
-            
-            // Sum what is already filled in the other inputs
+            // The transaction amount is always absolute in HTML
+            let totalBank = getAmount($("#qonto_trx_amount").val());
+
+            // Add the values already entered (positive or negative)
             let otherAllocated = 0;
             modalForm.find(".amount_input").not(amountInput).each(function () {
                 if (!$(this).prop("disabled") && $(this).val() !== "") {
@@ -31,36 +31,22 @@ $(document).ready(function () {
                 }
             });
 
-            // What remains to be distributed (+ or -)
+            // Remaining amount to allocate
             let available = totalBank - otherAllocated;
-            
-            // The remaining amount to pay for the clicked document (+ for invoice, - for credit note)
+
+            // Remaining amount to pay (positive for invoice, negative for credit note)
             let remain = getAmount($(this).data("remain"));
             let toAllocate = 0;
 
-            // STRICT RULE: Check the signs
-            if (totalBank > 0) {
-                // The transaction is POSITIVE (e.g. +3000)
-                if (remain > 0 && available > 0) {
-                    // It's an invoice, give the maximum possible without exceeding it
-                    toAllocate = Math.min(available, remain);
-                } else {
-                    // It's a credit note, or there's nothing left to distribute -> 0
-                    toAllocate = 0;
-                }
-            } 
-            else if (totalBank < 0) {
-                // The transaction is NEGATIVE (e.g. -3000)
-                if (remain < 0 && available < 0) {
-                    // It's a credit note, give the "maximum" possible (closest to zero)
-                    toAllocate = Math.max(available, remain);
-                } else {
-                    // It's an invoice, or there's nothing left to distribute -> 0
-                    toAllocate = 0;
-                }
+            if (remain > 0) {
+                // It's an invoice, allocate the maximum available without exceeding the remainder
+                toAllocate = (available > 0) ? Math.min(available, remain) : 0;
+            } else if (remain < 0) {
+                // It's a credit note (negative), allocate it systematically in full 
+                // to "dig" the gap and increase the available amount for other invoices
+                toAllocate = remain;
             }
 
-            // Display
             if (toAllocate !== 0) {
                 amountInput.val(toAllocate.toFixed(2));
             } else {
@@ -69,32 +55,52 @@ $(document).ready(function () {
         }
     });
 
-    // 2. CONTROL DURING MANUAL INPUT
+    // 2. LIVE CONTROL DURING ENTRY (UX)
     $(document).on("input", ".amount_input", function () {
         let checkbox = $(this).closest("tr").find(".check_link_doc");
         if (!checkbox.is(":checked")) return;
 
         let rawVal = $(this).val();
-        // Let the user type a "minus" sign without blocking them immediately
+        let remain = getAmount(checkbox.data("remain"));
+
+        // --- LIVE UX FEATURE: FORCING SIGNS DIRECTLY ---
+        if (remain < 0 && rawVal !== "" && rawVal !== "-" && !rawVal.startsWith("-")) {
+            // If it's a credit note and he types a number without the minus, add it
+            rawVal = "-" + rawVal;
+            $(this).val(rawVal);
+        } else if (remain > 0 && rawVal.startsWith("-")) {
+            // If it's an invoice and he types a minus, remove it
+            rawVal = rawVal.replace("-", "");
+            $(this).val(rawVal);
+        }
+        // ----------------------------------------------------
+
+        // Let the user type a minus alone or clear the box without blocking it
         if (rawVal === "" || rawVal === "-") return;
 
         let val = getAmount(rawVal);
-        let remain = getAmount(checkbox.data("remain"));
 
-        // SIMPLE RESTRICTION TO THE DOCUMENT ONLY
+        // Mathematical limitation of boundaries
         if (remain > 0) {
-            // --- INVOICE (Positive) ---
-            if (val < 0) val = 0; // No negative input
-            if (val > remain) val = remain; // Not greater than the invoice
+            // Entry on an invoice: Only negative numbers are forbidden
+            if (val < 0) val = 0;
         } else if (remain < 0) {
-            // --- CREDIT NOTE (Negative) ---
-            if (val > 0) val = 0; // No positive input
-            if (val < remain) val = remain; // Not smaller than the credit note (e.g. you can't type -600 on a -500 credit note)
+            // Entry on a credit note: Force in negative, without blocking the quantity
+            if (val > 0) val = -val;
         }
 
-        // Only update the input if mathematically necessary (to not disrupt typing)
+        // Reformat completely (which breaks decimal entry) only if the user has entered an amount outside the limits
         if (getAmount(rawVal) !== val) {
             $(this).val(val.toFixed(2));
+        }
+    });
+
+    // 3. CLEAN FORMATTING WHEN LEAVING THE FIELD
+    $(document).on("change", ".amount_input", function () {
+        let rawVal = $(this).val();
+        // When the user clicks elsewhere, ensure cents are displayed (e.g.: -50.00)
+        if (rawVal !== "" && rawVal !== "-") {
+            $(this).val(getAmount(rawVal).toFixed(2));
         }
     });
 
