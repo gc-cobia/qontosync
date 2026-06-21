@@ -68,6 +68,8 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                                             if ($detail->doc_type == 'cinv') print $langs->trans("CustomersInvoices"); 
                                             elseif ($detail->doc_type == 'sinv') print $langs->trans("SupplierInvoices"); 
                                             elseif ($detail->doc_type == 'vat') print $langs->trans("VAT"); 
+                                            elseif ($detail->doc_type == 'social') print $langs->trans("SocialContributions"); 
+                                            elseif ($detail->doc_type == 'expense') print $langs->trans("ExpenseReports"); 
                                             elseif ($detail->doc_type == 'various') print $langs->trans("VariousPayment"); 
                                             elseif ($detail->doc_type == 'salary') print $langs->trans("SalaryPayment"); 
                                         ?>
