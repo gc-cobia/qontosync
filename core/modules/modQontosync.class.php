@@ -23,7 +23,7 @@ class modQontosync extends DolibarrModules
 		global $langs, $conf;
 
 		$this->db = $db;
-		$this->numero = 456789;
+		$this->numero = 424019;
 		$this->rights_class = 'qontosync';
 		$this->family = 'financial';
 		$this->module_position = '50';
