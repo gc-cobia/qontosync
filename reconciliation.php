@@ -1,7 +1,7 @@
 <?php
 /*
  * QontoSync dolibarr module 
- * @file       index.php
+ * @file       reconciliation.php
  * @author     Gaëtan COURTOIS
  * @license    GPLv3
  */
