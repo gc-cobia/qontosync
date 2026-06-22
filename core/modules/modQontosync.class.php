@@ -117,22 +117,55 @@ class modQontosync extends DolibarrModules
 		// Main menu entries
 		$this->menu = array();
 		$r = 0;
-		$r++;
-		$this->menu[$r] = array(
-			'fk_menu' => 'fk_mainmenu=bank',
-			'type' => 'left',
-			'titre' => 'QontoSync',
-			'mainmenu' => 'bank',
-			'leftmenu' => 'qontosync',
-			'url' => '/qontosync/index.php',
-			'langs' => 'qontosync@qontosync',
-			'position' => 1000,
-			'enabled' => '$conf->qontosync->enabled',
-			'perms' => '$user->rights->qontosync->read',
-			'target' => '',
-			'user' => 2,
-			'picto' => 'qonto@qontosync'
-		);
+      
+        $this->menu[$r] = array(
+            'fk_menu'   => 'fk_mainmenu=bank',              
+            'type'      => 'left',                          
+            'mainmenu'  => 'bank',
+            'leftmenu'  => 'qontosync_main',
+            'url'       => '/qontosync/index.php',
+            'langs'     => 'qontosync@qontosync',           
+            'position'  => 2000,                            
+            'enabled'   => '$conf->qontosync->enabled',     
+            'perms'     => '$user->rights->qontosync->read',
+            'target'    => '',
+            'user'      => 2,                               
+            'titre'     => 'QontoSync',
+            'prefix'    => img_picto('', 'object_qonto.svg@qontosync', 'style="width: 16px; margin-right: 5px; vertical-align: text-bottom;"')
+        );
+        $r++;
+        
+        $this->menu[$r] = array(
+            'fk_menu'   => 'fk_mainmenu=bank,fk_leftmenu=qontosync_main', 
+            'type'      => 'left',
+            'mainmenu'  => 'bank',
+            'leftmenu'  => 'qontosync_reconciliation',
+            'url'       => '/qontosync/reconciliation.php',
+            'langs'     => 'qontosync@qontosync',
+            'position'  => 2001,
+            'enabled'   => '$conf->qontosync->enabled',
+            'perms'     => '$user->rights->qontosync->read',
+            'target'    => '',
+            'user'      => 2,
+            'titre'     => 'Rapprochement'
+        );
+        $r++;
+        
+        $this->menu[$r] = array(
+            'fk_menu'   => 'fk_mainmenu=bank,fk_leftmenu=qontosync_main', 
+            'type'      => 'left',
+            'mainmenu'  => 'bank',
+            'leftmenu'  => 'qontosync_statements',
+            'url'       => '/qontosync/statements.php',
+            'langs'     => 'qontosync@qontosync',
+            'position'  => 2002,
+            'enabled'   => '$conf->qontosync->enabled',
+            'perms'     => '$user->rights->qontosync->read',
+            'target'    => '',
+            'user'      => 2,
+            'titre'     => 'EditionDeReleve' 
+        );
+        $r++;
 	}
 
 	/**
