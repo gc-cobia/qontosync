@@ -147,7 +147,7 @@ class modQontosync extends DolibarrModules
             'perms'     => '$user->rights->qontosync->read',
             'target'    => '',
             'user'      => 2,
-            'titre'     => 'Rapprochement'
+            'titre'     => 'BankReconciliation'
         );
         $r++;
         
@@ -163,7 +163,7 @@ class modQontosync extends DolibarrModules
             'perms'     => '$user->rights->qontosync->read',
             'target'    => '',
             'user'      => 2,
-            'titre'     => 'EditionDeReleve' 
+            'titre'     => 'Statements' 
         );
         $r++;
 	}
