@@ -400,4 +400,43 @@ class QontoRepository
         
         return $details;
     }
+
+    /**
+	 * Retrieve Dolibarr opening and closing balances for each month of a given year
+	 *
+	 * @param int $bank_id Bank account id
+	 * @param int $year Year to analyze
+	 * @return array Array of months (1 to 12) with opening and closing balances
+	 */
+    public function getMonthlyBalances($bank_id, $year)
+    {
+        if (empty($bank_id) || empty($year)) return array();
+
+        // Loading the native banking library if not already done
+        if (!function_exists('bank_balance')) {
+            require_once DOL_DOCUMENT_ROOT . "/core/lib/bank.lib.php";
+        }
+        
+        $balances = array();
+
+        for ($m = 1; $m <= 12; $m++) {
+            // Defining the month's boundaries
+            $filter_start_month = sprintf("%04d-%02d-01", $year, $m);
+            $filter_end_month = date("Y-m-t", strtotime($filter_start_month));
+
+            // 1. OPENING balance for the month (Balance as of the day before the 1st of the month)
+            $veille_start = date("Y-m-d", strtotime("-1 day", strtotime($filter_start_month)));
+            $opening = bank_balance($this->db, $bank_id, $veille_start);
+
+            // 2. Month-end CLOSING balance (Balance as of the last day of the month)
+            $closing = bank_balance($this->db, $bank_id, $filter_end_month);
+
+            $balances[$m] = array(
+                'opening' => (float)$opening,
+                'closing' => (float)$closing
+            );
+        }
+
+        return $balances;
+    }
 }

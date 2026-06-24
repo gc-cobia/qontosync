@@ -542,4 +542,110 @@ class QontoUpdater
 			return -1;
 		}
 	}
+
+	/**
+	 * Download missing statements from Qonto to Dolibarr GED
+	 *
+	 * @param Account  $account Bank account object
+	 * @param int      $year    Year to analyze
+	 * @param QontoApi $api     Instantiated Qonto API object
+	 * @return array            Array with success, error, and skipped counts
+	 */
+	public function syncStatementsGED($account, $year, $api)
+	{
+		global $conf;
+
+		$result = array(
+			'success_count'  => 0,
+			'error_count'    => 0,
+			'already_exists' => 0,
+			'api_error'      => false
+		);
+
+		// 1. Retrieving the list of statements from the Qonto API
+		$qonto_statements_raw = $api->getStatements($account->iban, $year);
+
+		if ($qonto_statements_raw === false) {
+			$result['api_error'] = true;
+			return $result;
+		}
+
+		// 2. Indexing of statements by period ("05-2024")
+		$indexed_statements = array();
+		if (is_array($qonto_statements_raw)) {
+			foreach ($qonto_statements_raw as $stmt) {
+				if (!empty($stmt['period'])) {
+					$indexed_statements[$stmt['period']] = $stmt;
+				}
+			}
+		}
+
+		// 3. Format definition
+		$format_setting = getDolGlobalString('QONTOSYNC_STATEMENT_FORMAT') !== '' ? getDolGlobalString('QONTOSYNC_STATEMENT_FORMAT') : '{Y}-{m}';
+
+		// 4. Download loop
+		for ($m = 1; $m <= 12; $m++) {
+			$period_key = sprintf("%02d-%04d", $m, $year);
+
+			if (isset($indexed_statements[$period_key])) {
+				$stmt = $indexed_statements[$period_key];
+				$statement_url = $stmt['file']['file_url'];
+
+				// Calculating the exact file name
+				$filter_start_month = sprintf("%04d-%02d-01", $year, $m);
+				$time_month = strtotime($filter_start_month);
+				$raw_ref = preg_replace_callback('/\{([^}]+)\}/', function($matches) use ($time_month) {
+					return date($matches[1], $time_month);
+				}, $format_setting);
+				$clean_ref = preg_replace('/[^a-zA-Z0-9\-_.\/]/', '', $raw_ref);
+				$ref_releve = substr($clean_ref, 0, 50);
+				
+				$dir_output = $conf->bank->dir_output . '/' . $account->id . '/statement/' . $ref_releve;
+				if (!file_exists($dir_output)) {
+					dol_mkdir($dir_output);
+				}
+
+				$filename = $ref_releve . '.pdf';
+				$dest_file_path = $dir_output . '/' . $filename;
+
+				// If the file already exists locally, it is ignored.
+				if (file_exists($dest_file_path)) {
+					$result['already_exists']++;
+					continue;
+				}
+
+				// Secure download
+				if (!empty($statement_url)) {
+					$ch = curl_init();
+					curl_setopt($ch, CURLOPT_URL, $statement_url);
+					curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+					curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+					curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+					curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+					curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+					
+					$pdf_content = curl_exec($ch);
+					$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+					curl_close($ch);
+
+					if ($http_code == 200 && !empty($pdf_content)) {
+						// Writing the file to Dolibarr
+						$result_write = file_put_contents($dest_file_path, $pdf_content);
+						if ($result_write !== false) {
+							$result['success_count']++;
+							dol_syslog(__METHOD__ . ": Statement downloaded successfully for period " . $period_key . " to " . $dest_file_path, LOG_INFO);
+						} else {
+							$result['error_count']++;
+							dol_syslog(__METHOD__ . ": Failed to write statement file to disk: " . $dest_file_path, LOG_ERR);
+						}
+					} else {
+						$result['error_count']++;
+						dol_syslog(__METHOD__ . ": Failed to download statement from Qonto. HTTP Code: " . $http_code, LOG_ERR);
+					}
+				}
+			}
+		}
+
+		return $result;
+	}
 }

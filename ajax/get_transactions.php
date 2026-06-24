@@ -36,7 +36,7 @@ ob_end_clean();
 
 // Security check
 if (GETPOST('token', 'alpha') !== currentToken()) {
-    http_response_code(403);
+    http_response_code(401);
     echo "Invalid Token";
     exit;
 }

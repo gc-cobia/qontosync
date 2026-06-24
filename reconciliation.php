@@ -13,11 +13,7 @@ if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../..
 if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
 // Security check
-if ($user->socid > 0) {
-	accessforbidden();
-}
-
-if (!$user->hasRight('qontosync', 'read')) {
+if ($user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
     accessforbidden();
 }
 

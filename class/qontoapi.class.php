@@ -253,4 +253,76 @@ class QontoApi
 		dol_syslog(__METHOD__ . ": Testing the Qonto connection.", LOG_DEBUG);
 		return $response !== false;
 	}
+
+	/**
+	 * Get statements list from Qonto API filtered by IBAN and Year
+	 *
+	 * @param string $iban
+	 * @param int $year
+	 * @return array|bool Array of statements or false on error
+	 */
+	public function getStatements($iban, $year)
+	{
+		$all_statements = array();
+		$current_page = 1;
+
+		// Clean the IBAN by removing spaces
+		$clean_iban = str_replace(' ', '', $iban);
+
+		$period_from = "01-" . (int)$year;
+		$period_to = "12-" . (int)$year;
+
+		$base_endpoint = "/v2/statements?per_page=100&ibans[]=" . urlencode($clean_iban) . "&period_from=" . $period_from . "&period_to=" . $period_to;
+
+		do {
+			$endpoint = $base_endpoint . "&page=" . $current_page;
+			$response = $this->sendRequest($endpoint);
+			
+			if ($response === false) {
+				return false;
+			}
+
+			$data = json_decode($response, true);
+			
+			if (isset($data['statements']) && is_array($data['statements'])) {
+				$all_statements = array_merge($all_statements, $data['statements']);
+			}
+
+			// Check if there is a next page according to Qonto API meta object
+			if (isset($data['meta']) && !empty($data['meta']['next_page'])) {
+				$current_page = (int)$data['meta']['next_page'];
+			} else {
+				$current_page = null;
+			}
+			
+		} while ($current_page !== null);
+
+		dol_syslog(__METHOD__ . ": fetched " . count($all_statements) . " statements for year " . $year, LOG_DEBUG);
+
+		return $all_statements;
+	}
+
+	/**
+	 * Retrieve a specific statement from Qonto API by its ID
+	 *
+	 * @param string $statement_id ID of the statement
+	 * @return array|bool Array of the statement data or false on error
+	 */
+	public function getStatementById($statement_id)
+	{
+		$endpoint = "/v2/statements/" . urlencode(trim($statement_id));
+		$response = $this->sendRequest($endpoint);
+		
+		if ($response === false) {
+			return false;
+		}
+
+		$data = json_decode($response, true);
+		
+		if (isset($data['statement'])) {
+			return $data['statement'];
+		}
+
+		return false;
+	}
 }

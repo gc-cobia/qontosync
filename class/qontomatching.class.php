@@ -250,4 +250,133 @@ class QontoMatching
 		// Return the list of entries
 		return $entries;
 	}
+
+	/**
+	 * Prepare statements data by matching Qonto data with Dolibarr balances & VFS
+	 *
+	 * @param Account $account Bank account object
+	 * @param int $year
+	 * @param array $transactions Raw Qonto transactions
+	 * @param array $qonto_statements_raw Raw Qonto statements
+	 * @return array
+	 */
+	public function matchStatements($account, $year, $transactions, $qonto_statements_raw)
+	{
+		global $conf;
+
+		$months_data = array();
+
+		// 1. Retrieving pure Dolibarr balances via the Repository
+		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+		$qontoRepo = new QontoRepository($this->db);
+		$dolibarr_balances = $qontoRepo->getMonthlyBalances($account->id, $year);
+
+		// 2. Breakdown of Qonto transactions by month
+		$transactions_by_month = array_fill(1, 12, array());
+		if (is_array($transactions)) {
+			foreach ($transactions as $t) {
+				if (!empty($t['settled_at'])) {
+					$month_idx = (int)date('m', strtotime($t['settled_at']));
+					if ($month_idx >= 1 && $month_idx <= 12) {
+						$transactions_by_month[$month_idx][] = $t;
+					}
+				}
+			}
+		}
+
+		// 3. Qonto balance calculation
+		$qonto_month_opening = array();
+		$qonto_month_closing = array();
+		for ($m = 1; $m <= 12; $m++) {
+			if (!empty($transactions_by_month[$m])) {
+				$month_trxs = $transactions_by_month[$m];
+				
+				$newest_trx = $month_trxs[0];
+				$qonto_month_closing[$m] = isset($newest_trx['settled_balance_cents']) ? ($newest_trx['settled_balance_cents'] / 100) : (float)$newest_trx['settled_balance'];
+				
+				$oldest_trx = $month_trxs[count($month_trxs) - 1];
+				$oldest_balance = isset($oldest_trx['settled_balance_cents']) ? ($oldest_trx['settled_balance_cents'] / 100) : (float)$oldest_trx['settled_balance'];
+				$oldest_amount = isset($oldest_trx['amount_cents']) ? ($oldest_trx['amount_cents'] / 100) : (float)$oldest_trx['amount'];
+				
+				if (isset($oldest_trx['side']) && $oldest_trx['side'] == 'debit') {
+					$oldest_amount = -$oldest_amount;
+				}
+				$qonto_month_opening[$m] = $oldest_balance - $oldest_amount;
+			}
+		}
+		
+		// Reports of empty months (Qonto)
+		$last_known_balance = null;
+		for ($m = 1; $m <= 12; $m++) {
+			if (isset($qonto_month_closing[$m])) {
+				$last_known_balance = $qonto_month_closing[$m];
+			} elseif ($last_known_balance !== null) {
+				$qonto_month_opening[$m] = $last_known_balance;
+				$qonto_month_closing[$m] = $last_known_balance;
+			}
+		}
+		$next_known_balance = null;
+		for ($m = 12; $m >= 1; $m--) {
+			if (isset($qonto_month_opening[$m])) {
+				$next_known_balance = $qonto_month_opening[$m];
+			} elseif ($next_known_balance !== null) {
+				$qonto_month_opening[$m] = $next_known_balance;
+				$qonto_month_closing[$m] = $next_known_balance;
+			}
+		}
+
+		// 4. Qonto API statement indexing
+		$indexed_statements = array();
+		if (is_array($qonto_statements_raw)) {
+			foreach ($qonto_statements_raw as $stmt) {
+				if (!empty($stmt['period'])) {
+					$indexed_statements[$stmt['period']] = $stmt;
+				}
+			}
+		}
+
+		// 5. Final assembly
+		$format_setting = getDolGlobalString('QONTOSYNC_STATEMENT_FORMAT') !== '' ? getDolGlobalString('QONTOSYNC_STATEMENT_FORMAT') : '{Y}-{m}';
+
+		for ($m = 1; $m <= 12; $m++) {
+			$period_key = sprintf("%02d-%04d", $m, $year);
+			$month_label = dol_print_date(strtotime(sprintf("%04d-%02d-01", $year, $m)), "%B");
+			$filter_start_month = sprintf("%04d-%02d-01", $year, $m);
+
+			$has_statement_qonto = isset($indexed_statements[$period_key]);
+			
+			// Vérification GED
+			$time_month = strtotime($filter_start_month);
+			$raw_ref = preg_replace_callback('/\{([^}]+)\}/', function($matches) use ($time_month) {
+				return date($matches[1], $time_month);
+			}, $format_setting);
+			$clean_ref = preg_replace('/[^a-zA-Z0-9\-_.\/]/', '', $raw_ref);
+			$ref_releve = substr($clean_ref, 0, 50);
+			
+			$expected_filename = $ref_releve . '.pdf';
+			
+			// Path compliant with the Dolibarr standard
+			$file_path = $conf->bank->dir_output . '/' . $account->id . '/statement/' . $ref_releve . '/' . $expected_filename;
+
+			$in_dolibarr = file_exists($file_path);
+
+			$file_param = urlencode($account->id) . '/statement/' . urlencode($ref_releve) . '/' . urlencode($expected_filename);
+			$dolibarr_url = DOL_URL_ROOT . '/document.php?modulepart=bank&file=' . $file_param;
+
+			$months_data[$m] = array(
+				'label'            => $month_label,
+				'dolibarr_opening' => isset($dolibarr_balances[$m]['opening']) ? $dolibarr_balances[$m]['opening'] : 0,
+				'dolibarr_closing' => isset($dolibarr_balances[$m]['closing']) ? $dolibarr_balances[$m]['closing'] : 0,
+				'qonto_opening'    => isset($qonto_month_opening[$m]) ? $qonto_month_opening[$m] : 0,
+				'qonto_closing'    => isset($qonto_month_closing[$m]) ? $qonto_month_closing[$m] : 0,
+				'in_qonto'         => $has_statement_qonto,
+				'in_dolibarr'      => $in_dolibarr,
+				'dolibarr_url'     => $dolibarr_url,
+				'ref_releve'       => $ref_releve,
+				'statement_url'    => $has_statement_qonto ? $indexed_statements[$period_key]['file']['file_url'] : ''
+			);
+		}
+
+		return $months_data;
+	}
 }
