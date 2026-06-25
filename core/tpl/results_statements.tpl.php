@@ -22,11 +22,11 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
         <table class="liste centpercent">
             <tr class="liste_titre">
                 <th><?php print $langs->trans("Month"); ?></th>
-                <th class="right">Qonto<br><span class="small"><?php print $langs->trans("InitialBankBalance"); ?></span></th>
                 <th class="right">Dolibarr<br><span class="small"><?php print $langs->trans("InitialBankBalance"); ?></span></th>
+                <th class="right">Qonto<br><span class="small"><?php print $langs->trans("InitialBankBalance"); ?></span></th>
                 <th class="right"><?php print $langs->trans("Delta"); ?></th>
-                <th class="right">Qonto<br><span class="small"><?php print $langs->trans("EndBankBalance"); ?></span></th>
                 <th class="right">Dolibarr<br><span class="small"><?php print $langs->trans("EndBankBalance"); ?></span></th>
+                <th class="right">Qonto<br><span class="small"><?php print $langs->trans("EndBankBalance"); ?></span></th>
                 <th class="right"><?php print $langs->trans("Delta"); ?></th>
                 <th class="center"><?php print $langs->trans("AccountStatements"); ?></th>
             </tr>
