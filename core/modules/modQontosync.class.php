@@ -141,13 +141,13 @@ class modQontosync extends DolibarrModules
             'mainmenu'  => 'bank',
             'leftmenu'  => 'qontosync_reconciliation',
             'url'       => '/qontosync/reconciliation.php',
-            'langs'     => 'qontosync@qontosync',
+            'langs'     => 'banks',
             'position'  => 2001,
             'enabled'   => '$conf->qontosync->enabled',
             'perms'     => '$user->rights->qontosync->read',
             'target'    => '',
             'user'      => 2,
-            'titre'     => 'BankReconciliation'
+            'titre'     => 'Conciliation'
         );
         $r++;
         
@@ -157,13 +157,13 @@ class modQontosync extends DolibarrModules
             'mainmenu'  => 'bank',
             'leftmenu'  => 'qontosync_statements',
             'url'       => '/qontosync/statements.php',
-            'langs'     => 'qontosync@qontosync',
+            'langs'     => 'banks',
             'position'  => 2002,
             'enabled'   => '$conf->qontosync->enabled',
             'perms'     => '$user->rights->qontosync->read',
             'target'    => '',
             'user'      => 2,
-            'titre'     => 'Statements' 
+            'titre'     => 'AccountStatements' 
         );
         $r++;
 	}
