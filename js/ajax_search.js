@@ -79,7 +79,7 @@ $(document).ready(function () {
         });
     };
 
-    // MODALE SPINNER
+    // 7. MODALE SPINNER
     $(document).on('dialogopen', function (e) {
         let dialog = $(e.target);
         if (dialog.find('iframe').length > 0) {
@@ -94,7 +94,7 @@ $(document).ready(function () {
         }
     });
 
-    // TOGGLE SWITCH TO HIDE LINKED TRANSACTIONS
+    // 8. TOGGLE SWITCH TO HIDE LINKED TRANSACTIONS
     $(document).on('click', '[id*="QONTOSYNC_HIDE_LINKED"]', function () {
         $('.trx-linked').toggle();
         let eyeIcon = $('#qontosync_eye_icon');

@@ -36,18 +36,12 @@ ob_end_clean();
 
 // Security check
 if (GETPOST('token', 'alpha') !== currentToken()) {
-    http_response_code(403);
+    http_response_code(401);
     echo "Invalid Token";
     exit;
 }
 
-if ($user->socid > 0) {
-    http_response_code(403);
-    echo "External users not allowed";
-    exit;
-}
-
-if (!$user->hasRight('qontosync', 'write')) {
+if ($user->socid > 0 || !$user->hasRight('qontosync', 'write')) {
     http_response_code(403);
     echo "Permission Denied";
     exit;
@@ -121,10 +115,10 @@ if ($action == 'batch_link' && is_array($target_vals) && $bank_rowid > 0) {
         $type = ($error_count > 0) ? 'warnings' : 'mesgs';
         setEventMessages($msg, null, $type);
     } else {
-        setEventMessages($langs->trans("NoTransactionToLink"), null, 'warnings');
+        setEventMessages($langs->trans("NoTransactionToLink"), null, 'mesgs');
     }
 
-    // Respond to JS that everything went well
+    // Respond to JS
     echo "OK";
     exit;
 }

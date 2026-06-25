@@ -134,7 +134,7 @@ if ($action == 'process_advanced_match') {
         }
     }
 
-    // Respond to JS that everything went well
+    // Respond to JS
     echo "OK";
     exit;
 }

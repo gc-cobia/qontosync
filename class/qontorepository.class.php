@@ -293,6 +293,11 @@ class QontoRepository
      */
     public function getLinkedDetails($bank_id)
     {
+        if (empty($bank_id)) {
+            dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
+            return array();
+        }
+
         $details = array();
         
         // Searches for payments associated with this bank line
@@ -410,13 +415,16 @@ class QontoRepository
 	 */
     public function getMonthlyBalances($bank_id, $year)
     {
-        if (empty($bank_id) || empty($year)) return array();
-
-        // Loading the native banking library if not already done
-        if (!function_exists('bank_balance')) {
-            require_once DOL_DOCUMENT_ROOT . "/core/lib/bank.lib.php";
+        if (empty($bank_id) || empty($year)) {
+            dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
+            return array();
         }
-        
+       
+        // Load the native Dolibarr Account class
+        if (!class_exists('Account')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/account.class.php';
+        $account = new Account($this->db);
+        $account->fetch($bank_id);
+
         $balances = array();
 
         for ($m = 1; $m <= 12; $m++) {
@@ -424,12 +432,12 @@ class QontoRepository
             $filter_start_month = sprintf("%04d-%02d-01", $year, $m);
             $filter_end_month = date("Y-m-t", strtotime($filter_start_month));
 
-            // 1. OPENING balance for the month (Balance as of the day before the 1st of the month)
+             // 1. OPENING balance for the month (Balance as of the day before the 1st of the month)
             $veille_start = date("Y-m-d", strtotime("-1 day", strtotime($filter_start_month)));
-            $opening = bank_balance($this->db, $bank_id, $veille_start);
+            $opening = $account->solde(1, $veille_start);
 
             // 2. Month-end CLOSING balance (Balance as of the last day of the month)
-            $closing = bank_balance($this->db, $bank_id, $filter_end_month);
+            $closing = $account->solde(1, $filter_end_month);
 
             $balances[$m] = array(
                 'opening' => (float)$opening,

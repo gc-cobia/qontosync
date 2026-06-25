@@ -75,9 +75,9 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
             </div>
     
     	    <!-- Button validate all matches in right float box -->
-    	    <div style="margin-left: auto; padding-left: 15px;">
-    	        <input type="submit" form="form_batch_link" class="button button-save" value="<?php print $langs->trans("Validate"); ?>">
-    	    </div>
+			<button type="submit" form="form_batch_link" class="butAction" id="btn_validate_conciliation" style="border: none; cursor: pointer; display: inline-flex; align-items: center; font-size: 1em;">
+                <i class="fas fa-link marginrightonly"></i><?php print $langs->trans("Validate"); ?>
+            </button>
     	
     	</div>
     </form>

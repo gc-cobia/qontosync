@@ -72,26 +72,21 @@ if ($action == 'sync_ged' && $bank_rowid > 0 && $year > 0) {
     // Prepare the data
     $sync_result = $qontoUpdater->syncStatementsGED($account, $year, $api);
 
-    if ($sync_result['api_error']) {
-        setEventMessages("Erreur lors de la communication avec l'API Qonto.", null, 'errors');
-        echo "API_ERROR";
-        exit;
-    }
-
-    // Managing notifications in the interface feedback
+    // Prepare notification messages for the next display
     if ($sync_result['success_count'] > 0 || $sync_result['error_count'] > 0) {
-        $msg = "Synchronisation GED terminée : " . $sync_result['success_count'] . " relevé(s) téléchargé(s) avec succès.";
+        $msg = $langs->trans("FileTransferComplete") . ' (' . $sync_result['success_count'] . ')';
         if ($sync_result['error_count'] > 0) {
-            $msg .= " " . $sync_result['error_count'] . " échec(s).";
+            $msg .= ' ' . $langs->trans("ErrorFailedToSaveFile") . ' (' . $sync_result['error_count'] . ')';
             setEventMessages($msg, null, 'warnings');
         } else {
             setEventMessages($msg, null, 'mesgs');
         }
     } else {
-        setEventMessages("Tous les relevés disponibles pour cette année sont déjà présents dans votre GED.", null, 'warnings');
+        setEventMessages("Completed", null, 'mesgs');
     }
 
-    echo "OK";
+    // Respond to JS
+    print dol_htmloutput_events();
     exit;
 }
 

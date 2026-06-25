@@ -559,7 +559,8 @@ class QontoUpdater
 			'success_count'  => 0,
 			'error_count'    => 0,
 			'already_exists' => 0,
-			'api_error'      => false
+			'api_error'      => false,
+			'valid_refs'     => array()
 		);
 
 		// 1. Retrieving the list of statements from the Qonto API
@@ -611,6 +612,7 @@ class QontoUpdater
 				// If the file already exists locally, it is ignored.
 				if (file_exists($dest_file_path)) {
 					$result['already_exists']++;
+					$result['valid_refs'][] = $ref_releve;
 					continue;
 				}
 
@@ -633,6 +635,7 @@ class QontoUpdater
 						$result_write = file_put_contents($dest_file_path, $pdf_content);
 						if ($result_write !== false) {
 							$result['success_count']++;
+							$result['valid_refs'][] = $ref_releve;
 							dol_syslog(__METHOD__ . ": Statement downloaded successfully for period " . $period_key . " to " . $dest_file_path, LOG_INFO);
 						} else {
 							$result['error_count']++;
