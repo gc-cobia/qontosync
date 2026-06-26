@@ -135,8 +135,8 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                                     <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
                                 <?php endif; ?>
                                 </td>
-                                <td><?php print $d->label; ?></td>
-                                <td><?php print $d->thirdparty; ?></td>
+                                <td><?php print dol_escape_htmltag($d->label); ?></td>
+                                <td><?php print dol_escape_htmltag($d->thirdparty); ?></td>
                                 <td class="right amount"><?php print price($d->amount); ?></td>
                                 <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_cinv_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
                             </tr>
@@ -154,8 +154,8 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                                     <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
                                 <?php endif; ?>
                                 </td>
-                                <td><?php print $d->label; ?> <span class="opacitymedium small">(<?php print $d->ref_supplier; ?>)</span></td>
-                                <td><?php print $d->thirdparty; ?></td>
+                                <td><?php print dol_escape_htmltag($d->label); ?> <span class="opacitymedium small">(<?php print dol_escape_htmltag($d->ref_supplier); ?>)</span></td>
+                                <td><?php print dol_escape_htmltag($d->thirdparty); ?></td>
                                 <td class="right amount"><?php print price($d->amount); ?></td>
                                 <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_sinv_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
                             </tr>
@@ -168,7 +168,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                             <tr class="oddeven doc_row">
                                 <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="vat_<?php print $d->rowid; ?>" data-doctype="vat" data-thirdparty="VAT" data-remain="<?php print $d->amount; ?>"></td>
                                 <td><?php print $langs->trans("VAT"); ?></td>
-                                <td><?php print $d->label; ?></td>
+                                <td><?php print dol_escape_htmltag($d->label); ?></td>
                                 <td>-</td>
                                 <td class="right amount"><?php print price($d->amount); ?></td>
                                 <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_vat_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
@@ -183,7 +183,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                             <tr class="oddeven doc_row">
                                 <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="social_<?php print $d->rowid; ?>" data-doctype="social" data-thirdparty="SOCIAL" data-remain="<?php print $d->amount; ?>"></td>
                                 <td><?php print $langs->trans("SocialContributions"); ?></td>
-                                <td><?php print $d->label; ?></td>
+                                <td><?php print dol_escape_htmltag($d->label); ?></td>
                                 <td>-</td>
                                 <td class="right amount"><?php print price($d->amount); ?></td>
                                 <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
@@ -198,7 +198,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                             <tr class="oddeven doc_row">
                                 <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="salary_<?php print $d->rowid; ?>" data-doctype="salary" data-thirdparty="SALARY" data-remain="<?php print $d->amount; ?>"></td>
                                 <td><?php print $langs->trans("SalaryPayment"); ?></td>
-                                <td><?php print $d->label; ?></td>
+                                <td><?php print dol_escape_htmltag($d->label); ?></td>
                                 <td>-</td>
                                 <td class="right amount"><?php print price($d->amount); ?></td>
                                 <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_salary_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
@@ -213,7 +213,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                             <tr class="oddeven doc_row">
                                 <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="expense_<?php print $d->rowid; ?>" data-doctype="expense" data-thirdparty="EXPENSE" data-remain="<?php print $d->amount; ?>"></td>
                                 <td><?php print $langs->trans("ExpenseReports"); ?></td>
-                                <td><?php print $d->label; ?></td>
+                                <td><?php print dol_escape_htmltag($d->label); ?></td>
                                 <td>-</td>
                                 <td class="right amount"><?php print price($d->amount); ?></td>
                                 <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>

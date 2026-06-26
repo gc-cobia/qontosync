@@ -19,7 +19,7 @@ print dol_htmloutput_events();
 ?>
 
 <div style="flex: 1 1 auto; overflow-y: auto; background: var(--colorbackbody, #fff);">
-    <form id="form_batch_link" method="post" action="<?php print $_SERVER["PHP_SELF"]; ?>" style="margin: 0;">
+    <form id="form_batch_link" method="post" action="<?php print dol_escape_htmltag($_SERVER["PHP_SELF"]); ?>" style="margin: 0;">
         <input type="hidden" name="token" value="<?php print newToken(); ?>">
         <input type="hidden" name="action" value="batch_link">
         <input type="hidden" name="bank_rowid" value="<?php print $bank_rowid; ?>">

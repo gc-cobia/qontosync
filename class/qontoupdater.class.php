@@ -6,6 +6,15 @@
  * @license    GPLv3
  */
 
+/**
+ * SECURITY WARNING - SQL INJECTIONS
+ * As this module relies on standard Dolibarr $db abstraction (no prepared statements),
+ * ANY dynamic variable injected in SQL strings MUST strictly follow these rules:
+ * - Numerical IDs MUST be casted to integer: (int)$id
+ * - Strings MUST be escaped: $this->db->escape($string)
+ * - Arrays/Lists MUST be validated before implode()
+ */
+
 class QontoUpdater
 {
     private $db;
@@ -196,7 +205,7 @@ class QontoUpdater
 				return date($matches[1], $time_trx);
 			}, $format_setting);
 
-			$clean_ref = preg_replace('/[^a-zA-Z0-9\-_.\/]/', '', $raw_ref);
+			$clean_ref = dol_sanitizeFileName($raw_ref);
 
 			$ref_releve = substr($clean_ref, 0, 50);
 		}
@@ -598,7 +607,7 @@ class QontoUpdater
 				$raw_ref = preg_replace_callback('/\{([^}]+)\}/', function($matches) use ($time_month) {
 					return date($matches[1], $time_month);
 				}, $format_setting);
-				$clean_ref = preg_replace('/[^a-zA-Z0-9\-_.\/]/', '', $raw_ref);
+				$clean_ref = dol_sanitizeFileName($raw_ref);
 				$ref_releve = substr($clean_ref, 0, 50);
 				
 				$dir_output = $conf->bank->dir_output . '/' . $account->id . '/statement/' . $ref_releve;
@@ -619,12 +628,22 @@ class QontoUpdater
 				// Secure download
 				if (!empty($statement_url)) {
 					$ch = curl_init();
+
 					curl_setopt($ch, CURLOPT_URL, $statement_url);
 					curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 					curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-					curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+					curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+
 					curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 					curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+					
+					curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+					curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+					if (defined('CURLOPT_PROTOCOLS_STR')) {
+						curl_setopt($ch, CURLOPT_PROTOCOLS_STR, 'HTTPS');
+					} else {
+						curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+					}
 					
 					$pdf_content = curl_exec($ch);
 					$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);

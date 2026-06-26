@@ -12,8 +12,8 @@ if (! $res && file_exists("../../../main.inc.php")) $res = @include "../../../ma
 if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../../../main.inc.php";
 if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
-dol_include_once('/core/lib/admin.lib.php');
-dol_include_once('/core/class/html.form.class.php');
+if (!function_exists('dolibarr_set_const')) require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+if (!class_exists('Form')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
 
 $langs->loadLangs(array("admin", "qontosync@qontosync", "bills", "banks", "compta"));
@@ -90,29 +90,6 @@ if ($action == 'test') {
 	}
 }
 
-// Get VAR from dictionary
-$sql = "SELECT id, code, libelle FROM " . MAIN_DB_PREFIX . "c_paiement WHERE active = 1 AND entity IN (" . getEntity('c_paiement') . ")";
-$resql = $db->query($sql);
-$payment_modes = array();
-$payment_modes[''] = '-- ' . $langs->trans("Select") . ' --';
-
-if ($resql) {
-	while ($obj = $db->fetch_object($resql)) {
-		$trans_key = "PaymentTypeShort" . $obj->code;
-		$translated_label = $langs->trans($trans_key);
-		
-		if ($translated_label == $trans_key) {
-			$translated_label = $langs->trans($obj->code);
-			if ($translated_label == $obj->code) {
-				$translated_label = $obj->libelle;
-			}
-		}
-		
-		$payment_modes[$obj->id] = $translated_label . ' (' . $obj->code . ')';
-	}
-	$db->free($resql);
-}
-
 $page_name = "QontoSyncSetup";
 llxHeader('', $langs->trans("QontoSyncSetup"));
 
@@ -123,7 +100,7 @@ print load_fiche_titre($langs->trans("QontoSyncSetup"), $linkback, 'title_setup'
 /**
  * Qonto API parameters
  */
-print '<form method="post" action="'.$_SERVER["PHP_SELF"].'">';
+print '<form method="post" action="'.dol_escape_htmltag($_SERVER["PHP_SELF"]).'">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="update">';
 
@@ -135,13 +112,13 @@ print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSlug").'</td>';
-print '<td><input type="text" size="60" name="QONTOSYNC_SLUG" value="'.getDolGlobalString('QONTOSYNC_SLUG').'"></td>';
+print '<td><input type="text" size="60" name="QONTOSYNC_SLUG" value="'.dol_escape_htmltag(getDolGlobalString('QONTOSYNC_SLUG')).'"></td>';
 print '</tr>';
 
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoAPIKey").'</td>';
-print '<td><input type="text" size="60" name="QONTOSYNC_API_KEY" value="'.getDolGlobalString('QONTOSYNC_API_KEY').'"></td>';
+print '<td><input type="text" size="60" name="QONTOSYNC_API_KEY" value="'.dol_escape_htmltag(getDolGlobalString('QONTOSYNC_API_KEY')).'"></td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
@@ -151,7 +128,7 @@ print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSandboxToken").'</td>';
-print '<td><input type="text" size="60" name="QONTOSYNC_SANDBOX_TOKEN" value="'.getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN').'"></td>';
+print '<td><input type="text" size="60" name="QONTOSYNC_SANDBOX_TOKEN" value="'.dol_escape_htmltag(getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN')).'"></td>';
 print '</tr>';
 
 /**
@@ -161,22 +138,22 @@ print '<tr class="liste_titre"><td colspan="2">'.$langs->trans("Payments").'</td
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSyncPMTransfer").'</td>';
-print '<td>' . $form->selectarray('QONTOSYNC_PM_TRANSFER', $payment_modes, getDolGlobalString('QONTOSYNC_PM_TRANSFER')) . '</td>';
+print '<td>' . $form->select_types_paiements(getDolGlobalString('QONTOSYNC_PM_TRANSFER'), 'QONTOSYNC_PM_TRANSFER', '', 0, 1, 0, 0, 1, 'minwidth200 flat', 1) . '</td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSyncPMCard").'</td>';
-print '<td>' . $form->selectarray('QONTOSYNC_PM_CARD', $payment_modes, getDolGlobalString('QONTOSYNC_PM_CARD')) . '</td>';
+print '<td>' . $form->select_types_paiements(getDolGlobalString('QONTOSYNC_PM_CARD'), 'QONTOSYNC_PM_CARD', '', 0, 1, 0, 0, 1, 'minwidth200 flat', 1) . '</td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSyncPMDD").'</td>';
-print '<td>' . $form->selectarray('QONTOSYNC_PM_DD', $payment_modes, getDolGlobalString('QONTOSYNC_PM_DD')) . '</td>';
+print '<td>' . $form->select_types_paiements(getDolGlobalString('QONTOSYNC_PM_DD'), 'QONTOSYNC_PM_DD', '', 0, 1, 0, 0, 1, 'minwidth200 flat', 1) . '</td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSyncPMCheck").'</td>';
-print '<td>' . $form->selectarray('QONTOSYNC_PM_CHECK', $payment_modes, getDolGlobalString('QONTOSYNC_PM_CHECK')) . '</td>';
+print '<td>' . $form->select_types_paiements(getDolGlobalString('QONTOSYNC_PM_CHECK'), 'QONTOSYNC_PM_CHECK', '', 0, 1, 0, 0, 1, 'minwidth200 flat', 1) . '</td>';
 print '</tr>';
 
 /**

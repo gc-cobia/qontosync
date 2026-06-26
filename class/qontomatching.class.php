@@ -350,7 +350,7 @@ class QontoMatching
 			$raw_ref = preg_replace_callback('/\{([^}]+)\}/', function($matches) use ($time_month) {
 				return date($matches[1], $time_month);
 			}, $format_setting);
-			$clean_ref = preg_replace('/[^a-zA-Z0-9\-_.\/]/', '', $raw_ref);
+			$clean_ref = dol_sanitizeFileName($raw_ref);
 			$ref_releve = substr($clean_ref, 0, 50);
 			
 			$expected_filename = $ref_releve . '.pdf';

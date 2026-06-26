@@ -6,6 +6,15 @@
  * @license    GPLv3
  */
 
+/**
+ * SECURITY WARNING - SQL INJECTIONS
+ * As this module relies on standard Dolibarr $db abstraction (no prepared statements),
+ * ANY dynamic variable injected in SQL strings MUST strictly follow these rules:
+ * - Numerical IDs MUST be casted to integer: (int)$id
+ * - Strings MUST be escaped: $this->db->escape($string)
+ * - Arrays/Lists MUST be validated before implode()
+ */
+
 class QontoRepository
 {
 	public $db;
