@@ -18,10 +18,14 @@
 class QontoRepository
 {
 	public $db;
+    private $multicurrency_enabled;
 
 	public function __construct($db)
 	{
+        global $conf;
+
 		$this->db = $db;
+        $this->multicurrency_enabled = !empty($conf->multicurrency->enabled);
 	}
 	
 	/**
@@ -33,7 +37,7 @@ class QontoRepository
 	 */
 	public function getUnpaidDocuments($type = 'all')
 	{
-		global $conf;
+        global $conf;
 
 		$documents = array(
             'c_invoices' => array(),
@@ -56,6 +60,12 @@ class QontoRepository
 		// 1. Fetch unpaid customers invoices
 		if (!empty($conf->facture->enabled) && ($type === 'all' || $type === 'cinv')) {
 			$sql_c_inv = "SELECT f.rowid, f.ref, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
+
+            // If multicurrency is enabled
+            if ($this->multicurrency_enabled) {
+                $sql_c_inv .= ", f.multicurrency_code, f.multicurrency_tx ";
+            }
+
 			$sql_c_inv .= "FROM " . MAIN_DB_PREFIX . "facture as f ";
 			$sql_c_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
 			$sql_c_inv .= "WHERE f.entity IN (" . getEntity('facture') . ") AND f.fk_statut = 1 AND f.paye = 0 ";
@@ -67,6 +77,7 @@ class QontoRepository
 				$fact = new Facture($this->db);							
 				
 				while ($obj_c_inv = $this->db->fetch_object($resql_c_inv)) {
+
 					$fact->id = $obj_c_inv->rowid;
 					$fact->ref = $obj_c_inv->ref;
 					$fact->total_ttc = $obj_c_inv->total_ttc;
@@ -75,13 +86,21 @@ class QontoRepository
 					
 					$remain = $fact->getRemainToPay();						
 					if ($remain != 0) {
+                        // If multicurrency is enabled
+                        $mc_code = !empty($this->multicurrency_enabled) ? $obj_c_inv->multicurrency_code : '';
+                        $mc_tx = (!empty($this->multicurrency_enabled) && $obj_c_inv->multicurrency_tx > 0) ? (float)$obj_c_inv->multicurrency_tx : 1;
+                        $mc_remain = ($mc_code && $mc_code != $conf->currency) ? ($remain * $mc_tx) : $remain;
+
 						$documents['c_invoices'][] = (object) array(
-						'rowid'         => $fact->id,
-						'label'         => $fact->ref,
-						'amount'        => $remain,
-						'datev'         => $fact->date,
-						'thirdparty'    => $obj_c_inv->thirdparty_name,
-						'inv_type'      => (int)$obj_c_inv->type
+                            'rowid'         => $fact->id,
+                            'label'         => $fact->ref,
+                            'amount'        => $remain,
+                            'mc_amount'     => $mc_remain,
+                            'mc_code'       => $mc_code,
+                            'mc_tx'         => $mc_tx,
+                            'datev'         => $fact->date,
+                            'thirdparty'    => $obj_c_inv->thirdparty_name,
+                            'inv_type'      => (int)$obj_c_inv->type
 						);
 					}
 				}
@@ -92,6 +111,12 @@ class QontoRepository
 		// 2. Fetch unpaid suppliers invoices
 		if (!empty($conf->fournisseur->enabled) && ($type === 'all' || $type === 'sinv')) {
 			$sql_s_inv = "SELECT f.rowid, f.ref, f.ref_supplier, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
+            
+            // If multicurrency is enabled
+            if ($this->multicurrency_enabled) {
+                $sql_s_inv .= ", f.multicurrency_code, f.multicurrency_tx ";
+            }
+
 			$sql_s_inv .= "FROM " . MAIN_DB_PREFIX . "facture_fourn as f ";
 			$sql_s_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
 			$sql_s_inv .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") AND f.fk_statut = 1 AND f.paye = 0 ";
@@ -111,10 +136,18 @@ class QontoRepository
 					
 					$remain = $fact_fourn->getRemainToPay();
 					if ($remain != 0) {
+                        // If multicurrency is enabled
+                        $mc_code = !empty($this->multicurrency_enabled) ? $obj_s_inv->multicurrency_code : '';
+                        $mc_tx = (!empty($this->multicurrency_enabled) && $obj_s_inv->multicurrency_tx > 0) ? (float)$obj_s_inv->multicurrency_tx : 1;
+                        $mc_remain = ($mc_code && $mc_code != $conf->currency) ? ($remain * $mc_tx) : $remain;
+
 						$documents['s_invoices'][] = (object) array(
 							'rowid'        => $fact_fourn->id,
 							'label'        => $fact_fourn->ref,
 							'amount'       => $remain,
+                            'mc_amount'     => $mc_remain,
+                            'mc_code'       => $mc_code,
+                            'mc_tx'         => $mc_tx,
 							'datev'        => $fact_fourn->date,
 							'thirdparty'   => $obj_s_inv->thirdparty_name,
 							'ref_supplier' => $obj_s_inv->ref_supplier,

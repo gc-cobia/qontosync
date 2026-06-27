@@ -116,8 +116,14 @@ print dol_htmloutput_events();
                                             <optgroup label="<?php print $langs->trans('CustomersInvoices'); ?>">
                                                 
                                                 <?php foreach ($t['c_invoices'] as $cinv): ?>
+                                                    <?php
+                                                    $amt_display = price($cinv->amount) . ' ' . $conf->currency;
+                                                    if (!empty($cinv->mc_code) && $cinv->mc_code != $conf->currency) {
+                                                        $amt_display = price($cinv->mc_amount) . ' ' . $cinv->mc_code . ' (' . $amt_display . ')';
+                                                    }
+                                                    ?>
                                                     <option value="cinv_<?php print $cinv->rowid; ?>">
-                                                        <?php print dol_print_date($cinv->datev, 'day'); ?> - <?php print dol_escape_htmltag($cinv->label); ?> (<?php print price($cinv->amount); ?>) - <?php print dol_escape_htmltag($cinv->thirdparty); ?>
+                                                        <?php print dol_print_date($cinv->datev, 'day'); ?> - <?php print dol_escape_htmltag($cinv->label); ?> (<?php print $amt_display; ?>) - <?php print dol_escape_htmltag($cinv->thirdparty); ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                                 
@@ -127,10 +133,16 @@ print dol_htmloutput_events();
                                         <!-- insert suppliers invoices -->
                                         <?php if ($has_s_invoices): ?>
                                             <optgroup label="<?php print $langs->trans('SupplierInvoices'); ?>">
-                                                
+
                                                 <?php foreach ($t['s_invoices'] as $sinv): ?>
+                                                    <?php
+                                                    $amt_display = price($sinv->amount) . ' ' . $conf->currency;
+                                                    if (!empty($sinv->mc_code) && $sinv->mc_code != $conf->currency) {
+                                                        $amt_display = price($sinv->mc_amount) . ' ' . $sinv->mc_code . ' (' . $amt_display . ')';
+                                                    }
+                                                    ?>
                                                     <option value="sinv_<?php print $sinv->rowid; ?>">
-                                                        <?php print dol_print_date($sinv->datev, 'day'); ?> - <?php print dol_escape_htmltag($sinv->label); ?> (<?php print dol_escape_htmltag($sinv->ref_supplier); ?>) - <?php print dol_escape_htmltag($sinv->thirdparty); ?> (<?php print price($sinv->amount); ?>)
+                                                        <?php print dol_print_date($sinv->datev, 'day'); ?> - <?php print dol_escape_htmltag($sinv->label); ?> (<?php print $amt_display; ?>) - <?php print dol_escape_htmltag($cinv->thirdparty); ?> (<?php print dol_escape_htmltag($sinv->ref_supplier); ?>)
                                                     </option>
                                                 <?php endforeach; ?>
                                                 

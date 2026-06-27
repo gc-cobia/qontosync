@@ -18,9 +18,12 @@
 class QontoUpdater
 {
     private $db;
+	private $multicurrency_enabled;
 
     public function __construct($db) {
-        $this->db = $db;
+		global $conf;
+		$this->db = $db;
+		$this->multicurrency_enabled = !empty($conf->multicurrency->enabled);
     }
 
 	/**
@@ -209,6 +212,8 @@ class QontoUpdater
 
 			$ref_releve = substr($clean_ref, 0, 50);
 		}
+
+		$payment_label_prefix = '';
 		
 		switch ($type) {
 			case 'bank':
@@ -247,6 +252,7 @@ class QontoUpdater
                 $payment_type_str = 'payment';
 
 				$valid_amounts = array();
+				$valid_multicurrency_amounts = array();
                 $first_socid = 0;
                 $payment_label_ref = '';
 
@@ -268,8 +274,22 @@ class QontoUpdater
                         // Handle Credit Notes by applying a negative sign to the payment amount
 						$pay_amount = abs((float)$amount);
 						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
+
+						// Handle multicurrency
+						if (!empty($this->multicurrency_enabled) && $invoice->multicurrency_code != $conf->currency) {
+							$rate = (float)$invoice->multicurrency_tx > 0 ? (float)$invoice->multicurrency_tx : 1;
+							
+							if (isset($qonto_trx['currency']) && $qonto_trx['currency'] == $invoice->multicurrency_code) {
+								$valid_multicurrency_amounts[$doc_id] = $pay_amount;
+								$valid_amounts[$doc_id] = $pay_amount / $rate;
+							} else {
+								$valid_amounts[$doc_id] = $pay_amount;
+								$valid_multicurrency_amounts[$doc_id] = $pay_amount * $rate;
+							}
+						} else {
+							$valid_amounts[$doc_id] = $pay_amount;
+						}
 						
-						$valid_amounts[$doc_id] = $pay_amount;
 						$payment_label_ref .= $invoice->ref . ', ';
 					} else {
 						$error++;
@@ -290,6 +310,7 @@ class QontoUpdater
                 $payment_type_str = 'payment_supplier';
 
 				$valid_amounts = array();
+				$valid_multicurrency_amounts = array();
                 $first_socid = 0;
                 $payment_label_ref = '';
 
@@ -311,8 +332,22 @@ class QontoUpdater
                         // Handle Credit Notes by applying a negative sign to the payment amount
 						$pay_amount = abs((float)$amount);
 						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
-						
-						$valid_amounts[$doc_id] = $pay_amount;
+
+						// Handle multicurrency
+						if (!empty($this->multicurrency_enabled) && $invoice->multicurrency_code != $conf->currency) {
+							$rate = (float)$invoice->multicurrency_tx > 0 ? (float)$invoice->multicurrency_tx : 1;
+							
+							if (isset($qonto_trx['currency']) && $qonto_trx['currency'] == $invoice->multicurrency_code) {
+								$valid_multicurrency_amounts[$doc_id] = $pay_amount;
+								$valid_amounts[$doc_id] = $pay_amount / $rate;
+							} else {
+								$valid_amounts[$doc_id] = $pay_amount;
+								$valid_multicurrency_amounts[$doc_id] = $pay_amount * $rate;
+							}
+						} else {
+							$valid_amounts[$doc_id] = $pay_amount;
+						}
+
 						$payment_label_ref .= $invoice->ref . ', ';
 					} else {
 						$error++;
@@ -467,6 +502,11 @@ class QontoUpdater
             $payment->datep = strtotime($qonto_trx['settled_at']); // Specifically required by PaymentExpenseReport and PaymentSalary
             $payment->num_payment = $num_chq;
             $payment->amounts = $valid_amounts;
+
+			// If multicurrency is enabled
+			if (!empty($valid_multicurrency_amounts) && property_exists($payment, 'multicurrency_amounts')) {
+				$payment->multicurrency_amounts = $valid_multicurrency_amounts;
+			}
 
             $payment_label_ref = rtrim($payment_label_ref, ', ');
 

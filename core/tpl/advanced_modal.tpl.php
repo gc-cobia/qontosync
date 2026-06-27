@@ -127,9 +127,21 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                     <?php if (!empty($filtered_documents['c_invoices'])): ?>
                         <?php $has_data = true; ?>
                         <?php foreach ($filtered_documents['c_invoices'] as $d): ?>
-                            <?php $soc_name = dol_escape_htmltag($d->thirdparty); ?>
+                            <?php 
+                            $soc_name = dol_escape_htmltag($d->thirdparty); 
+                            
+                            $remain_for_js = $d->amount;
+                            $amt_display = price($d->amount) . ' ' . $conf->currency;
+                            
+                            if (!empty($d->mc_code) && $d->mc_code != $conf->currency) {
+                                if (isset($processed_trx['currency']) && $d->mc_code == $processed_trx['currency']) {
+                                    $remain_for_js = $d->mc_amount;
+                                }
+                                $amt_display = price($d->mc_amount) . ' ' . $d->mc_code . '<br><span class="opacitymedium small">' . price($d->amount) . ' ' . $conf->currency . '</span>';
+                            }
+                            ?>
                             <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_<?php print $d->rowid; ?>" data-doctype="cinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $d->amount; ?>"></td>
+                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_<?php print $d->rowid; ?>" data-doctype="cinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $remain_for_js; ?>"></td>
                                 <td><?php print $langs->trans("CustomersInvoices"); ?>
                                 <?php if ($d->inv_type == 2) : ?>
                                     <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
@@ -137,7 +149,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                                 </td>
                                 <td><?php print dol_escape_htmltag($d->label); ?></td>
                                 <td><?php print dol_escape_htmltag($d->thirdparty); ?></td>
-                                <td class="right amount"><?php print price($d->amount); ?></td>
+                                <td class="right amount"><?php print $amt_display; ?></td>
                                 <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_cinv_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
                             </tr>
                         <?php endforeach; ?>
@@ -146,9 +158,21 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                     <?php if (!empty($filtered_documents['s_invoices'])): ?>
                         <?php $has_data = true; ?>
                         <?php foreach ($filtered_documents['s_invoices'] as $d): ?>
-                            <?php $soc_name = dol_escape_htmltag($d->thirdparty); ?>
+                            <?php 
+                            $soc_name = dol_escape_htmltag($d->thirdparty); 
+                            
+                            $remain_for_js = $d->amount;
+                            $amt_display = price($d->amount) . ' ' . $conf->currency;
+                            
+                            if (!empty($d->mc_code) && $d->mc_code != $conf->currency) {
+                                if (isset($processed_trx['currency']) && $d->mc_code == $processed_trx['currency']) {
+                                    $remain_for_js = $d->mc_amount;
+                                }
+                                $amt_display = price($d->mc_amount) . ' ' . $d->mc_code . '<br><span class="opacitymedium small">' . price($d->amount) . ' ' . $conf->currency . '</span>';
+                            }
+                            ?>
                             <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_<?php print $d->rowid; ?>" data-doctype="sinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $d->amount; ?>"></td>
+                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_<?php print $d->rowid; ?>" data-doctype="sinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $remain_for_js; ?>"></td>
                                 <td><?php print $langs->trans("SupplierInvoices"); ?>
                                 <?php if ($d->inv_type == 2) : ?>
                                     <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
@@ -156,7 +180,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                                 </td>
                                 <td><?php print dol_escape_htmltag($d->label); ?> <span class="opacitymedium small">(<?php print dol_escape_htmltag($d->ref_supplier); ?>)</span></td>
                                 <td><?php print dol_escape_htmltag($d->thirdparty); ?></td>
-                                <td class="right amount"><?php print price($d->amount); ?></td>
+                                <td class="right amount"><?php print $amt_display; ?></td>
                                 <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_sinv_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
                             </tr>
                         <?php endforeach; ?>

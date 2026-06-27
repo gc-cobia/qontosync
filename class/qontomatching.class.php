@@ -10,10 +10,13 @@ class QontoMatching
 {
 	public $db;
 	private $links_cache = array(); // PHP cache to store already linked Qonto IDs
+	private $multicurrency_enabled;
 
 	public function __construct($db)
 	{
+		global $conf;
 		$this->db = $db;
+		$this->multicurrency_enabled = !empty($conf->multicurrency->enabled);
 	}
 
 	/**
@@ -78,19 +81,19 @@ class QontoMatching
 			return -1;
 		}
 	
-		if ($op_type == 'income' || $op_type == 'transfer') {
-			return getDolGlobalInt('QONTOSYNC_PM_TRANSFER') ? getDolGlobalInt('QONTOSYNC_PM_TRANSFER') : '';
+		if ($op_type == 'income' || $op_type == 'transfer' || $op_type == 'swift_income' || $op_type == 'recall' || $op_type == 'account_remuneration') {
+			return getDolGlobalInt('QONTOSYNC_PM_TRANSFER') ?: '';
 		} elseif ($op_type == 'card' || $op_type == 'card_acquirer_payout') {
-			return getDolGlobalInt('QONTOSYNC_PM_CARD') ? getDolGlobalInt('QONTOSYNC_PM_CARD') : '';
-		} elseif ($op_type == 'direct_debit' || $op_type == 'direct_debit_collection') {
-			return getDolGlobalInt('QONTOSYNC_PM_DD') ? getDolGlobalInt('QONTOSYNC_PM_DD') : '';
+			return getDolGlobalInt('QONTOSYNC_PM_CARD') ?: '';
+		} elseif ($op_type == 'direct_debit' || $op_type == 'direct_debit_collection' || $op_type == 'financing_installment') {
+			return getDolGlobalInt('QONTOSYNC_PM_DD') ?: '';
 		} elseif ($op_type == 'check') {
-			return getDolGlobalInt('QONTOSYNC_PM_CHECK') ? getDolGlobalInt('QONTOSYNC_PM_CHECK') : '';
+			return getDolGlobalInt('QONTOSYNC_PM_CHECK') ?: '';
 		} elseif ($op_type == 'qonto_fee') {
 			if ($side === 'credit') {
-				return getDolGlobalInt('QONTOSYNC_PM_TRANSFER');
+				return getDolGlobalInt('QONTOSYNC_PM_TRANSFER') ?: '';
 			} else {
-				return getDolGlobalInt('QONTOSYNC_PM_DD');
+				return getDolGlobalInt('QONTOSYNC_PM_DD') ?: '';
 			}
 		}
 	
@@ -199,7 +202,10 @@ class QontoMatching
 				// Compare transactions amount with unpaid customers invoices amount
 				$t["c_invoices"] = array();
 				foreach ($unpaid_c_invoices as $c_inv) {
-					if (price2num((float) $c_inv->amount, 'MT') == price2num($t['amount'], 'MT')) {
+					$match_base = (price2num((float) $c_inv->amount, 'MT') == price2num($t['amount'], 'MT'));
+					$match_mc = (!empty($c_inv->mc_code) && $c_inv->mc_code != $conf->currency && price2num((float) $c_inv->mc_amount, 'MT') == price2num($t['amount'], 'MT'));
+
+					if ($match_base || $match_mc) {
 						$t["c_invoices"][] = clone $c_inv;
 					}
 				}
@@ -207,7 +213,10 @@ class QontoMatching
 				// Compare transactions amount with unpaid suppliers invoices amount
 				$t["s_invoices"] = array();
 				foreach ($unpaid_s_invoices as $s_inv) {
-					if (-(price2num((float) $s_inv->amount, 'MT')) == price2num($t['amount'], 'MT')) {
+					$match_base = (-(price2num((float) $s_inv->amount, 'MT')) == price2num($t['amount'], 'MT'));
+					$match_mc = (!empty($s_inv->mc_code) && $s_inv->mc_code != $conf->currency && -(price2num((float) $s_inv->mc_amount, 'MT')) == price2num($t['amount'], 'MT'));
+
+					if ($match_base || $match_mc) {
 						$t["s_invoices"][] = clone $s_inv;
 					}
 				}

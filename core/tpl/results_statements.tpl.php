@@ -33,6 +33,8 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 
             <?php foreach ($months_data as $m => $data): ?>
                 <?php 
+                    $is_future = ($year > date('Y') || ($year == date('Y') && $m > date('n')));
+
                     $diff_open = price2num($data['qonto_opening'] - $data['dolibarr_opening'], 'MT');
                     $diff_close = price2num($data['qonto_closing'] - $data['dolibarr_closing'], 'MT');
                     
@@ -42,14 +44,26 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                 <tr class="oddeven">
                     <td><span class="ucfirst"><?php print dol_escape_htmltag($data['label']); ?></span></td>
 
+                    <?php if ($is_future): ?>
+                    <td class="right">-</td>
+                    <td class="right">-</td>
+                    <td class="right">-</td>
+                    
+                    <td class="right">-</td>
+                    <td class="right">-</td>
+                    <td class="right">-</td>
+
+                    <td class="center">-</td>
+
+                    <?php else: ?>
                     <td class="right"><?php print price($data['dolibarr_opening']); ?></td>
                     <td class="right"><?php print price($data['qonto_opening']); ?></td>
                     <td class="right" style="color: <?php print $color_open; ?>; font-weight:bold;">
                         <?php print price($diff_open); ?>
                     </td>
                     
-                    <td class="right opacitymedium"><?php print price($data['dolibarr_closing']); ?></td>
-                    <td class="right opacitymedium"><?php print price($data['qonto_closing']); ?></td>
+                    <td class="right"><?php print price($data['dolibarr_closing']); ?></td>
+                    <td class="right"><?php print price($data['qonto_closing']); ?></td>
                     <td class="right" style="color: <?php print $color_close; ?>; font-weight:bold;">
                         <?php print price($diff_close); ?>
                     </td>
@@ -67,6 +81,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                             <span class="opacitymedium small"><?php print $langs->trans("NotAvailable"); ?></span>
                         <?php endif; ?>
                     </td>
+                    <?php endif; ?>
                 </tr>
             <?php endforeach; ?>
 

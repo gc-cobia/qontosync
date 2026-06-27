@@ -189,7 +189,7 @@ class QontoApi
 		$current_page = 1;
 
 		do {
-			$endpoint = $base_endpoint . "&current_page=" . $current_page;
+			$endpoint = $base_endpoint . "&page=" . $current_page;
 			$response = $this->sendRequest($endpoint);
 			
 			if ($response === false) {

@@ -118,7 +118,7 @@ print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoAPIKey").'</td>';
-print '<td><input type="text" size="60" name="QONTOSYNC_API_KEY" value="'.dol_escape_htmltag(getDolGlobalString('QONTOSYNC_API_KEY')).'"></td>';
+print '<td><input type="password" size="60" name="QONTOSYNC_API_KEY" value="'.dol_escape_htmltag(getDolGlobalString('QONTOSYNC_API_KEY')).'"></td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
