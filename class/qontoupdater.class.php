@@ -134,10 +134,17 @@ class QontoUpdater
 			return -1;
 		}
 			
+		// Define local qonto currency amount
+		$qonto_local_amount = 0.0;
+		if (!empty($this->multicurrency_enabled)) {
+			$qonto_local_amount = (float)$qonto_trx['local_amount'];
+		}
+
 		// Calculate the real Qonto amount with its sign
 		$qonto_amount = (float)$qonto_trx['amount'];
 		if (isset($qonto_trx['side']) && $qonto_trx['side'] == 'debit') {
 			$qonto_amount = -$qonto_amount;
+			$qonto_local_amount = -$qonto_local_amount;
 		}
 		
 		// Amount verification
@@ -252,7 +259,7 @@ class QontoUpdater
                 $payment_type_str = 'payment';
 
 				$valid_amounts = array();
-				$valid_multicurrency_amounts = array();
+				$exchange_diff_amounts = array();
                 $first_socid = 0;
                 $payment_label_ref = '';
 
@@ -275,21 +282,20 @@ class QontoUpdater
 						$pay_amount = abs((float)$amount);
 						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
 
-						// Handle multicurrency
+						$valid_amounts[$doc_id] = $pay_amount;
+
+						// Handle multicurrency different change
 						if (!empty($this->multicurrency_enabled) && $invoice->multicurrency_code != $conf->currency) {
-							$rate = (float)$invoice->multicurrency_tx > 0 ? (float)$invoice->multicurrency_tx : 1;
-							
-							if (isset($qonto_trx['currency']) && $qonto_trx['currency'] == $invoice->multicurrency_code) {
-								$valid_multicurrency_amounts[$doc_id] = $pay_amount;
-								$valid_amounts[$doc_id] = $pay_amount / $rate;
-							} else {
-								$valid_amounts[$doc_id] = $pay_amount;
-								$valid_multicurrency_amounts[$doc_id] = $pay_amount * $rate;
+							if (isset($qonto_trx['local_currency']) && strtoupper($qonto_trx['local_currency']) == strtoupper($invoice->multicurrency_code)
+							&& price2num($qonto_local_amount, 'MT') == price2num($invoice->multicurrency_total_ttc, 'MT')) {
+								$historic_eur = (float) $invoice->getRemainToPay();
+								$diff_eur = $historic_eur - $pay_amount;
+								if (abs($diff_eur) >= 0.01) {
+                                    $exchange_diff_amounts[$doc_id] = $diff_eur;
+                                }
 							}
-						} else {
-							$valid_amounts[$doc_id] = $pay_amount;
 						}
-						
+
 						$payment_label_ref .= $invoice->ref . ', ';
 					} else {
 						$error++;
@@ -310,7 +316,7 @@ class QontoUpdater
                 $payment_type_str = 'payment_supplier';
 
 				$valid_amounts = array();
-				$valid_multicurrency_amounts = array();
+				$exchange_diff_amounts = array();
                 $first_socid = 0;
                 $payment_label_ref = '';
 
@@ -333,19 +339,18 @@ class QontoUpdater
 						$pay_amount = abs((float)$amount);
 						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
 
-						// Handle multicurrency
+						$valid_amounts[$doc_id] = $pay_amount;
+
+						// Handle multicurrency different change
 						if (!empty($this->multicurrency_enabled) && $invoice->multicurrency_code != $conf->currency) {
-							$rate = (float)$invoice->multicurrency_tx > 0 ? (float)$invoice->multicurrency_tx : 1;
-							
-							if (isset($qonto_trx['currency']) && $qonto_trx['currency'] == $invoice->multicurrency_code) {
-								$valid_multicurrency_amounts[$doc_id] = $pay_amount;
-								$valid_amounts[$doc_id] = $pay_amount / $rate;
-							} else {
-								$valid_amounts[$doc_id] = $pay_amount;
-								$valid_multicurrency_amounts[$doc_id] = $pay_amount * $rate;
+							if (isset($qonto_trx['local_currency']) && strtoupper($qonto_trx['local_currency']) == strtoupper($invoice->multicurrency_code)
+							&& price2num(-$qonto_local_amount, 'MT') == price2num($invoice->multicurrency_total_ttc, 'MT')) {
+								$historic_eur = (float) $invoice->getRemainToPay();
+								$diff_eur = $historic_eur - $pay_amount;
+								if (abs($diff_eur) >= 0.01) {
+                                    $exchange_diff_amounts[$doc_id] = $diff_eur;
+                                }
 							}
-						} else {
-							$valid_amounts[$doc_id] = $pay_amount;
 						}
 
 						$payment_label_ref .= $invoice->ref . ', ';
@@ -484,7 +489,7 @@ class QontoUpdater
 				break;
 		}
 		
-        // Payment for customers/suppliers invoices & VAT
+        // Global payment
         if ($error == 0 && $type !== 'bank' && is_object($payment)) {
             
             // Properties common to all payments
@@ -502,11 +507,6 @@ class QontoUpdater
             $payment->datep = strtotime($qonto_trx['settled_at']); // Specifically required by PaymentExpenseReport and PaymentSalary
             $payment->num_payment = $num_chq;
             $payment->amounts = $valid_amounts;
-
-			// If multicurrency is enabled
-			if (!empty($valid_multicurrency_amounts) && property_exists($payment, 'multicurrency_amounts')) {
-				$payment->multicurrency_amounts = $valid_multicurrency_amounts;
-			}
 
             $payment_label_ref = rtrim($payment_label_ref, ', ');
 
@@ -563,6 +563,22 @@ class QontoUpdater
                                 $res_paid = $expense_obj->setPaid($first_doc_id, $user);
                                 if ($res_paid < 0) { $error++; }
                             }
+
+							// Multi-currency, close document if paid and create BookKeeping entries
+							if (!empty($this->multicurrency_enabled) && $error === 0 && !empty($exchange_diff_amounts)) {
+								$res_diff = $this->handleExchangeDifference(
+									$exchange_diff_amounts, 
+									$type, 
+									strtotime($qonto_trx['settled_at']), 
+									$user
+								);
+								
+								if ($res_diff < 0) {
+									$error++;
+								}
+							}
+
+
                         } else {
                             dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
                             $error++;
@@ -709,5 +725,124 @@ class QontoUpdater
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Handles commercial closure and accounting entries for exchange rate differences
+	 *
+	 * @param array  $exchange_diff_amounts Array of differences [doc_id => diff_eur]
+	 * @param string $type                  Document type ('cinv' or 'sinv')
+	 * @param int    $doc_date              Qonto transaction timestamp
+	 * @param User   $user                  Current user
+	 * @return int 1 on success, -1 on error
+	 */
+	private function handleExchangeDifference($exchange_diff_amounts, $type, $doc_date, $user)
+	{
+		global $conf;
+
+		$is_customer = ($type === 'cinv');
+		$is_supplier = ($type === 'sinv');
+		$accounting_enabled = !empty($conf->accounting->enabled);
+
+		if (!$is_customer && !$is_supplier) {
+			return -1;
+		}
+
+		// Conditional class loading
+		if ($is_customer && !class_exists('Facture')) require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+		if ($is_supplier && !class_exists('FactureFournisseur')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+		
+		if ($accounting_enabled && !class_exists('BookKeeping')) {
+			require_once DOL_DOCUMENT_ROOT.'/accountancy/class/bookkeeping.class.php';
+		}
+
+		// Retrieve configuration parameters
+		$loss_account = getDolGlobalString('ACCOUNTING_ACCOUNT_CHG_LOSS') ?: '666000';
+		$gain_account = getDolGlobalString('ACCOUNTING_ACCOUNT_CHG_GAIN') ?: '766000';
+		$od_journal   = getDolGlobalString('ACCOUNTING_JOURNAL_OD') ?: 'OD';
+
+		foreach ($exchange_diff_amounts as $inv_id => $diff_eur) {
+			$inv_mc = $is_customer ? new Facture($this->db) : new FactureFournisseur($this->db);
+			
+			if ($inv_mc->fetch($inv_id) > 0) {
+				
+				// 1. Commercial closure of the invoice
+				$res_paid = $inv_mc->setPaid($user, 'discount', 'Exchange diff - QontoSync');
+				
+				if ($res_paid < 0) { 
+					$doc_label = $is_customer ? "customer invoice" : "supplier invoice";
+					dol_syslog(__METHOD__ . ": Error during closing (Exchange rate difference) " . $doc_label . ": " . $inv_mc->error, LOG_ERR);
+					return -1;
+				}
+
+				/*/ 2. Accounting entry via native BookKeeping class
+				if ($accounting_enabled) {
+					$inv_mc->fetch_thirdparty();
+					
+					// Resolve third-party accounts
+					if ($is_customer) {
+						$thirdparty_account = !empty($inv_mc->thirdparty->code_compta) ? $inv_mc->thirdparty->code_compta : '411000';
+					} else {
+						$thirdparty_account = !empty($inv_mc->thirdparty->code_compta_fournisseur) ? $inv_mc->thirdparty->code_compta_fournisseur : '401000';
+					}
+
+					// Determine the direction of the entry
+					$lines = array();
+					
+					if ($is_customer) {
+						if ($diff_eur > 0) {
+							// Customer loss: Debit 666 / Credit 411
+							$lines[] = array('account' => $loss_account, 'sub' => '', 'debit' => $diff_eur, 'credit' => 0);
+							$lines[] = array('account' => '411000', 'sub' => $thirdparty_account, 'debit' => 0, 'credit' => $diff_eur);
+						} else {
+							// Customer gain: Debit 411 / Credit 766
+							$lines[] = array('account' => '411000', 'sub' => $thirdparty_account, 'debit' => abs($diff_eur), 'credit' => 0);
+							$lines[] = array('account' => $gain_account, 'sub' => '', 'debit' => 0, 'credit' => abs($diff_eur));
+						}
+					} else { 
+						if ($diff_eur > 0) {
+							// Supplier gain: Debit 401 / Credit 766
+							$lines[] = array('account' => '401000', 'sub' => $thirdparty_account, 'debit' => $diff_eur, 'credit' => 0);
+							$lines[] = array('account' => $gain_account, 'sub' => '', 'debit' => 0, 'credit' => $diff_eur);
+						} else {
+							// Supplier loss: Debit 666 / Credit 401
+							$lines[] = array('account' => $loss_account, 'sub' => '', 'debit' => abs($diff_eur), 'credit' => 0);
+							$lines[] = array('account' => '401000', 'sub' => $thirdparty_account, 'debit' => 0, 'credit' => abs($diff_eur));
+						}
+					}
+					
+					// Create lines in the General Ledger
+					foreach ($lines as $line) {
+						$bk = new BookKeeping($this->db);
+						
+						$bk->doc_date          = $doc_date;
+						$bk->doc_type          = 'od';
+						$bk->doc_ref           = $inv_mc->ref;
+						$bk->fk_doc            = $inv_mc->id;
+						$bk->fk_docdet         = 0;
+						$bk->code_journal      = $od_journal;
+						$bk->numero_compte     = $line['account'];
+						$bk->subledger_account = $line['sub'];
+						$bk->label_operation   = 'Exchange diff - ' . $inv_mc->ref;
+						$bk->debit             = $line['debit'];
+						$bk->credit            = $line['credit'];
+						$bk->montant           = $line['debit'] > 0 ? $line['debit'] : $line['credit'];
+						$bk->sens              = $line['debit'] > 0 ? 'D' : 'C';
+						$bk->entity            = $conf->entity;
+
+						$res_bk = $bk->create($user);
+						
+						if ($res_bk < 0) {
+							dol_syslog(__METHOD__ . ": Accounting OD error: " . $bk->error, LOG_ERR);
+							return -1;
+						}
+					}
+				}*/
+			} else {
+				return -1;
+			}
+		}
+
+		return 1;
 	}
 }

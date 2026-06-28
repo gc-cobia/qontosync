@@ -108,7 +108,7 @@ class QontoMatching
 	 * @param bool $fast_mod
 	 * @return array Array transactions with trx status and linked_rowid or trx_status = "ErrorTooManyTrx" or trx_status = "unlinked" with trx array
 	 */
-	public function fetchTransactions($transaction, $bank_id, $fast_mod = false)
+	public function fetchTransactions($transaction, $bank_id)
 	{
 		global $conf; // Required to read the tolerance setting from global configuration
 
@@ -150,11 +150,15 @@ class QontoMatching
 			$t['trx'] = array();
 			
 			$t['amount'] = isset($t['amount']) ? (float)$t['amount'] : 0.0;
+			$t['local_amount'] = isset($t['local_amount']) ? (float)$t['local_amount'] : 0.0;
 
 			// Correct the sign amount due to the side movement
 			if (isset($t['side']) && $t['side'] == 'debit') {
 				$t['amount'] = -$t['amount'];
+				$t['local_amount'] = -$t['local_amount'];
 			}
+
+			$qonto_local_currency = isset($t['local_currency']) ? strtoupper($t['local_currency']) : '';
 
 			// Verify if transaction is already linked using the cached data
 			$link_status = $this->isLinked($t['id'], $bank_id);
@@ -203,7 +207,16 @@ class QontoMatching
 				$t["c_invoices"] = array();
 				foreach ($unpaid_c_invoices as $c_inv) {
 					$match_base = (price2num((float) $c_inv->amount, 'MT') == price2num($t['amount'], 'MT'));
-					$match_mc = (!empty($c_inv->mc_code) && $c_inv->mc_code != $conf->currency && price2num((float) $c_inv->mc_amount, 'MT') == price2num($t['amount'], 'MT'));
+
+					$match_mc = false;
+					if ($this->multicurrency_enabled) {
+						$match_mc = (
+							!empty($c_inv->mc_code) 
+							&& $c_inv->mc_code != $conf->currency 
+							&& strtoupper($c_inv->mc_code) === $qonto_local_currency 
+							&& (price2num((float) $c_inv->mc_amount, 'MT')) == price2num($t['local_amount'], 'MT')
+						);
+					}
 
 					if ($match_base || $match_mc) {
 						$t["c_invoices"][] = clone $c_inv;
@@ -214,7 +227,16 @@ class QontoMatching
 				$t["s_invoices"] = array();
 				foreach ($unpaid_s_invoices as $s_inv) {
 					$match_base = (-(price2num((float) $s_inv->amount, 'MT')) == price2num($t['amount'], 'MT'));
-					$match_mc = (!empty($s_inv->mc_code) && $s_inv->mc_code != $conf->currency && -(price2num((float) $s_inv->mc_amount, 'MT')) == price2num($t['amount'], 'MT'));
+					
+					$match_mc = false;
+					if ($this->multicurrency_enabled) {
+						$match_mc = (
+							!empty($s_inv->mc_code) 
+							&& $s_inv->mc_code != $conf->currency 
+							&& strtoupper($s_inv->mc_code) === $qonto_local_currency 
+							&& -(price2num((float) $s_inv->mc_amount, 'MT')) == price2num($t['local_amount'], 'MT')
+						);
+					}
 
 					if ($match_base || $match_mc) {
 						$t["s_invoices"][] = clone $s_inv;
