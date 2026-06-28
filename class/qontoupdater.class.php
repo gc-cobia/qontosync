@@ -263,15 +263,45 @@ class QontoUpdater
                 $first_socid = 0;
                 $payment_label_ref = '';
 
+				// Multi-currency pre-check 
+				$allow_exchange_diff = false;
+				if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+					$batch_mc_expected = 0.0;
+					$batch_mc_valid = true;
+					
+					// Direct entry of the total amount (including tax) in foreign currency (NO rate calculation)
+					foreach ($amounts_array as $doc_id => $amount) {
+						$inv_check = new Facture($this->db);
+						if ($inv_check->fetch($doc_id) > 0) {
+							if ($inv_check->multicurrency_code == $conf->currency || strtoupper($inv_check->multicurrency_code) !== strtoupper($qonto_trx['local_currency'])) {
+								$batch_mc_valid = false; 
+								break;
+							}
+							
+							$mc_total = (float)$inv_check->multicurrency_total_ttc;
+							if ($inv_check->type == 2 || $inv_check->total_ttc < 0) $mc_total = -abs($mc_total);
+							
+							$batch_mc_expected += $mc_total;
+						}
+					}
+					
+					// If the sum of the invoices exactly matches the Qonto amount in the currency, we allow to close documents
+					if ($batch_mc_valid && price2num($qonto_local_amount, 'MT') === price2num($batch_mc_expected, 'MT')) {
+						$allow_exchange_diff = true;
+					}
+				}
+
 				// Loop through amounts_array to validate and collect payment data	
 				foreach ($amounts_array as $doc_id => $amount) {
 					$invoice = new Facture($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
+
 					    // Retrieve thirdparty info for the first document to populate the bank line
 						if ($first_socid == 0) {
 							$first_socid = $invoice->fk_soc;
 							$invoice->fetch_thirdparty();
 							$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
+
 						// Strict blocking if the third party is different for the following documents
 						} elseif ($first_socid != $invoice->fk_soc) {
 						    dol_syslog(__METHOD__ . ": Documents from different third parties detected.", LOG_ERR);
@@ -285,14 +315,12 @@ class QontoUpdater
 						$valid_amounts[$doc_id] = $pay_amount;
 
 						// Handle multicurrency different change
-						if (!empty($this->multicurrency_enabled) && $invoice->multicurrency_code != $conf->currency) {
-							if (isset($qonto_trx['local_currency']) && strtoupper($qonto_trx['local_currency']) == strtoupper($invoice->multicurrency_code)
-							&& price2num($qonto_local_amount, 'MT') == price2num($invoice->multicurrency_total_ttc, 'MT')) {
-								$historic_eur = (float) $invoice->getRemainToPay();
-								$diff_eur = $historic_eur - $pay_amount;
-								if (abs($diff_eur) >= 0.01) {
-                                    $exchange_diff_amounts[$doc_id] = $diff_eur;
-                                }
+						if ($allow_exchange_diff) {
+							$historic_eur = (float) $invoice->getRemainToPay();
+							$diff_eur = $historic_eur - $pay_amount;
+							
+							if (abs($diff_eur) >= 0.01) {
+								$exchange_diff_amounts[$doc_id] = $diff_eur;
 							}
 						}
 
@@ -313,43 +341,74 @@ class QontoUpdater
 				
 				// Initialize payment
 				$payment = new PaiementFourn($this->db);
-                $payment_type_str = 'payment_supplier';
+				$payment_type_str = 'payment_supplier';
 
 				$valid_amounts = array();
 				$exchange_diff_amounts = array();
-                $first_socid = 0;
-                $payment_label_ref = '';
+				$first_socid = 0;
+				$payment_label_ref = '';
 
-				// Loop through amounts_array to validate and collect payment data
+				// Multi-currency pre-check
+				$allow_exchange_diff = false;
+				if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+					$batch_mc_expected = 0.0;
+					$batch_mc_valid = true;
+					
+					// Direct entry of the total amount (including tax) in foreign currency (NO rate calculation)
+					foreach ($amounts_array as $doc_id => $amount) {
+						$inv_check = new FactureFournisseur($this->db);
+						if ($inv_check->fetch($doc_id) > 0) {
+							if (
+								$inv_check->multicurrency_code == $conf->currency || 
+								empty($qonto_trx['local_currency']) || 
+								strtoupper($inv_check->multicurrency_code) !== strtoupper($qonto_trx['local_currency'])
+							) {
+								$batch_mc_valid = false; 
+								break;
+							}
+							
+							$mc_total = (float)$inv_check->multicurrency_total_ttc;
+							if ($inv_check->type == 2 || $inv_check->total_ttc < 0) $mc_total = -abs($mc_total);
+							
+							$batch_mc_expected += $mc_total;
+						}
+					}
+					
+					// If the sum of the invoices exactly matches the Qonto amount in the currency, we allow to close documents
+					if ($batch_mc_valid && price2num(-$qonto_local_amount, 'MT') === price2num($batch_mc_expected, 'MT')) {
+						$allow_exchange_diff = true;
+					}
+				}
+
+				// Loop through amounts_array to validate and collect payment data	
 				foreach ($amounts_array as $doc_id => $amount) {
 					$invoice = new FactureFournisseur($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
+
 						// Retrieve thirdparty info for the first document to populate the bank line
 						if ($first_socid == 0) {
 							$first_socid = $invoice->fk_soc;
 							$invoice->fetch_thirdparty();
 							$emitter_name = is_object($invoice->thirdparty) ? $invoice->thirdparty->name : '';
+
 						// Strict blocking if the third party is different for the following documents
 						} elseif ($first_socid != $invoice->fk_soc) {
-						    dol_syslog(__METHOD__ . ": Documents from different third parties detected.", LOG_ERR);
+							dol_syslog(__METHOD__ . ": Documents from different third parties detected.", LOG_ERR);
 							$error++; break;
 						}
 
-                        // Handle Credit Notes by applying a negative sign to the payment amount
 						$pay_amount = abs((float)$amount);
 						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
 
 						$valid_amounts[$doc_id] = $pay_amount;
 
 						// Handle multicurrency different change
-						if (!empty($this->multicurrency_enabled) && $invoice->multicurrency_code != $conf->currency) {
-							if (isset($qonto_trx['local_currency']) && strtoupper($qonto_trx['local_currency']) == strtoupper($invoice->multicurrency_code)
-							&& price2num(-$qonto_local_amount, 'MT') == price2num($invoice->multicurrency_total_ttc, 'MT')) {
-								$historic_eur = (float) $invoice->getRemainToPay();
-								$diff_eur = $historic_eur - $pay_amount;
-								if (abs($diff_eur) >= 0.01) {
-                                    $exchange_diff_amounts[$doc_id] = $diff_eur;
-                                }
+						if ($allow_exchange_diff) {
+							$historic_eur = (float) $invoice->getRemainToPay();
+							$diff_eur = $historic_eur - $pay_amount;
+							
+							if (abs($diff_eur) >= 0.01) {
+								$exchange_diff_amounts[$doc_id] = $diff_eur;
 							}
 						}
 
