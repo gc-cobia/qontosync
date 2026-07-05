@@ -61,7 +61,7 @@ $link_docs = GETPOST('link_doc', 'array');
 if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
 $qontoRepo = new QontoRepository($db);
 
-if ($bank_rowid <= 0 || !$qontoRepo->isAccountAllowed($bank_rowid)) {
+if ($bank_rowid > 0 && !$qontoRepo->isAccountAllowed($bank_rowid)) {
     http_response_code(403);
     echo "Permission Denied";
     exit;

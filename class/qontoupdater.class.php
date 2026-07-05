@@ -108,6 +108,15 @@ class QontoUpdater
 			return -1;
 		}
 
+		// Multi-tenant Security (Anti-IDOR)
+		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+		$qontoRepo = new QontoRepository($this->db);
+
+		if (empty($bank_account_id) || !$qontoRepo->isAccountAllowed($bank_account_id)) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope: " . $bank_account_id, LOG_ERR);
+			return -1;
+		}
+
 		// Security: Block multiple documents selection for 1-to-1 relation types
         $one_to_one_types = array('bank', 'vat', 'social', 'salary', 'expense');
         if (in_array($type, $one_to_one_types) && count($amounts_array) > 1) {
