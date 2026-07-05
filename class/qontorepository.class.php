@@ -27,6 +27,46 @@ class QontoRepository
 		$this->db = $db;
         $this->multicurrency_enabled = !empty($conf->multicurrency->enabled);
 	}
+
+    /**
+     * Verify that the bank account is accessible within the current user's entity scope
+     * (Multi-Company Security)
+     *
+     * @param int $bank_id Bank account ID to be verified
+     * @return bool True if the account is authorized, False otherwise.
+     */
+    public function isAccountAllowed($bank_id)
+    {
+        global $conf;
+
+        if (empty($bank_id) || $bank_id <= 0) {
+            return false;
+        }
+
+        $sql = "SELECT entity FROM " . MAIN_DB_PREFIX . "bank_account WHERE rowid = " . (int) $bank_id;
+        $resql = $this->db->query($sql);
+
+        if (!$resql || $this->db->num_rows($resql) == 0) {
+            dol_syslog(__METHOD__ . ": Bank account not found: " . $bank_id, LOG_ERR);
+            return false;
+        }
+
+        $obj = $this->db->fetch_object($resql);
+        $this->db->free($resql);
+
+        $account_entity = (int) $obj->entity;
+
+        if ($account_entity === (int) $conf->entity) {
+            return true;
+        }
+
+        if (function_exists('getEntity')) {
+            $allowed_entities = explode(',', getEntity('bank_account'));
+            return in_array((string) $account_entity, $allowed_entities);
+        }
+
+        return false;
+    }
 	
 	/**
 	 * Retrieve unpaid documents (Customers/Suppliers invoices/credit notes, VAT)
