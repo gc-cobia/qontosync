@@ -742,15 +742,24 @@ class QontoUpdater
 
 				// Secure download
 				if (!empty($statement_url)) {
+
+					$fp = fopen($dest_file_path, 'w+');
+					if ($fp === false) {
+						$result['error_count']++;
+						dol_syslog(__METHOD__ . ": Unable to open the file for writing : " . $dest_file_path, LOG_ERR);
+						continue;
+					}
+
 					$ch = curl_init();
 
 					curl_setopt($ch, CURLOPT_URL, $statement_url);
-					curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+					curl_setopt($ch, CURLOPT_FILE, $fp);
+					
 					curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 					curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
 
 					curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-					curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+					curl_setopt($ch, CURLOPT_TIMEOUT, 60);
 					
 					curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 					curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
@@ -760,22 +769,21 @@ class QontoUpdater
 						curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
 					}
 					
-					$pdf_content = curl_exec($ch);
+					curl_exec($ch);
 					$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+					
 					curl_close($ch);
+					fclose($fp);
 
-					if ($http_code == 200 && !empty($pdf_content)) {
-						// Writing the file to Dolibarr
-						$result_write = file_put_contents($dest_file_path, $pdf_content);
-						if ($result_write !== false) {
-							$result['success_count']++;
-							$result['valid_refs'][] = $ref_releve;
-							dol_syslog(__METHOD__ . ": Statement downloaded successfully for period " . $period_key . " to " . $dest_file_path, LOG_INFO);
-						} else {
-							$result['error_count']++;
-							dol_syslog(__METHOD__ . ": Failed to write statement file to disk: " . $dest_file_path, LOG_ERR);
+					if ($http_code == 200) {
+						if (!empty($conf->global->MAIN_UMASK)) {
+							@chmod($dest_file_path, octdec($conf->global->MAIN_UMASK));
 						}
+						$result['success_count']++;
+						$result['valid_refs'][] = $ref_releve;
+						dol_syslog(__METHOD__ . ": Statement downloaded successfully for period " . $period_key . " to " . $dest_file_path, LOG_INFO);
 					} else {
+						@unlink($dest_file_path);
 						$result['error_count']++;
 						dol_syslog(__METHOD__ . ": Failed to download statement from Qonto. HTTP Code: " . $http_code, LOG_ERR);
 					}
