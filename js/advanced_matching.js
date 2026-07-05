@@ -39,8 +39,8 @@ $(document).ready(function () {
                     let thisType = $(this).data("doctype");
                     let thisThirdParty = $(this).data("thirdparty");
 
-                    // If it is a 1-to-1 document, disable all other cases.
-                    // Otherwise (ex: invoices), just check that it's the same type and same third party.
+                    // If it is a 1-to-1 document, disable all other cases
+                    // Otherwise (ex: invoices), just check that it's the same type and same third party
                     if (isStrictlyOneToOne || thisType !== docType || thisThirdParty !== thirdParty) {
                         $(this).prop("disabled", true);
                         $(this).closest("tr").addClass("opacitymedium");
@@ -52,4 +52,45 @@ $(document).ready(function () {
             });
         }
     });
+    
+    
+    // Click anywhere on the line to check/uncheck
+    $(document).on("click", ".doc_row", function (e) {
+        // The event is ignored if the user clicked directly on the checkbox or in the input field
+        if ($(e.target).is("input")) return;
+
+        let checkbox = $(this).find(".check_link_doc");
+        
+        // If the line is not grayed out or disabled, a click on the checkbox is simulated
+        if (!checkbox.prop("disabled")) {
+            checkbox.prop("checked", !checkbox.prop("checked")).trigger("change");
+        }
+    });
+    
+    // Live Search
+    $(document).on("keyup", "#advanced_search_input", function() {
+        let value = $(this).val().toLowerCase().replace(/\./g, ',').replace(/\s+/g, '');
+        let modalContainer = $(this).closest("#qontosync_advanced_wrapper");
+        
+        let visibleCount = 0;
+        
+        modalContainer.find(".doc_row").each(function() {
+            let rowText = $(this).text().toLowerCase().replace(/\s+/g, '');
+            
+            if (rowText.indexOf(value) > -1) {
+                $(this).show();
+                visibleCount++;
+            } else {
+                $(this).hide();
+            }
+        });
+        
+        // No result
+        if (visibleCount === 0 && value !== "") {
+            modalContainer.find("#no_search_result_row").show();
+        } else {
+            modalContainer.find("#no_search_result_row").hide();
+        }
+    });
+
 });

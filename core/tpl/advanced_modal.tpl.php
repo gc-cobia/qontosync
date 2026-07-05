@@ -52,7 +52,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                     
             <?php if (!empty($linked_details)): ?>
                 <div style="margin-top: 20px;">
-                    <?php print load_fiche_titre($langs->trans("Documents"), '', 'doc'); ?>
+                    <?php print load_fiche_titre($langs->trans("Documents"), '', 'bill'); ?>
                     <div class="div-table-responsive">
                         <table class="liste centpercent">
                             <tr class="liste_titre">
@@ -99,163 +99,184 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
         <?php endif; ?>
 
     <?php else: ?>
+        <div style="margin-top: 20px;">
+            <?php
+            // Live search
+            $search_bar_html = '
+            <div style="display: inline-flex; align-items: center; font-weight: normal;">
+                <span class="fa fa-search opacitymedium" style="margin-right: 8px; font-size: 0.9em;"></span>
+                <input type="text" id="advanced_search_input" class="flat" placeholder="'.$langs->trans('Search').' ('.$langs->trans('Ref').', '.$langs->trans('ThirdParty').'...)" style="width: 250px; padding: 4px 6px;">
+            </div>';
     
-        <br>
-        <?php print load_fiche_titre($langs->trans("PendingDocuments"), '', 'bill'); ?>
-        <div class="clearboth"></div>
-        
-        <form id="form_advanced_matching" method="post" action="">
-            <input type="hidden" name="token" value="<?php print newToken(); ?>">
-            <input type="hidden" name="action" value="process_advanced_match">
-            <input type="hidden" name="qonto_id" value="<?php print dol_escape_htmltag($processed_trx['id']); ?>">
-            <input type="hidden" name="bank_rowid" value="<?php print $bank_rowid; ?>">
-            <input type="hidden" id="qonto_trx_amount" value="<?php print abs($processed_trx['amount']); ?>">
-
-            <div class="div-table-responsive" style="margin-bottom: 60px;">
-                <table class="liste centpercent">
-                    <tr class="liste_titre">
-                        <th class="liste_titre center" style="width: 40px;">#</th>
-                        <th class="liste_titre"><?php print $langs->trans("Type"); ?></th>
-                        <th class="liste_titre"><?php print $langs->trans("Ref"); ?></th>
-                        <th class="liste_titre"><?php print $langs->trans("ThirdParty"); ?></th>
-                        <th class="liste_titre right"><?php print $langs->trans("RemainToPay"); ?></th>
-                        <th class="liste_titre right" style="width: 140px;"><?php print $langs->trans("AmountToImpute"); ?></th>
-                    </tr>
-
-                    <?php $has_data = false; ?>
-
-                    <?php if (!empty($filtered_documents['c_invoices'])): ?>
-                        <?php $has_data = true; ?>
-                        <?php foreach ($filtered_documents['c_invoices'] as $d): ?>
-                            <?php 
-                            $soc_name = dol_escape_htmltag($d->thirdparty); 
-                            
-                            $remain_for_js = $d->amount;
-                            $amt_display = price($d->amount) . ' ' . $conf->currency;
-                            
-                            if (!empty($d->mc_code) && $d->mc_code != $conf->currency) {
-                                if (isset($processed_trx['currency']) && $d->mc_code == $processed_trx['currency']) {
-                                    $remain_for_js = $d->mc_amount;
-                                }
-                                $amt_display = price($d->mc_amount) . ' ' . $d->mc_code . '<br><span class="opacitymedium small">' . price($d->amount) . ' ' . $conf->currency . '</span>';
-                            }
-                            ?>
-                            <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_<?php print $d->rowid; ?>" data-doctype="cinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $remain_for_js; ?>"></td>
-                                <td><?php print $langs->trans("CustomersInvoices"); ?>
-                                <?php if ($d->inv_type == 2) : ?>
-                                    <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
-                                <?php endif; ?>
-                                </td>
-                                <td><?php print dol_escape_htmltag($d->label); ?></td>
-                                <td><?php print dol_escape_htmltag($d->thirdparty); ?></td>
-                                <td class="right amount"><?php print $amt_display; ?></td>
-                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_cinv_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <?php if (!empty($filtered_documents['s_invoices'])): ?>
-                        <?php $has_data = true; ?>
-                        <?php foreach ($filtered_documents['s_invoices'] as $d): ?>
-                            <?php 
-                            $soc_name = dol_escape_htmltag($d->thirdparty); 
-                            
-                            $remain_for_js = $d->amount;
-                            $amt_display = price($d->amount) . ' ' . $conf->currency;
-                            
-                            if (!empty($d->mc_code) && $d->mc_code != $conf->currency) {
-                                if (isset($processed_trx['currency']) && $d->mc_code == $processed_trx['currency']) {
-                                    $remain_for_js = $d->mc_amount;
-                                }
-                                $amt_display = price($d->mc_amount) . ' ' . $d->mc_code . '<br><span class="opacitymedium small">' . price($d->amount) . ' ' . $conf->currency . '</span>';
-                            }
-                            ?>
-                            <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_<?php print $d->rowid; ?>" data-doctype="sinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $remain_for_js; ?>"></td>
-                                <td><?php print $langs->trans("SupplierInvoices"); ?>
-                                <?php if ($d->inv_type == 2) : ?>
-                                    <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
-                                <?php endif; ?>
-                                </td>
-                                <td><?php print dol_escape_htmltag($d->label); ?> <span class="opacitymedium small">(<?php print dol_escape_htmltag($d->ref_supplier); ?>)</span></td>
-                                <td><?php print dol_escape_htmltag($d->thirdparty); ?></td>
-                                <td class="right amount"><?php print $amt_display; ?></td>
-                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_sinv_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <?php if (!empty($filtered_documents['vat'])): ?>
-                        <?php $has_data = true; ?>
-                        <?php foreach ($filtered_documents['vat'] as $d): ?>
-                            <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="vat_<?php print $d->rowid; ?>" data-doctype="vat" data-thirdparty="VAT" data-remain="<?php print $d->amount; ?>"></td>
-                                <td><?php print $langs->trans("VAT"); ?></td>
-                                <td><?php print dol_escape_htmltag($d->label); ?></td>
-                                <td>-</td>
-                                <td class="right amount"><?php print price($d->amount); ?></td>
-                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_vat_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <!-- Social Charges -->
-                    <?php if (!empty($filtered_documents['social'])): ?>
-                        <?php $has_data = true; ?>
-                        <?php foreach ($filtered_documents['social'] as $d): ?>
-                            <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="social_<?php print $d->rowid; ?>" data-doctype="social" data-thirdparty="SOCIAL" data-remain="<?php print $d->amount; ?>"></td>
-                                <td><?php print $langs->trans("SocialContributions"); ?></td>
-                                <td><?php print dol_escape_htmltag($d->label); ?></td>
-                                <td>-</td>
-                                <td class="right amount"><?php print price($d->amount); ?></td>
-                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <!-- Salary Payments -->
-                    <?php if (!empty($filtered_documents['salary'])): ?>
-                        <?php $has_data = true; ?>
-                        <?php foreach ($filtered_documents['salary'] as $d): ?>
-                            <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="salary_<?php print $d->rowid; ?>" data-doctype="salary" data-thirdparty="SALARY" data-remain="<?php print $d->amount; ?>"></td>
-                                <td><?php print $langs->trans("SalaryPayment"); ?></td>
-                                <td><?php print dol_escape_htmltag($d->label); ?></td>
-                                <td>-</td>
-                                <td class="right amount"><?php print price($d->amount); ?></td>
-                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_salary_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <!-- Expense Reports -->
-                    <?php if (!empty($filtered_documents['expense'])): ?>
-                        <?php $has_data = true; ?>
-                        <?php foreach ($filtered_documents['expense'] as $d): ?>
-                            <tr class="oddeven doc_row">
-                                <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="expense_<?php print $d->rowid; ?>" data-doctype="expense" data-thirdparty="EXPENSE" data-remain="<?php print $d->amount; ?>"></td>
-                                <td><?php print $langs->trans("ExpenseReports"); ?></td>
-                                <td><?php print dol_escape_htmltag($d->label); ?></td>
-                                <td>-</td>
-                                <td class="right amount"><?php print price($d->amount); ?></td>
-                                <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <?php if (!$has_data): ?>
-                        <tr><td colspan="6" class="center opacitymedium"><?php print $langs->trans("NoPendingDocumentsFound"); ?></td></tr>
-                    <?php endif; ?>
-                </table>
-            </div>
-
-            <div class="qontosync-modal-footer action-buttons">
-                <input type="submit" class="button button-save qontosync-btn-full" value="<?php print $langs->trans("Validate"); ?>">
-            </div>
+            print load_fiche_titre($langs->trans("PendingDocuments"), $search_bar_html, 'bill'); 
+            ?>
             
-        </form>
+            <!-- Documents list -->
+            <form id="form_advanced_matching" method="post" action="">
+                <input type="hidden" name="token" value="<?php print newToken(); ?>">
+                <input type="hidden" name="action" value="process_advanced_match">
+                <input type="hidden" name="qonto_id" value="<?php print dol_escape_htmltag($processed_trx['id']); ?>">
+                <input type="hidden" name="bank_rowid" value="<?php print $bank_rowid; ?>">
+                <input type="hidden" id="qonto_trx_amount" value="<?php print abs($processed_trx['amount']); ?>">
+    
+                <div class="div-table-responsive" style="margin-bottom: 60px;">
+                    <table class="liste centpercent">
+                        <tr class="liste_titre">
+                            <th class="liste_titre center" style="width: 40px;">#</th>
+                            <th class="liste_titre"><?php print $langs->trans("Type"); ?></th>
+                            <th class="liste_titre"><?php print $langs->trans("Date"); ?></th>
+                            <th class="liste_titre"><?php print $langs->trans("Ref"); ?></th>
+                            <th class="liste_titre"><?php print $langs->trans("ThirdParty"); ?></th>
+                            <th class="liste_titre right"><?php print $langs->trans("RemainToPay"); ?></th>
+                            <th class="liste_titre right" style="width: 140px;"><?php print $langs->trans("AmountToImpute"); ?></th>
+                        </tr>
+    
+                        <?php $has_data = false; ?>
+    
+                        <?php if (!empty($filtered_documents['c_invoices'])): ?>
+                            <?php $has_data = true; ?>
+                            <?php foreach ($filtered_documents['c_invoices'] as $d): ?>
+                                <?php 
+                                $soc_name = dol_escape_htmltag($d->thirdparty); 
+                                
+                                $remain_for_js = $d->amount;
+                                $amt_display = price($d->amount) . ' ' . $conf->currency;
+                                
+                                if (!empty($d->mc_code) && $d->mc_code != $conf->currency) {
+                                    if (isset($processed_trx['currency']) && $d->mc_code == $processed_trx['currency']) {
+                                        $remain_for_js = $d->mc_amount;
+                                    }
+                                    $amt_display = price($d->mc_amount) . ' ' . $d->mc_code . '<br><span class="opacitymedium small">' . price($d->amount) . ' ' . $conf->currency . '</span>';
+                                }
+                                ?>
+                                <tr class="oddeven doc_row">
+                                    <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="cinv_<?php print $d->rowid; ?>" data-doctype="cinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $remain_for_js; ?>"></td>
+                                    <td><?php print $langs->trans("CustomersInvoices"); ?>
+                                    <?php if ($d->inv_type == 2) : ?>
+                                        <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
+                                    <?php endif; ?>
+                                    </td>
+                                    <td><?php print dol_print_date($d->datev, 'day'); ?></td>
+                                    <td><?php print dol_escape_htmltag($d->label); ?></td>
+                                    <td><?php print dol_escape_htmltag($d->thirdparty); ?></td>
+                                    <td class="right amount"><?php print $amt_display; ?></td>
+                                    <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_cinv_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+    
+                        <?php if (!empty($filtered_documents['s_invoices'])): ?>
+                            <?php $has_data = true; ?>
+                            <?php foreach ($filtered_documents['s_invoices'] as $d): ?>
+                                <?php 
+                                $soc_name = dol_escape_htmltag($d->thirdparty); 
+                                
+                                $remain_for_js = $d->amount;
+                                $amt_display = price($d->amount) . ' ' . $conf->currency;
+                                
+                                if (!empty($d->mc_code) && $d->mc_code != $conf->currency) {
+                                    if (isset($processed_trx['currency']) && $d->mc_code == $processed_trx['currency']) {
+                                        $remain_for_js = $d->mc_amount;
+                                    }
+                                    $amt_display = price($d->mc_amount) . ' ' . $d->mc_code . '<br><span class="opacitymedium small">' . price($d->amount) . ' ' . $conf->currency . '</span>';
+                                }
+                                ?>
+                                <tr class="oddeven doc_row">
+                                    <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="sinv_<?php print $d->rowid; ?>" data-doctype="sinv" data-thirdparty="<?php print $soc_name; ?>" data-remain="<?php print $remain_for_js; ?>"></td>
+                                    <td><?php print $langs->trans("SupplierInvoices"); ?>
+                                    <?php if ($d->inv_type == 2) : ?>
+                                        <span class="badge badge-info"><?php print $langs->trans("CreditNote"); ?></span>
+                                    <?php endif; ?>
+                                    </td>
+                                    <td><?php print dol_print_date($d->datev, 'day'); ?></td>
+                                    <td><?php print dol_escape_htmltag($d->label); ?> <span class="opacitymedium small">(<?php print dol_escape_htmltag($d->ref_supplier); ?>)</span></td>
+                                    <td><?php print dol_escape_htmltag($d->thirdparty); ?></td>
+                                    <td class="right amount"><?php print $amt_display; ?></td>
+                                    <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_sinv_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+    
+                        <?php if (!empty($filtered_documents['vat'])): ?>
+                            <?php $has_data = true; ?>
+                            <?php foreach ($filtered_documents['vat'] as $d): ?>
+                                <tr class="oddeven doc_row">
+                                    <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="vat_<?php print $d->rowid; ?>" data-doctype="vat" data-thirdparty="VAT" data-remain="<?php print $d->amount; ?>"></td>
+                                    <td><?php print $langs->trans("VAT"); ?></td>
+                                    <td><?php print dol_print_date($d->datev, 'day'); ?></td>
+                                    <td><?php print dol_escape_htmltag($d->label); ?></td>
+                                    <td>-</td>
+                                    <td class="right amount"><?php print price($d->amount); ?></td>
+                                    <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_vat_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+    
+                        <!-- Social Charges -->
+                        <?php if (!empty($filtered_documents['social'])): ?>
+                            <?php $has_data = true; ?>
+                            <?php foreach ($filtered_documents['social'] as $d): ?>
+                                <tr class="oddeven doc_row">
+                                    <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="social_<?php print $d->rowid; ?>" data-doctype="social" data-thirdparty="SOCIAL" data-remain="<?php print $d->amount; ?>"></td>
+                                    <td><?php print $langs->trans("SocialContributions"); ?></td>
+                                    <td><?php print dol_print_date($d->datev, 'day'); ?></td>
+                                    <td><?php print dol_escape_htmltag($d->label); ?></td>
+                                    <td>-</td>
+                                    <td class="right amount"><?php print price($d->amount); ?></td>
+                                    <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+    
+                        <!-- Salary Payments -->
+                        <?php if (!empty($filtered_documents['salary'])): ?>
+                            <?php $has_data = true; ?>
+                            <?php foreach ($filtered_documents['salary'] as $d): ?>
+                                <tr class="oddeven doc_row">
+                                    <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="salary_<?php print $d->rowid; ?>" data-doctype="salary" data-thirdparty="SALARY" data-remain="<?php print $d->amount; ?>"></td>
+                                    <td><?php print $langs->trans("SalaryPayment"); ?></td>
+                                    <td><?php print dol_print_date($d->datev, 'day'); ?></td>
+                                    <td><?php print dol_escape_htmltag($d->label); ?></td>
+                                    <td>-</td>
+                                    <td class="right amount"><?php print price($d->amount); ?></td>
+                                    <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_salary_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+    
+                        <!-- Expense Reports -->
+                        <?php if (!empty($filtered_documents['expense'])): ?>
+                            <?php $has_data = true; ?>
+                            <?php foreach ($filtered_documents['expense'] as $d): ?>
+                                <tr class="oddeven doc_row">
+                                    <td class="center"><input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="expense_<?php print $d->rowid; ?>" data-doctype="expense" data-thirdparty="EXPENSE" data-remain="<?php print $d->amount; ?>"></td>
+                                    <td><?php print $langs->trans("ExpenseReports"); ?></td>
+                                    <td><?php print dol_print_date($d->datev, 'day'); ?></td>
+                                    <td><?php print dol_escape_htmltag($d->label); ?></td>
+                                    <td>-</td>
+                                    <td class="right amount"><?php print price($d->amount); ?></td>
+                                    <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+    
+                        <?php if (!$has_data): ?>
+                            <tr><td colspan="6" class="center opacitymedium"><?php print $langs->trans("NoPendingDocumentsFound"); ?></td></tr>
+                        <?php endif; ?>
+
+                         <!-- No result line for live search -->
+                        <tr id="no_search_result_row" style="display: none;">
+                            <td colspan="7" class="center opacitymedium"><?php print $langs->trans("NoCorrespondenceFound"); ?></td>
+                        </tr>
+                    </table>
+                </div>
+    
+                <div class="qontosync-modal-footer action-buttons">
+                    <input type="submit" class="button button-save qontosync-btn-full" value="<?php print $langs->trans("Validate"); ?>">
+                </div>
+                
+            </form>
+        </div>
 
     <?php endif; ?>
 </div>
