@@ -57,6 +57,16 @@ $bank_rowid = GETPOST('bank_rowid', 'int');
 $qonto_id = GETPOST('qonto_id', 'alphanohtml');
 $link_docs = GETPOST('link_doc', 'array');
 
+// Multi-company security segregation (Bank account entity verification)
+if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+$qontoRepo = new QontoRepository($db);
+
+if ($bank_rowid <= 0 || !$qontoRepo->isAccountAllowed($bank_rowid)) {
+    http_response_code(403);
+    echo "Permission Denied";
+    exit;
+}
+
 if ($action == 'process_advanced_match') {
     
     if (empty($qonto_id) || empty($bank_rowid) || empty($link_docs) || !is_array($link_docs)) {
