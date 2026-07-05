@@ -255,7 +255,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                                     <td><?php print dol_escape_htmltag($d->label); ?></td>
                                     <td>-</td>
                                     <td class="right amount"><?php print price($d->amount); ?></td>
-                                    <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_social_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
+                                    <td class="right"><input type="text" class="flat right maxwidth75 amount_input" name="amount_expense_<?php print $d->rowid; ?>" value="" placeholder="0.00" disabled></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
