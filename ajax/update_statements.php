@@ -53,6 +53,16 @@ $action = GETPOST('action', 'alpha');
 $bank_rowid = GETPOST('bank_rowid', 'int');
 $year = GETPOST('year', 'int');
 
+// Multi-company security segregation (Bank account entity verification)
+if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+$qontoRepo = new QontoRepository($db);
+
+if ($bank_rowid <= 0 || !$qontoRepo->isAccountAllowed($bank_rowid)) {
+    http_response_code(403);
+    echo "Permission Denied";
+    exit;
+}
+
 if ($action == 'sync_ged' && $bank_rowid > 0 && $year > 0) {
     
     if (!class_exists('Account')) require_once DOL_DOCUMENT_ROOT .'/compta/bank/class/account.class.php';
