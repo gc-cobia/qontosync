@@ -58,6 +58,16 @@ llxHeader('', $langs->trans("AdvancedSearch"), '', '', 0, 0, $arrayofjs);
 $qonto_id = GETPOST('qonto_id', 'alphanohtml');
 $bank_rowid = GETPOST('bank_rowid', 'int');
 
+// Multi-company security segregation (Bank account entity verification)
+if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+$qontoRepo = new QontoRepository($db);
+
+if ($bank_rowid <= 0 || !$qontoRepo->isAccountAllowed($bank_rowid)) {
+    http_response_code(403);
+    echo "Permission Denied";
+    exit;
+}
+
 // If no transaction ID
 if (empty($qonto_id)) {
     print "<div class='error'>ID de transaction manquant.</div>";
