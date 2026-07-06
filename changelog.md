@@ -4,6 +4,7 @@
 
 ### Changed
 - API key is now saved encrypted
+- firefox AJAX fix
 
 ## [1.1]
 

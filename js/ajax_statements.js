@@ -41,6 +41,11 @@ $(document).ready(function () {
     });
 
     // 3. PROCESSING DOWNLOAD STATEMENTS
+    $(document).on('click', '#btn_import_statements', function(e) {
+        e.preventDefault();
+        $('#form_batch_link').trigger('submit');
+    });
+    
     $(document).on('submit', '#form_batch_link', function (e) {
         e.preventDefault();
 

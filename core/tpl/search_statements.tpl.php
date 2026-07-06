@@ -57,7 +57,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
             </div>
     
     	    <!-- Button for update all statements PDF -->
-            <button type="submit" form="form_batch_link" class="butAction" id="btn_import_statements" style="border: none; cursor: pointer; display: inline-flex; align-items: center; font-size: 1em;">
+            <button type="button" class="butAction" id="btn_import_statements" style="border: none; cursor: pointer; display: inline-flex; align-items: center; font-size: 1em;">
                 <i class="fas fa-cloud-download-alt marginrightonly"></i><?php print $langs->trans("Import"); ?>
             </button>
     	

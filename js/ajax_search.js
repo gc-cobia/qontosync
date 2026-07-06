@@ -46,6 +46,11 @@ $(document).ready(function () {
     });
 
     // 3. PROCESSING UPDATE
+    $(document).on('click', '#btn_validate_conciliation', function(e) {
+        e.preventDefault();
+        $('#form_batch_link').trigger('submit');
+    });
+
     $(document).on('submit', '#form_batch_link', function (e) {
         e.preventDefault();
 

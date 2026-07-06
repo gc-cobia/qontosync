@@ -87,7 +87,7 @@ print dol_htmloutput_events();
                             <!-- print select list with entries found -->
                             <?php if ($has_bank_entries || $has_c_invoices || $has_s_invoices || $has_vat || $has_social || $has_salary || $has_expense): ?>
             
-                                <select name="target_val[<?php print $q_id; ?>]" id="<?php print 'form_select_' . md5($q_id); ?>" form="form_batch_link" class="flat" style="<?php print $style_select; ?>">
+                                <select name="target_val[<?php print $q_id; ?>]" id="<?php print 'form_select_' . md5($q_id); ?>" class="flat" style="<?php print $style_select; ?>">
                                     <option value="">&nbsp;</option>
 
                                         <!-- insert bank entries -->
