@@ -49,9 +49,6 @@ if ($user->socid > 0 || !$user->hasRight('qontosync', 'write')) {
 
 $langs->loadLangs(array("qontosync@qontosync"));
 
-if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
-if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
-
 $action = GETPOST('action', 'alpha');
 $bank_rowid = GETPOST('bank_rowid', 'int');
 $qonto_id = GETPOST('qonto_id', 'alphanohtml');
@@ -75,6 +72,9 @@ if ($action == 'process_advanced_match') {
         exit;
     }
 
+    if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
+    if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
+    
     $api = new QontoApi();
     $qontoUpdater = new QontoUpdater($db);
     
@@ -89,6 +89,11 @@ if ($action == 'process_advanced_match') {
     
     // Retrieve the amount
     $amount = abs((float)$selected_trx['amount']);
+    
+    // Calculate the real amount with its sign
+    if (isset($selected_trx['side']) && $selected_trx['side'] == 'debit') {
+        $amount = -$amount;
+    }
     
     $amounts_array = array();
     $doc_type = '';
@@ -126,6 +131,9 @@ if ($action == 'process_advanced_match') {
         setEventMessages($langs->trans("ErrorNoAmountSpecified"), null, 'errors');
         $error++;
     }
+
+    // Adapt sign to the document type
+    $total_imputed = ($doc_type === 'sinv' || $doc_type === 'vat' || $doc_type === 'social' || $doc_type === 'salary' || $doc_type === 'expense') ? -$total_imputed : $total_imputed;
     
     // The total must EXACTLY match the transaction amount to be compatible with QontoUpdater::update()
     if ($error == 0 && price2num($total_imputed, 'MT') != price2num($amount, 'MT')) {
