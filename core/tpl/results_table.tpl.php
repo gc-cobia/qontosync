@@ -212,7 +212,7 @@ print dol_htmloutput_events();
                         $btn_html = '<span class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;"><span class="fa fa-search"></span></span>';
                         	
                         // Generate dynamic URL
-                        $url_modal = dol_buildpath('/qontosync/advanced_match.php', 1) . '?qonto_id=' . urlencode($q_id) . '&bank_rowid=' . $bank_rowid . '&token=' . newToken();
+                        $url_modal = dol_buildpath('/qontosync/advanced_match.php', 2) . '?qonto_id=' . urlencode($q_id) . '&bank_rowid=' . $bank_rowid . '&token=' . newToken();
                         
                         print dolButtonToOpenUrlInDialogPopup(
                             'btn_adv_match_' . md5($q_id),
