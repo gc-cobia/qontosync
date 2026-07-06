@@ -13,6 +13,7 @@ if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../..
 if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
 if (!function_exists('dolibarr_set_const')) require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+if (!function_exists('dolEncrypt')) require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
 if (!class_exists('Form')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
 
@@ -33,7 +34,7 @@ if (GETPOST('test', 'alpha')) {
 	$action = 'test';
 }
 
-$apikey = GETPOST('QONTOSYNC_API_KEY', 'alphanohtml');
+$apikey = GETPOST('QONTOSYNC_API_KEY', 'none');
 $slug = GETPOST('QONTOSYNC_SLUG', 'alphanohtml');
 $sandbox = GETPOST('QONTOSYNC_SANDBOX', 'int') ? 1 : 0;
 $sandbox_token = GETPOST('QONTOSYNC_SANDBOX_TOKEN', 'alphanohtml');
@@ -45,6 +46,9 @@ $tolerance_days = GETPOST('QONTOSYNC_TOLERANCE_DAYS', 'int');
 $max_months = GETPOST('QONTOSYNC_MAX_MONTHS', 'int');
 $statement_format = GETPOST('QONTOSYNC_STATEMENT_FORMAT', 'alphanohtml');
 
+$has_apikey = getDolGlobalString('QONTOSYNC_API_KEY');
+$display_apikey = !empty($has_apikey) ? '****************' : '';
+
 // Update constants
 if ($action == 'update') {
 	// Check CSRF token
@@ -52,7 +56,14 @@ if ($action == 'update') {
 		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
 		$action = '';
 	} else {
-		dolibarr_set_const($db, 'QONTOSYNC_API_KEY', $apikey, 'chaine', 0, '', $conf->entity);
+		if ($apikey != '****************') {
+	        $encrypted_apikey = '';
+	        if (!empty($apikey)) {
+	            $encrypted_apikey = dolEncrypt($apikey, $conf->file->instance_unique_id);
+	        }
+		    dolibarr_set_const($db, 'QONTOSYNC_API_KEY', $encrypted_apikey, 'chaine', 0, '', $conf->entity);
+	    }
+	    
 		dolibarr_set_const($db, 'QONTOSYNC_SLUG', $slug, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($db, 'QONTOSYNC_SANDBOX', $sandbox, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($db, 'QONTOSYNC_SANDBOX_TOKEN', $sandbox_token, 'chaine', 0, '', $conf->entity);
@@ -77,6 +88,10 @@ if ($action == 'test') {
 		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
 		$action = '';
 	} else {
+		if ($apikey == '****************') {
+	     	$apikey = dolDecrypt(getDolGlobalString('QONTOSYNC_API_KEY'), $conf->file->instance_unique_id);
+	    }
+
 		if (empty($apikey) || empty($slug)) {
 			setEventMessages($langs->trans("NoParameters"), null, 'warnings');
 		} else {
@@ -118,7 +133,7 @@ print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoAPIKey").'</td>';
-print '<td><input type="password" size="60" name="QONTOSYNC_API_KEY" value="'.dol_escape_htmltag(getDolGlobalString('QONTOSYNC_API_KEY')).'"></td>';
+print '<td><input type="password" size="60" name="QONTOSYNC_API_KEY" value="'.$display_apikey.'"></td>';
 print '</tr>';
 
 print '<tr class="oddeven">';

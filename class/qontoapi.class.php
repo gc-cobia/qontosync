@@ -34,8 +34,18 @@ class QontoApi
 	public function __construct($apiKey = '', $slug = '', $sandbox = null, $sandboxToken = '')
 	{
 		global $conf;
+
+		if (!function_exists('dolDecrypt')) require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
+		$savedApiKey = getDolGlobalString('QONTOSYNC_API_KEY');
+		$decryptedKey = '';
+		if (!empty($savedApiKey)) {
+		    $decryptedKey = dolDecrypt($savedApiKey, $conf->file->instance_unique_id);
+		    if (empty($decryptedKey)) {
+		        $decryptedKey = $savedApiKey;
+		    }
+		}
 		
-		$apiKeyVal = !empty($apiKey) ? $apiKey : getDolGlobalString('QONTOSYNC_API_KEY');
+		$apiKeyVal = !empty($apiKey) ? $apiKey : $decryptedKey;
 		$slugVal = !empty($slug) ? $slug : getDolGlobalString('QONTOSYNC_SLUG');
 		$sandboxTokenVal = !empty($sandboxToken) ? $sandboxToken : getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN');
 

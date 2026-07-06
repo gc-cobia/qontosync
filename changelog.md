@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2]
+
+### Changed
+- API key is now saved encrypted
+
 ## [1.1]
 
 ### Added
