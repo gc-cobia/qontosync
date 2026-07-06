@@ -5,6 +5,8 @@
 ### Changed
 - API key is now saved encrypted
 - firefox AJAX fix
+- Fix modale negative concilliation
+- Fix advanced box path
 
 ## [1.1]
 
