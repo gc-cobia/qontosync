@@ -175,7 +175,7 @@ class QontoApi
 			// Log in Dolibarr (SYSLOG)
 			dol_syslog(__METHOD__ . ": API Error HTTP " . $httpcode . " on URL " . $url, LOG_ERR);
 			dol_syslog(__METHOD__ . ": Trace-ID: " . $this->traceId, LOG_ERR);
-			dol_syslog(__METHOD__ . ": Raw API Response: " . $response, LOG_ERR);
+			dol_syslog(__METHOD__ . ": API error response (truncated): " . substr($response, 0, 200), LOG_ERR);
 			
 			return false;
 		}
