@@ -305,6 +305,12 @@ class QontoUpdater
 					$invoice = new Facture($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
 
+						// Multi-Company Security (IDOR)
+						if ($invoice->entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$invoice->entity, explode(',', getEntity('facture'))))) {
+							dol_syslog(__METHOD__ . ": Entity mismatch on customer invoice " . $doc_id, LOG_WARNING);
+							$error++; break;
+						}
+
 					    // Retrieve thirdparty info for the first document to populate the bank line
 						if ($first_socid == 0) {
 							$first_socid = $invoice->fk_soc;
@@ -394,6 +400,12 @@ class QontoUpdater
 					$invoice = new FactureFournisseur($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
 
+						// Multi-Company Security (IDOR)
+						if ($invoice->entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$invoice->entity, explode(',', getEntity('facture_fourn'))))) {
+							dol_syslog(__METHOD__ . ": Entity mismatch on supplier invoice " . $doc_id, LOG_WARNING);
+							$error++; break;
+						}
+
 						// Retrieve thirdparty info for the first document to populate the bank line
 						if ($first_socid == 0) {
 							$first_socid = $invoice->fk_soc;
@@ -450,6 +462,18 @@ class QontoUpdater
 
                 $vat = new Tva($this->db);
                 if ($vat->fetch($doc_id) > 0) {
+
+					// Multi-Company Security (IDOR)
+					$doc_entity = isset($vat->entity) ? $vat->entity : null;
+					if ($doc_entity === null) {
+						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "tva WHERE rowid = " . (int)$doc_id);
+						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
+					}
+					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$doc_entity, explode(',', getEntity('tva'))))) {
+						dol_syslog(__METHOD__ . ": Entity mismatch on VAT " . $doc_id, LOG_WARNING);
+						$error++; break;
+					}
+
                     $pay_amount = abs((float)$amount);
                     if ($vat->amount < 0) $pay_amount = -$pay_amount;
                     
@@ -482,6 +506,18 @@ class QontoUpdater
 
                 $charge = new ChargeSociales($this->db);
                 if ($charge->fetch($doc_id) > 0) {
+
+					// Multi-Company Security (IDOR)
+					$doc_entity = isset($charge->entity) ? $charge->entity : null;
+					if ($doc_entity === null) {
+						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "chargesociales WHERE rowid = " . (int)$doc_id);
+						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
+					}
+					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$doc_entity, explode(',', getEntity('tax'))))) {
+						dol_syslog(__METHOD__ . ": Entity mismatch on Social Charge " . $doc_id, LOG_WARNING);
+						$error++; break;
+					}
+
                     $valid_amounts[$doc_id] = abs((float)$amount);
                     $payment_label_ref = $charge->ref;
                 } else { 
@@ -511,6 +547,18 @@ class QontoUpdater
 
                 $salary = new Salary($this->db);
                 if ($salary->fetch($doc_id) > 0) {
+
+					// Multi-Company Security (IDOR)
+					$doc_entity = isset($salary->entity) ? $salary->entity : null;
+					if ($doc_entity === null) {
+						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "salary WHERE rowid = " . (int)$doc_id);
+						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
+					}
+					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$doc_entity, explode(',', getEntity('salary'))))) {
+						dol_syslog(__METHOD__ . ": Entity mismatch on Salary " . $doc_id, LOG_WARNING);
+						$error++; break;
+					}
+
                     $valid_amounts[$doc_id] = abs((float)$amount);
                     
                     // Create the reference text for the bank line
@@ -546,6 +594,18 @@ class QontoUpdater
 
                 $expense = new ExpenseReport($this->db);
                 if ($expense->fetch($doc_id) > 0) {
+
+					// Multi-Company Security (IDOR)
+					$doc_entity = isset($expense->entity) ? $expense->entity : null;
+					if ($doc_entity === null) {
+						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "expensereport WHERE rowid = " . (int)$doc_id);
+						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
+					}
+					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$doc_entity, explode(',', getEntity('expensereport'))))) {
+						dol_syslog(__METHOD__ . ": Entity mismatch on Expense Report " . $doc_id, LOG_WARNING);
+						$error++; break;
+					}
+
                     $valid_amounts[$doc_id] = abs((float)$amount);
                     $payment_label_ref = $expense->ref;
                 } else { 
