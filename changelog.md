@@ -2,11 +2,14 @@
 
 ## [1.2]
 
-### Changed
-- API key is now saved encrypted
-- firefox AJAX fix
-- Fix modale negative concilliation
-- Fix advanced box path
+### Security
+- Hardening (Anti-IDOR): Added strict Multi-Company / Entity verification on all documents fetched during reconciliation (Customer Invoices, Supplier Invoices, VAT, Social Taxes, Salaries, Expense Reports) to prevent cross-entity interactions.
+- Log sanitization: Truncated raw Qonto API error responses in Dolibarr syslog to prevent potential sensitive data leaks.
+
+### Fixed
+- Browser compatibility: Fixed an AJAX serialization bug specific to Firefox preventing the validation of bank reconciliations from the dropdown lists.
+- Subdirectory installations: Fixed a 404 error when opening the advanced matching modal on Dolibarr instances installed in a subfolder (forced absolute URL generation).
+- Advanced matching: Fixed a bug preventing the reconciliation of negative amounts (credit notes, expenses, salaries, etc.) in the advanced modal.
 
 ## [1.1]
 
