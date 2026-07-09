@@ -20,6 +20,7 @@
 - Multicurrency support for customer and supplier invoices reconciliation.
 - Smart matching with Qonto transaction local amounts (`local_amount` and `local_currency`).
 - Automatic handling of currency exchange rate differences (generation of dedicated loss/gain bookkeeping lines).
+  (Note: The accounting entry for the exchange rate difference is not yet active)
 - Live search bar in the advanced matching modal to quickly filter pending documents by reference or third-party name.
 
 ### Changed
