@@ -103,7 +103,8 @@ class QontoRepository
 
             // If multicurrency is enabled
             if ($this->multicurrency_enabled) {
-                $sql_c_inv .= ", f.multicurrency_code, f.multicurrency_tx ";
+                $sql_c_inv .= ", f.multicurrency_code, f.multicurrency_tx, f.multicurrency_total_ttc, ";
+                $sql_c_inv .= "(SELECT SUM(multicurrency_amount) FROM " . MAIN_DB_PREFIX . "paiement_facture WHERE fk_facture = f.rowid) as already_paid_mc ";
             }
 
 			$sql_c_inv .= "FROM " . MAIN_DB_PREFIX . "facture as f ";
@@ -129,7 +130,13 @@ class QontoRepository
                         // If multicurrency is enabled
                         $mc_code = !empty($this->multicurrency_enabled) ? $obj_c_inv->multicurrency_code : '';
                         $mc_tx = (!empty($this->multicurrency_enabled) && $obj_c_inv->multicurrency_tx > 0) ? (float)$obj_c_inv->multicurrency_tx : 1;
-                        $mc_remain = ($mc_code && $mc_code != $conf->currency) ? ($remain * $mc_tx) : $remain;
+                        if ($mc_code && $mc_code != $conf->currency) {
+                            $mc_total = (float)$obj_c_inv->multicurrency_total_ttc;
+                            $mc_paid = (float)$obj_c_inv->already_paid_mc;
+                            $mc_remain = $mc_total - $mc_paid;
+                        } else {
+                            $mc_remain = $remain;
+                        }
 
 						$documents['c_invoices'][] = (object) array(
                             'rowid'         => $fact->id,
@@ -154,7 +161,8 @@ class QontoRepository
             
             // If multicurrency is enabled
             if ($this->multicurrency_enabled) {
-                $sql_s_inv .= ", f.multicurrency_code, f.multicurrency_tx ";
+                $sql_s_inv .= ", f.multicurrency_code, f.multicurrency_tx, f.multicurrency_total_ttc, ";
+                $sql_s_inv .= "(SELECT SUM(multicurrency_amount) FROM " . MAIN_DB_PREFIX . "paiementfourn_facturefourn WHERE fk_facturefourn = f.rowid) as already_paid_mc ";
             }
 
 			$sql_s_inv .= "FROM " . MAIN_DB_PREFIX . "facture_fourn as f ";
@@ -179,7 +187,13 @@ class QontoRepository
                         // If multicurrency is enabled
                         $mc_code = !empty($this->multicurrency_enabled) ? $obj_s_inv->multicurrency_code : '';
                         $mc_tx = (!empty($this->multicurrency_enabled) && $obj_s_inv->multicurrency_tx > 0) ? (float)$obj_s_inv->multicurrency_tx : 1;
-                        $mc_remain = ($mc_code && $mc_code != $conf->currency) ? ($remain * $mc_tx) : $remain;
+                        if ($mc_code && $mc_code != $conf->currency) {
+                            $mc_total = (float)$obj_s_inv->multicurrency_total_ttc;
+                            $mc_paid = (float)$obj_s_inv->already_paid_mc;
+                            $mc_remain = $mc_total - $mc_paid;
+                        } else {
+                            $mc_remain = $remain;
+                        }
 
 						$documents['s_invoices'][] = (object) array(
 							'rowid'        => $fact_fourn->id,
@@ -528,5 +542,32 @@ class QontoRepository
         }
 
         return $balances;
+    }
+
+    /**
+     * Returns the total already paid in the invoice currency (multi-currency)
+     *
+     * @param int    $doc_id Invoice ID
+     * @param string $type   'cinv' (customer) or 'sinv' (supplier)
+     * @return float         Total amount paid in foreign currency
+     */
+    public function getMulticurrencyPaidAmount($doc_id, $type = 'cinv')
+    {
+        $table = ($type === 'cinv') ? 'paiement_facture' : 'paiementfourn_facturefourn';
+        $field = ($type === 'cinv') ? 'fk_facture' : 'fk_facturefourn';
+
+        $sql = "SELECT SUM(multicurrency_amount) as amount_paid_devise ";
+        $sql .= "FROM " . MAIN_DB_PREFIX . $table . " ";
+        $sql .= "WHERE " . $field . " = " . (int)$doc_id;
+
+        $resql = $this->db->query($sql);
+        
+        if ($resql && $obj = $this->db->fetch_object($resql)) {
+            $amount = (float)$obj->amount_paid_devise;
+            $this->db->free($resql);
+            return $amount;
+        }
+        
+        return 0.0;
     }
 }

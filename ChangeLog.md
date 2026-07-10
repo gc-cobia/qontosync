@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3]
+
+### Changed
+- In multi-currency mode, the module no longer pushes the exchange rate variance entry to the general journal; the data is being prepared for transfer to the accounting module.
+ 
+### Fixed
+- Improved support for multi-currency allocations.
+- Fixed ChangeLog location (filename missmatch with dolibarr).
+
 ## [1.2]
 
 ### Security

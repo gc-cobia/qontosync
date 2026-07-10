@@ -146,11 +146,15 @@ class QontoUpdater
 		// Define local qonto currency amount
 		$qonto_local_amount = 0.0;
 		if (!empty($this->multicurrency_enabled)) {
-			$qonto_local_amount = (float)$qonto_trx['local_amount'];
+			$qonto_local_amount = isset($qonto_trx['local_amount']) ? (float)$qonto_trx['local_amount'] : 0.0;
 		}
 
 		// Calculate the real Qonto amount with its sign
-		$qonto_amount = (float)$qonto_trx['amount'];
+		$qonto_amount = isset($qonto_trx['amount']) ? (float)$qonto_trx['amount'] : 0.0;
+		if (empty($qonto_amount)) {
+			dol_syslog(__METHOD__ . ": Error: Qonto amount is zero or empty.", LOG_ERR);
+			return -1;
+		}
 		if (isset($qonto_trx['side']) && $qonto_trx['side'] == 'debit') {
 			$qonto_amount = -$qonto_amount;
 			$qonto_local_amount = -$qonto_local_amount;
@@ -229,6 +233,7 @@ class QontoUpdater
 			$ref_releve = substr($clean_ref, 0, 50);
 		}
 
+		$autoclose = 1;
 		$payment_label_prefix = '';
 		
 		switch ($type) {
@@ -263,46 +268,60 @@ class QontoUpdater
 				if (!class_exists('Paiement')) require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
 				if (!class_exists('Facture')) require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 				
+				// Initialize invoice
+				$invoice = new Facture($this->db);
+
 				// Initialize payment
 				$payment = new Paiement($this->db);
                 $payment_type_str = 'payment';
 
 				$valid_amounts = array();
-				$exchange_diff_amounts = array();
+				
                 $first_socid = 0;
                 $payment_label_ref = '';
 
-				// Multi-currency pre-check 
-				$allow_exchange_diff = false;
-				if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
-					$batch_mc_expected = 0.0;
-					$batch_mc_valid = true;
+				// Multi-currency pre-check
+				$valid_mc_amounts = array();
+                $mc_remain_all_docs = 0;
+                $mc_remain_by_doc = array();
+				$eur_remaining = abs($qonto_amount);
+				$mc_remaining = abs($qonto_local_amount);
+				$doc_index = 0;
+                $total_docs = 0;
+                
+                if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+                    foreach ($amounts_array as $doc_id => $amount) {
+                        if ($invoice->fetch($doc_id) > 0) {
+                            $tmp_total = (float)$invoice->multicurrency_total_ttc;
+                            $tmp_paid = $qontoRepo->getMulticurrencyPaidAmount($doc_id, 'cinv');
+                            $tmp_rem = price2num($tmp_total - $tmp_paid, 'MT');
+                            
+                            $mc_remain_by_doc[$doc_id] = $tmp_rem;
+                            $mc_remain_all_docs += $tmp_rem;
+
+							if (
+								$invoice->multicurrency_code != $conf->currency && 
+								!empty($qonto_trx['local_currency']) && 
+								strtoupper($invoice->multicurrency_code) === strtoupper($qonto_trx['local_currency'])
+							) {
+                                $total_docs++;
+                            }
+                        }
+                    }
 					
-					// Direct entry of the total amount (including tax) in foreign currency (NO rate calculation)
-					foreach ($amounts_array as $doc_id => $amount) {
-						$inv_check = new Facture($this->db);
-						if ($inv_check->fetch($doc_id) > 0) {
-							if ($inv_check->multicurrency_code == $conf->currency || strtoupper($inv_check->multicurrency_code) !== strtoupper($qonto_trx['local_currency'])) {
-								$batch_mc_valid = false; 
-								break;
-							}
-							
-							$mc_total = (float)$inv_check->multicurrency_total_ttc;
-							if ($inv_check->type == 2 || $inv_check->total_ttc < 0) $mc_total = -abs($mc_total);
-							
-							$batch_mc_expected += $mc_total;
-						}
+					$fetched_docs = count($mc_remain_by_doc);
+					if ($total_docs > 0 && $total_docs < $fetched_docs) {
+						dol_syslog(__METHOD__ . ": Error, mixed currency documents detected in the same reconciliation batch.", LOG_ERR);
+						$error++;
+						break;
 					}
-					
-					// If the sum of the invoices exactly matches the Qonto amount in the currency, we allow to close documents
-					if ($batch_mc_valid && price2num($qonto_local_amount, 'MT') === price2num($batch_mc_expected, 'MT')) {
-						$allow_exchange_diff = true;
-					}
-				}
+                }
+                
+                // If transaction local amount = total remain to pay of docs (in foreign currency)
+                $is_perfect_mc_match = (abs($mc_remain_all_docs - abs($qonto_local_amount)) <= 0.01);
 
 				// Loop through amounts_array to validate and collect payment data	
 				foreach ($amounts_array as $doc_id => $amount) {
-					$invoice = new Facture($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
 
 						// Multi-Company Security (IDOR)
@@ -330,12 +349,48 @@ class QontoUpdater
 						$valid_amounts[$doc_id] = $pay_amount;
 
 						// Handle multicurrency different change
-						if ($allow_exchange_diff) {
-							$historic_eur = (float) $invoice->getRemainToPay();
-							$diff_eur = $historic_eur - $pay_amount;
-							
-							if (abs($diff_eur) >= 0.01) {
-								$exchange_diff_amounts[$doc_id] = $diff_eur;
+						if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+							if (
+								$invoice->multicurrency_code != $conf->currency && 
+								!empty($qonto_trx['local_currency']) && 
+								strtoupper($invoice->multicurrency_code) === strtoupper($qonto_trx['local_currency'])
+							) {
+								$autoclose = 0;
+								$doc_index++;
+								$is_last_doc = ($doc_index === $total_docs);
+								$mc_remain = isset($mc_remain_by_doc[$doc_id]) ? $mc_remain_by_doc[$doc_id] : 0;
+                                
+								if ($is_perfect_mc_match) {
+									$mc_imput = abs($mc_remain);
+                                } else {
+                                    // Case of pure partial payment: proportional distribution
+									if ($eur_remaining > 0) {
+                                        $qonto_imput_tx = abs($amount) / $eur_remaining;
+                                        $mc_imput = $qonto_imput_tx * $mc_remaining;
+                                    } else {
+                                        $mc_imput = 0;
+                                    }
+                                }
+                                
+								$mc_imput = price2num($mc_imput, 'MT');
+
+								if ($is_last_doc && abs(abs($amount) - $eur_remaining) <= 0.01) {
+                                    $mc_imput = $mc_remaining;
+                                }
+
+                                // Safeguard: the amount of currency allocated cannot exceed the balance remaining in the overall transaction
+                                if ($mc_imput > abs($mc_remaining)) {
+                                    $mc_imput = abs($mc_remaining);
+                                }
+                                
+                                // The currency used for the next loop iteration is determined
+								$eur_remaining = price2num($eur_remaining - abs($amount), 'MT');
+                                $mc_remaining = price2num($mc_remaining - $mc_imput, 'MT');
+
+								// Prepare for payment
+								$mc_pay_amount = $mc_imput;
+								if ($invoice->type == 2 || $invoice->total_ttc < 0) $mc_pay_amount = -$mc_pay_amount;
+								$valid_mc_amounts[$doc_id] = $mc_pay_amount;
 							}
 						}
 
@@ -354,50 +409,60 @@ class QontoUpdater
 				if (!class_exists('PaiementFourn')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
 				if (!class_exists('FactureFournisseur')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 				
+				// Initialize invoice
+				$invoice = new FactureFournisseur($this->db);
+
 				// Initialize payment
 				$payment = new PaiementFourn($this->db);
 				$payment_type_str = 'payment_supplier';
 
 				$valid_amounts = array();
-				$exchange_diff_amounts = array();
+
 				$first_socid = 0;
 				$payment_label_ref = '';
 
 				// Multi-currency pre-check
-				$allow_exchange_diff = false;
-				if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
-					$batch_mc_expected = 0.0;
-					$batch_mc_valid = true;
-					
-					// Direct entry of the total amount (including tax) in foreign currency (NO rate calculation)
-					foreach ($amounts_array as $doc_id => $amount) {
-						$inv_check = new FactureFournisseur($this->db);
-						if ($inv_check->fetch($doc_id) > 0) {
+				$valid_mc_amounts = array();
+                $mc_remain_all_docs = 0;
+                $mc_remain_by_doc = array();
+				$eur_remaining = abs($qonto_amount);
+				$mc_remaining = abs($qonto_local_amount);
+				$doc_index = 0;
+                $total_docs = 0;
+                
+                if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+                    foreach ($amounts_array as $doc_id => $amount) {
+                        if ($invoice->fetch($doc_id) > 0) {
+                            $tmp_total = (float)$invoice->multicurrency_total_ttc;
+                            $tmp_paid = $qontoRepo->getMulticurrencyPaidAmount($doc_id, 'sinv');
+                            $tmp_rem = price2num($tmp_total - $tmp_paid, 'MT');
+                            
+                            $mc_remain_by_doc[$doc_id] = $tmp_rem;
+                            $mc_remain_all_docs += $tmp_rem;
+
 							if (
-								$inv_check->multicurrency_code == $conf->currency || 
-								empty($qonto_trx['local_currency']) || 
-								strtoupper($inv_check->multicurrency_code) !== strtoupper($qonto_trx['local_currency'])
+								$invoice->multicurrency_code != $conf->currency && 
+								!empty($qonto_trx['local_currency']) && 
+								strtoupper($invoice->multicurrency_code) === strtoupper($qonto_trx['local_currency'])
 							) {
-								$batch_mc_valid = false; 
-								break;
-							}
-							
-							$mc_total = (float)$inv_check->multicurrency_total_ttc;
-							if ($inv_check->type == 2 || $inv_check->total_ttc < 0) $mc_total = -abs($mc_total);
-							
-							$batch_mc_expected += $mc_total;
-						}
-					}
+                                $total_docs++;
+                            }
+                        }
+                    }
 					
-					// If the sum of the invoices exactly matches the Qonto amount in the currency, we allow to close documents
-					if ($batch_mc_valid && price2num(-$qonto_local_amount, 'MT') === price2num($batch_mc_expected, 'MT')) {
-						$allow_exchange_diff = true;
+					$fetched_docs = count($mc_remain_by_doc);
+					if ($total_docs > 0 && $total_docs < $fetched_docs) {
+						dol_syslog(__METHOD__ . ": Error, mixed currency documents detected in the same reconciliation batch.", LOG_ERR);
+						$error++;
+						break;
 					}
-				}
+                }
+                
+                // If Qonto currency amount = remain to pay (in foreign currency) of all docs; fast imputation
+                $is_perfect_mc_match = (abs($mc_remain_all_docs - abs($qonto_local_amount)) <= 0.01);
 
 				// Loop through amounts_array to validate and collect payment data	
 				foreach ($amounts_array as $doc_id => $amount) {
-					$invoice = new FactureFournisseur($this->db);
 					if ($invoice->fetch($doc_id) > 0) {
 
 						// Multi-Company Security (IDOR)
@@ -424,12 +489,48 @@ class QontoUpdater
 						$valid_amounts[$doc_id] = $pay_amount;
 
 						// Handle multicurrency different change
-						if ($allow_exchange_diff) {
-							$historic_eur = (float) $invoice->getRemainToPay();
-							$diff_eur = $historic_eur - $pay_amount;
-							
-							if (abs($diff_eur) >= 0.01) {
-								$exchange_diff_amounts[$doc_id] = $diff_eur;
+						if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+							if (
+								$invoice->multicurrency_code != $conf->currency && 
+								!empty($qonto_trx['local_currency']) && 
+								strtoupper($invoice->multicurrency_code) === strtoupper($qonto_trx['local_currency'])
+							) {
+								$autoclose = 0;
+								$doc_index++;
+								$is_last_doc = ($doc_index === $total_docs);
+								$mc_remain = isset($mc_remain_by_doc[$doc_id]) ? $mc_remain_by_doc[$doc_id] : 0;
+                                
+								if ($is_perfect_mc_match) {
+									$mc_imput = abs($mc_remain);
+                                } else {
+                                    // Case of pure partial payment: proportional distribution
+									if ($eur_remaining > 0) {
+                                        $qonto_imput_tx = abs($amount) / $eur_remaining;
+                                        $mc_imput = $qonto_imput_tx * $mc_remaining;
+                                    } else {
+                                        $mc_imput = 0;
+                                    }
+                                }
+                                
+								$mc_imput = price2num($mc_imput, 'MT');
+
+								if ($is_last_doc && abs(abs($amount) - $eur_remaining) <= 0.01) {
+                                    $mc_imput = $mc_remaining;
+                                }
+
+                                // Safeguard: the amount of currency allocated cannot exceed the balance remaining in the overall transaction
+                                if ($mc_imput > abs($mc_remaining)) {
+                                    $mc_imput = abs($mc_remaining);
+                                }
+                                
+                                // The currency used for the next loop iteration is determined
+								$eur_remaining = price2num($eur_remaining - abs($amount), 'MT');
+                                $mc_remaining = price2num($mc_remaining - $mc_imput, 'MT');
+
+								// Prepare for payment
+								$mc_pay_amount = $mc_imput;
+								if ($invoice->type == 2 || $invoice->total_ttc < 0) $mc_pay_amount = -$mc_pay_amount;
+								$valid_mc_amounts[$doc_id] = $mc_pay_amount;
 							}
 						}
 
@@ -650,7 +751,7 @@ class QontoUpdater
 			
 
             // Dolibarr payment creation (arg 1 = auto close document)
-            $run = $payment->create($user, 1);
+            $run = $payment->create($user, $autoclose);
             if ($run > 0) {
                 
                 // Push the newly created payment into the bank entries (AccountLine)
@@ -692,20 +793,80 @@ class QontoUpdater
                                 if ($res_paid < 0) { $error++; }
                             }
 
-							// Multi-currency, close document if paid and create BookKeeping entries
-							if (!empty($this->multicurrency_enabled) && $error === 0 && !empty($exchange_diff_amounts)) {
-								$res_diff = $this->handleExchangeDifference(
-									$exchange_diff_amounts, 
-									$type, 
-									strtotime($qonto_trx['settled_at']), 
-									$user
-								);
-								
-								if ($res_diff < 0) {
-									$error++;
-								}
-							}
+							// Multi-currency, close document if paid (Force closure for exchange rate differences)
+							if (!empty($this->multicurrency_enabled) && !empty($valid_mc_amounts)) {
+                                
+                                // Type (Customer or Supplier)
+                                $table_pf = ($type === 'cinv') ? 'paiement_facture' : 'paiementfourn_facturefourn';
+                                $field_p  = ($type === 'cinv') ? 'fk_paiement' : 'fk_paiementfourn';
+                                $field_f  = ($type === 'cinv') ? 'fk_facture' : 'fk_facturefourn';
+								                                
+                                // Single loop for foreign currency payments
+                                foreach ($valid_mc_amounts as $fk_doc => $mc_amount) {
+                                    
+                                    // Declare class to call
+									 if ($type === 'cinv') {
+                                        if (!class_exists('Facture')) require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+                                        $inv_to_close = new Facture($this->db);
+                                    } else {
+                                        if (!class_exists('FactureFournisseur')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+                                        $inv_to_close = new FactureFournisseur($this->db);
+                                    }
+                                    
+                                    // 1. SQL Byoass on payments
+                                    $mc_code_db = $this->db->escape($qonto_trx['local_currency']);
+                                    $imputed_eur = isset($valid_amounts[$fk_doc]) ? abs($valid_amounts[$fk_doc]) : 0;
+                                    $mc_tx_db = ($imputed_eur != 0) ? (abs($mc_amount) / $imputed_eur) : 1;
+									if ($inv_to_close->fetch($fk_doc) > 0) {
+                                        $mc_code_db = $this->db->escape($inv_to_close->multicurrency_code);
+                                    }
+                                    
+                                    $sql_mc = "UPDATE " . MAIN_DB_PREFIX . $table_pf . " ";
+                                    $sql_mc .= "SET multicurrency_amount = " . (float)price2num($mc_amount, 'MT') . ", ";
+                                    $sql_mc .= "    multicurrency_code = '" . $mc_code_db . "', ";
+                                    $sql_mc .= "    multicurrency_tx = " . $mc_tx_db . " ";
+                                    $sql_mc .= "WHERE " . $field_p . " = " . (int)$payment->id . " AND " . $field_f . " = " . (int)$fk_doc;
+                                    
+                                    $res_mc = $this->db->query($sql_mc);
+                                    if (!$res_mc) {
+                                        dol_syslog(__METHOD__ . ": Error while correcting the currency", LOG_ERR);
+                                        $error++;
+                                    }
+                                    
+                                    // 2. Smart closing management based on actual remaining balances
+                                    if ($inv_to_close->fetch($fk_doc) > 0) {
+                                        $new_remain_eur = (float)$inv_to_close->getRemainToPay();
+                                        
+                                        $mc_total = (float)$inv_to_close->multicurrency_total_ttc;
+                                        $mc_already_paid = $qontoRepo->getMulticurrencyPaidAmount($fk_doc, $type);
+                                        $new_remain_mc = $mc_total - $mc_already_paid;
 
+                                        // CASE A: Everything balances perfectly to zero (EUR and foreign currency) -> Standard closing
+                                        if (abs($new_remain_eur) <= 0.01 && abs($new_remain_mc) <= 0.01) {
+                                            $res_paid = $inv_to_close->setPaid($user);
+                                            if ($res_paid < 0) { $error++; }
+                                        } 
+                                        // CASE B: Fully paid in foreign currency, but a difference in EUR remains -> Exchange rate difference
+                                        elseif (abs($new_remain_mc) <= 0.01 && abs($new_remain_eur) > 0.01) {
+                                            $res_paid = $inv_to_close->setPaid($user, 'ExchangeRate', 'Exchange diff (MC full) - QontoSync');
+                                            if ($res_paid < 0) { $error++; }
+                                        } 
+                                    }
+
+									$final_parent_mc_amount = ($type === 'sinv') ? -$qonto_local_amount : $qonto_local_amount;
+
+									$table_parent = ($type === 'cinv') ? 'paiement' : 'paiementfourn';
+									$sql_parent = "UPDATE " . MAIN_DB_PREFIX . $table_parent . " ";
+									$sql_parent .= "SET multicurrency_amount = " . (float)price2num($final_parent_mc_amount, 'MT') . " ";
+									$sql_parent .= "WHERE rowid = " . (int)$payment->id;
+
+									$res_parent = $this->db->query($sql_parent);
+                                    if (!$res_parent) {
+                                        dol_syslog(__METHOD__ . ": Error while correcting the currency", LOG_ERR);
+                                        $error++;
+                                    }
+                                }
+                            }
 
                         } else {
                             dol_syslog(__METHOD__ . ": Error updating bank line: " . $line->error, LOG_ERR);
@@ -861,124 +1022,5 @@ class QontoUpdater
 		}
 
 		return $result;
-	}
-
-	/**
-	 * Handles commercial closure and accounting entries for exchange rate differences
-	 *
-	 * @param array  $exchange_diff_amounts Array of differences [doc_id => diff_eur]
-	 * @param string $type                  Document type ('cinv' or 'sinv')
-	 * @param int    $doc_date              Qonto transaction timestamp
-	 * @param User   $user                  Current user
-	 * @return int 1 on success, -1 on error
-	 */
-	private function handleExchangeDifference($exchange_diff_amounts, $type, $doc_date, $user)
-	{
-		global $conf;
-
-		$is_customer = ($type === 'cinv');
-		$is_supplier = ($type === 'sinv');
-		$accounting_enabled = !empty($conf->accounting->enabled);
-
-		if (!$is_customer && !$is_supplier) {
-			return -1;
-		}
-
-		// Conditional class loading
-		if ($is_customer && !class_exists('Facture')) require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-		if ($is_supplier && !class_exists('FactureFournisseur')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
-		
-		if ($accounting_enabled && !class_exists('BookKeeping')) {
-			require_once DOL_DOCUMENT_ROOT.'/accountancy/class/bookkeeping.class.php';
-		}
-
-		// Retrieve configuration parameters
-		$loss_account = getDolGlobalString('ACCOUNTING_ACCOUNT_CHG_LOSS') ?: '666000';
-		$gain_account = getDolGlobalString('ACCOUNTING_ACCOUNT_CHG_GAIN') ?: '766000';
-		$od_journal   = getDolGlobalString('ACCOUNTING_JOURNAL_OD') ?: 'OD';
-
-		foreach ($exchange_diff_amounts as $inv_id => $diff_eur) {
-			$inv_mc = $is_customer ? new Facture($this->db) : new FactureFournisseur($this->db);
-			
-			if ($inv_mc->fetch($inv_id) > 0) {
-				
-				// 1. Commercial closure of the invoice
-				$res_paid = $inv_mc->setPaid($user, 'discount', 'Exchange diff - QontoSync');
-				
-				if ($res_paid < 0) { 
-					$doc_label = $is_customer ? "customer invoice" : "supplier invoice";
-					dol_syslog(__METHOD__ . ": Error during closing (Exchange rate difference) " . $doc_label . ": " . $inv_mc->error, LOG_ERR);
-					return -1;
-				}
-
-				/*/ 2. Accounting entry via native BookKeeping class
-				if ($accounting_enabled) {
-					$inv_mc->fetch_thirdparty();
-					
-					// Resolve third-party accounts
-					if ($is_customer) {
-						$thirdparty_account = !empty($inv_mc->thirdparty->code_compta) ? $inv_mc->thirdparty->code_compta : '411000';
-					} else {
-						$thirdparty_account = !empty($inv_mc->thirdparty->code_compta_fournisseur) ? $inv_mc->thirdparty->code_compta_fournisseur : '401000';
-					}
-
-					// Determine the direction of the entry
-					$lines = array();
-					
-					if ($is_customer) {
-						if ($diff_eur > 0) {
-							// Customer loss: Debit 666 / Credit 411
-							$lines[] = array('account' => $loss_account, 'sub' => '', 'debit' => $diff_eur, 'credit' => 0);
-							$lines[] = array('account' => '411000', 'sub' => $thirdparty_account, 'debit' => 0, 'credit' => $diff_eur);
-						} else {
-							// Customer gain: Debit 411 / Credit 766
-							$lines[] = array('account' => '411000', 'sub' => $thirdparty_account, 'debit' => abs($diff_eur), 'credit' => 0);
-							$lines[] = array('account' => $gain_account, 'sub' => '', 'debit' => 0, 'credit' => abs($diff_eur));
-						}
-					} else { 
-						if ($diff_eur > 0) {
-							// Supplier gain: Debit 401 / Credit 766
-							$lines[] = array('account' => '401000', 'sub' => $thirdparty_account, 'debit' => $diff_eur, 'credit' => 0);
-							$lines[] = array('account' => $gain_account, 'sub' => '', 'debit' => 0, 'credit' => $diff_eur);
-						} else {
-							// Supplier loss: Debit 666 / Credit 401
-							$lines[] = array('account' => $loss_account, 'sub' => '', 'debit' => abs($diff_eur), 'credit' => 0);
-							$lines[] = array('account' => '401000', 'sub' => $thirdparty_account, 'debit' => 0, 'credit' => abs($diff_eur));
-						}
-					}
-					
-					// Create lines in the General Ledger
-					foreach ($lines as $line) {
-						$bk = new BookKeeping($this->db);
-						
-						$bk->doc_date          = $doc_date;
-						$bk->doc_type          = 'od';
-						$bk->doc_ref           = $inv_mc->ref;
-						$bk->fk_doc            = $inv_mc->id;
-						$bk->fk_docdet         = 0;
-						$bk->code_journal      = $od_journal;
-						$bk->numero_compte     = $line['account'];
-						$bk->subledger_account = $line['sub'];
-						$bk->label_operation   = 'Exchange diff - ' . $inv_mc->ref;
-						$bk->debit             = $line['debit'];
-						$bk->credit            = $line['credit'];
-						$bk->montant           = $line['debit'] > 0 ? $line['debit'] : $line['credit'];
-						$bk->sens              = $line['debit'] > 0 ? 'D' : 'C';
-						$bk->entity            = $conf->entity;
-
-						$res_bk = $bk->create($user);
-						
-						if ($res_bk < 0) {
-							dol_syslog(__METHOD__ . ": Accounting OD error: " . $bk->error, LOG_ERR);
-							return -1;
-						}
-					}
-				}*/
-			} else {
-				return -1;
-			}
-		}
-
-		return 1;
 	}
 }
