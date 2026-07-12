@@ -251,6 +251,22 @@ class QontoUpdater
 				// Get the unique ID of the sent bank line
 				reset($amounts_array);
 				$doc_id = key($amounts_array);
+
+				// Updating details of the bank line with transaction dates
+				if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
+				$line = new AccountLine($this->db);
+
+				if ($line->fetch($doc_id) > 0) {
+					$line->datev = strtotime($qonto_trx['settled_at']);
+					$line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
+
+					$update = $line->update($user);
+					if ($update < 0) {
+						dol_syslog(__METHOD__ . ": Error updating bank line dates: " . $line->error, LOG_ERR);
+						$error++;
+						break;
+					}
+				}
 				
 				// Link directly to the existing bank line (no payment creation)
 				$run = $this->linkTransaction($doc_id, $qonto_trx['id'], $ref_releve);
