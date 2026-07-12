@@ -46,7 +46,7 @@ $(document).ready(function () {
     });
 
     // 3. PROCESSING UPDATE
-    $(document).on('click', '#btn_validate_conciliation', function(e) {
+    $(document).on('click', '#btn_validate_conciliation', function (e) {
         e.preventDefault();
         $('#form_batch_link').trigger('submit');
     });
@@ -109,4 +109,12 @@ $(document).ready(function () {
             eyeIcon.removeClass('fa-eye').addClass('fa-eye-slash');
         }
     });
+
+    // 9. AUTO-LOADER
+    let bankSelect = searchForm.find('select[name="bank_rowid"]');
+    if (bankSelect.length > 0 && bankSelect.val() > 0) {
+        setTimeout(function () {
+            loadTransactions();
+        }, 150);
+    }
 });

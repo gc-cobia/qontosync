@@ -31,6 +31,7 @@ print dol_htmloutput_events();
                 <td><?php print $langs->trans('Amount'); ?></td>
                 <td><?php print $langs->trans('Correspondence'); ?></td>
 	            <td style="width: 1%; white-space: nowrap;">&nbsp;</td>
+	            <td style="width: 1%; white-space: nowrap;">&nbsp;</td>
             </tr>
  
             <!-- For each transaction -->
@@ -207,7 +208,7 @@ print dol_htmloutput_events();
                         <?php endif; ?>
                         
                     <td class="center">
-                        <!-- buton to access modal box -->
+                        <!-- Button to access modal box -->
                         <?php
                         $btn_html = '<span class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;"><span class="fa fa-search"></span></span>';
                         	
@@ -221,9 +222,65 @@ print dol_htmloutput_events();
                             $url_modal,
                             '',
                             '',
-                            
                         );
                         ?>
+                    </td>
+
+                    <td class="center">
+                        <?php
+
+                        if (!empty($t['trx_status']) && $t['trx_status'] === 'unlinked'):
+
+                        // Set various values
+                        $way = ($t['amount'] < 0) ? 0 : 1; 
+                        $amount = abs($t['amount']);                            
+                        $label = $t['label'];
+                        if (!empty($t['reference'])) {
+                            $label .= ' - ' . $t['reference'];
+                        }
+                        
+                        // Get payment code
+                        $mop = $qontoMatching->getPaymentModeId(
+                            isset($t['operation_type']) ? $t['operation_type'] : '', 
+                            isset($t['side']) ? $t['side'] : ''
+                        );
+                        $payment_code = '';
+                        if (!empty($mop)) {
+                            $payment_code = $langs->getLabelFromKey($db, $mop, 'c_paiement', 'id', 'code');
+                        }
+
+                        $dateo = isset($t['emitted_at']) ? strtotime($t['emitted_at']) : strtotime($t['settled_at']);
+                        $datev = strtotime($t['settled_at']);
+
+                        // Build URL for back page
+                        $back_url = dol_buildpath('/qontosync/reconciliation.php', 1) . '?bank_rowid=' . $bank_rowid;
+                        if (isset($month)) $back_url .= '&month=' . $month;
+                        if (isset($year)) $back_url .= '&year=' . $year;
+                        
+                        // Build URL with various values
+                        $various_url = dol_buildpath('/compta/bank/various_payment/card.php', 1) . '?action=add';
+                        $various_url .= '&token=' . newToken();
+                        $various_url .= '&accountid=' . $bank_rowid;
+                        $various_url .= '&amount=' . $amount;
+                        $various_url .= '&sens=' . $way;
+                        $various_url .= '&label=' . urlencode(dol_trunc($label, 255));
+                        $various_url .= '&num_payment=' . urlencode(!empty($t['reference']) ? $t['reference'] : $q_id);
+                        
+                        if (!empty($payment_code)) {
+                            $various_url .= '&paymenttype=' . urlencode($payment_code);
+                        }
+
+                        $various_url .= '&datepday=' . date('d', $dateo) . '&datepmonth=' . date('m', $dateo) . '&datepyear=' . date('Y', $dateo);
+                        $various_url .= '&datevday=' . date('d', $datev) . '&datevmonth=' . date('m', $datev) . '&datevyear=' . date('Y', $datev);
+                        
+                        
+                        $various_url .= '&backtopage=' . urlencode($back_url);
+                        ?>
+                        <!-- Button to create a various payment -->
+                        <a href="<?php print $various_url; ?>" class="button classfortooltip" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>">
+                            <span class="fas fa-plus"></span>
+                        </a>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
