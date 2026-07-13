@@ -125,21 +125,13 @@ class QontoUpdater
 			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope: " . $bank->fk_account, LOG_ERR);
 			return -1;
 		}
-		
-		// Lazy load ExtraFields class
-		if (!class_exists('ExtraFields')) require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';	
 
-		$extrafields = new ExtraFields($this->db);
-		$extrafields->fetch_name_optionals_label($bank->table_element);
-		$bank->fetch_optionals();
+		// Try to update the specific extrafieldm
+		// Direct SQL to force NULL and bypass Dolibarr's ORM empty string conversion which breaks UNIQUE constraint)
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "bank_extrafields SET qonto_id = NULL WHERE fk_object = " . (int)$bank_line_id;
+		$resql = $this->db->query($sql);
 		
-		// Unset the Qonto ID
-		$bank->array_options['options_qonto_id'] = '';
-	
-		// Try to update the specific extrafield
-		$res = $bank->updateExtraField('qonto_id');
-		
-		if ($res < 0) {
+		if ($resql < 0) {
 			dol_syslog(__METHOD__ . ": Error updating the bank line extrafield: ".$bank->error, LOG_ERR);
 			return -1;
 		}
