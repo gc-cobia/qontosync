@@ -91,3 +91,4 @@ TransactionAlreadyLinked=Diese Transaktion ist %s (Bank Ref: %s).
 AlreadyLinked=bereits mit einem Bankeintrag in Dolibarr verknüpft
 ErrorMultipleLinks=Fehler: Diese Transaktion hat %s in der Datenbank.
 MultipleLinks=mehrere Verknüpfungen
+ConfirmNewVariousPaymentQuestion=Sind Sie sicher, dass Sie für diese Transaktion eine neue sonstige Zahlung erstellen möchten?

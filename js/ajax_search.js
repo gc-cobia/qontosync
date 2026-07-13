@@ -117,4 +117,40 @@ $(document).ready(function () {
             loadTransactions();
         }, 150);
     }
+
+    // 10. CONFIRMATION MODAL FOR VARIOUS PAYMENT
+    $(document).on('click', '.btn-ask-create-od', function (e) {
+        e.preventDefault();
+        let targetUrl = $(this).data('url');
+        
+        let $dialog = $("#dialog-confirm-create-od");
+        let textYes = $dialog.data('yes') || 'Yes';
+        let textNo = $dialog.data('no') || 'No';
+
+        let buttonsArray = [];
+        let btnYes = {
+            text: textYes,
+            click: function() {
+                $(this).dialog("close");
+                window.location.href = targetUrl;
+            }
+        };
+        let btnNo = {
+            text: textNo,
+            click: function() {
+                $(this).dialog("close");
+            }
+        };
+        
+        buttonsArray.push(btnYes);
+        buttonsArray.push(btnNo);
+        
+        $dialog.dialog({
+            resizable: false,
+            height: "auto",
+            width: 400,
+            modal: true,
+            buttons: buttonsArray
+        });
+    });
 });

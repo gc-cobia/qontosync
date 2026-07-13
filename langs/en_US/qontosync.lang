@@ -89,3 +89,4 @@ TransactionAlreadyLinked=This transaction is %s to a bank entry in Dolibarr (Ban
 AlreadyLinked=already linked
 ErrorMultipleLinks=Error: This transaction has %s in the database.
 MultipleLinks=multiple links
+ConfirmNewVariousPaymentQuestion=Are you sure you want to create a new various payment for this transaction?

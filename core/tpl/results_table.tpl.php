@@ -228,7 +228,6 @@ print dol_htmloutput_events();
 
                     <td class="center">
                         <?php
-
                         if (!empty($t['trx_status']) && $t['trx_status'] === 'unlinked'):
 
                         // Set various values
@@ -277,13 +276,22 @@ print dol_htmloutput_events();
                         $various_url .= '&backtopage=' . urlencode($back_url);
                         ?>
                         <!-- Button to create a various payment -->
-                        <a href="<?php print $various_url; ?>" class="button classfortooltip" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>">
-                            <span class="fas fa-plus"></span>
-                        </a>
+                        <button type="button" class="button classfortooltip btn-ask-create-od" data-url="<?php print $various_url; ?>" style="padding: 0; margin: 0; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>">
+                                <span class="fas fa-plus"></span>
+                        </button>
                         <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
         </table>
     </form>
+
+    <!-- Confirmation modal for new various payment -->
+    <div id="dialog-confirm-create-od" 
+         title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>" 
+         data-yes="<?php print dol_escape_htmltag($langs->transnoentities("Yes")); ?>" 
+         data-no="<?php print dol_escape_htmltag($langs->transnoentities("No")); ?>" 
+         style="display: none;">
+        <p><span class="fas fa-exclamation-circle" style="float:left; margin:12px 12px 20px 0;"></span><?php print $langs->trans("ConfirmNewVariousPaymentQuestion"); ?></p>
+    </div>
 </div>

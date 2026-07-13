@@ -91,3 +91,4 @@ TransactionAlreadyLinked=Cette transaction est %s avec une écriture bancaire da
 AlreadyLinked=déjà rapprochée
 ErrorMultipleLinks=Erreur : Cette transaction possède %s en base de données.
 MultipleLinks=plusieurs rapprochements
+ConfirmNewVariousPaymentQuestion=Êtes-vous sûr de vouloir créer un nouveau paiement divers pour cette transaction ?

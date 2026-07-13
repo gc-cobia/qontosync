@@ -2,6 +2,10 @@
 
 ## [1.3]
 
+### Added
+- Button to create a new various payment from the reconciliation interface.
+- Confirmation modal for new various payment creation.
+
 ### Changed
 - In multi-currency mode, the module no longer pushes the exchange rate variance entry to the general journal; the data is being prepared for transfer to the accounting module.
  
