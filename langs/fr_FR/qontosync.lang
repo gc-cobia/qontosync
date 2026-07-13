@@ -91,4 +91,9 @@ TransactionAlreadyLinked=Cette transaction est %s avec une écriture bancaire da
 AlreadyLinked=déjà rapprochée
 ErrorMultipleLinks=Erreur : Cette transaction possède %s en base de données.
 MultipleLinks=plusieurs rapprochements
+
+# Confirm Modal
 ConfirmNewVariousPaymentQuestion=Êtes-vous sûr de vouloir créer un nouveau paiement divers pour cette transaction ?
+UnlinkTransaction=Délier la transaction
+ConfirmUnlinkTransaction=Êtes-vous sûr de vouloir délier cette transaction Qonto de son écriture bancaire dans Dolibarr ?
+TransactionSuccessfullyUnlinked=Transaction déliée avec succès.

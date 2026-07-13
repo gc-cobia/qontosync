@@ -89,4 +89,9 @@ TransactionAlreadyLinked=This transaction is %s to a bank entry in Dolibarr (Ban
 AlreadyLinked=already linked
 ErrorMultipleLinks=Error: This transaction has %s in the database.
 MultipleLinks=multiple links
+
+# Confirm Modal
 ConfirmNewVariousPaymentQuestion=Are you sure you want to create a new various payment for this transaction?
+UnlinkTransaction=Unlink transaction
+ConfirmUnlinkTransaction=Are you sure you want to unlink this Qonto transaction from its Dolibarr bank entry?
+TransactionSuccessfullyUnlinked=Transaction successfully unlinked.

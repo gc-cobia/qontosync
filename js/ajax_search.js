@@ -153,4 +153,50 @@ $(document).ready(function () {
             buttons: buttonsArray
         });
     });
+
+    // 11. CONFIRMATION MODAL FOR UNLINKING
+    let bankRowidToUnlink = null;
+    $(document).on('click', '.btn-ask-unlink', function (e) {
+        e.preventDefault();
+        bankRowidToUnlink = $(this).data('bank-rowid');
+        
+        let $dialog = $("#dialog-confirm-unlink");
+        let textYes = $dialog.data('yes') || 'Yes';
+        let textNo = $dialog.data('no') || 'No';
+
+        let buttonsArray = [];
+        let btnYes = {
+            text: textYes,
+            click: function() {
+                $(this).dialog("close");
+                container.html('<div style="text-align:center; padding:50px;" class="opacitymedium"><i class="fas fa-spinner fa-pulse fa-3x"></i></div>');
+                $.post('ajax/unlink_transaction.php', { bank_line_id: bankRowidToUnlink, token: $('input[name="token"]').val() }, function(response) {
+                    loadTransactions();
+                }).fail(function (xhr, status, error) {
+                    if (xhr.status === 401 || xhr.status === 403) {
+                        window.location.reload();
+                        return;
+                    }
+                    container.html('<div class="error">' + langAjaxError + ' : ' + error + '</div>');
+                });
+            }
+        };
+        let btnNo = {
+            text: textNo,
+            click: function() {
+                $(this).dialog("close");
+            }
+        };
+        
+        buttonsArray.push(btnYes);
+        buttonsArray.push(btnNo);
+        
+        $dialog.dialog({
+            resizable: false,
+            height: "auto",
+            width: 400,
+            modal: true,
+            buttons: buttonsArray
+        });
+    });
 });

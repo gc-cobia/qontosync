@@ -91,4 +91,9 @@ TransactionAlreadyLinked=Diese Transaktion ist %s (Bank Ref: %s).
 AlreadyLinked=bereits mit einem Bankeintrag in Dolibarr verknüpft
 ErrorMultipleLinks=Fehler: Diese Transaktion hat %s in der Datenbank.
 MultipleLinks=mehrere Verknüpfungen
+
+# Confirm Modal
 ConfirmNewVariousPaymentQuestion=Sind Sie sicher, dass Sie für diese Transaktion eine neue sonstige Zahlung erstellen möchten?
+UnlinkTransaction=Transaktion entkoppeln
+ConfirmUnlinkTransaction=Sind Sie sicher, dass Sie die Verknüpfung dieser Qonto-Transaktion mit der Bankbuchung in Dolibarr aufheben möchten?
+TransactionSuccessfullyUnlinked=Verknüpfung der Transaktion erfolgreich aufgehoben.

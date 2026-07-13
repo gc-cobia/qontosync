@@ -280,6 +280,13 @@ print dol_htmloutput_events();
                                 <span class="fas fa-plus"></span>
                         </button>
                         <?php endif; ?>
+
+                        <!-- Button to unlink transaction -->
+                        <?php if (!empty($t['trx_status']) && $t['trx_status'] === 'linked'): ?>
+                        <button type="button" class="button btn-ask-unlink" data-bank-rowid="<?php print $t['linked_rowid']; ?>" style="padding: 0; margin: 0; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%; vertical-align: middle; margin-left: 5px;" title="<?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>">
+                            <span class="fas fa-undo"></span>
+                        </button>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -293,5 +300,14 @@ print dol_htmloutput_events();
          data-no="<?php print dol_escape_htmltag($langs->transnoentities("No")); ?>" 
          style="display: none;">
         <p><span class="fas fa-exclamation-circle" style="float:left; margin:12px 12px 20px 0;"></span><?php print $langs->trans("ConfirmNewVariousPaymentQuestion"); ?></p>
+    </div>
+
+    <!-- Confirmation modal for unlinking -->
+    <div id="dialog-confirm-unlink" 
+         title="<?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>" 
+         data-yes="<?php print dol_escape_htmltag($langs->transnoentities("Yes")); ?>" 
+         data-no="<?php print dol_escape_htmltag($langs->transnoentities("No")); ?>" 
+         style="display: none;">
+        <p><span class="fas fa-exclamation-circle" style="float:left; margin:12px 12px 20px 0;"></span><?php print $langs->trans("ConfirmUnlinkTransaction"); ?></p>
     </div>
 </div>

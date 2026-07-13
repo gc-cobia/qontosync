@@ -93,4 +93,9 @@ TransactionAlreadyLinked=Esta transacción %s a una entrada bancaria en Dolibarr
 AlreadyLinked=ya está vinculada
 ErrorMultipleLinks=Error: Esta transacción tiene %s en la base de datos.
 MultipleLinks=múltiples enlaces
+
+# Confirm Modal
 ConfirmNewVariousPaymentQuestion=¿Está seguro de que desea crear un nuevo pago vario para esta transacción?
+UnlinkTransaction=Desvincular transacción
+ConfirmUnlinkTransaction=¿Está seguro de que desea desvincular esta transacción de Qonto de su asiento bancario en Dolibarr?
+TransactionSuccessfullyUnlinked=Transacción desvinculada con éxito.

@@ -90,6 +90,73 @@ class QontoUpdater
 		return 1;
 	}
 	
+	/**
+	 * Unlink a Qonto transaction ID from a Dolibarr bank entry
+	 *
+	 * @param int $bank_line_id
+	 * @return int 1 on success, -1 on error
+	 */
+	public function unlinkTransaction($bank_line_id)
+	{
+		global $conf, $user;
+
+		if (empty($bank_line_id)) {
+			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
+			return -1;
+		}
+		
+		// Lazy load AccountLine class if needed
+		if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
+		
+		$bank = new AccountLine($this->db);
+		$res = $bank->fetch($bank_line_id);
+		
+		// Verify if the bank line exists
+		if ($res <= 0) {
+			dol_syslog(__METHOD__ . ": bank line " . $bank_line_id . " doesn't exist", LOG_ERR);
+			return -1;
+		}
+
+		// Multi-tenant Security (Anti-IDOR)
+		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+		$qontoRepo = new QontoRepository($this->db);
+
+		if (!$qontoRepo->isAccountAllowed($bank->fk_account)) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope: " . $bank->fk_account, LOG_ERR);
+			return -1;
+		}
+		
+		// Lazy load ExtraFields class
+		if (!class_exists('ExtraFields')) require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';	
+
+		$extrafields = new ExtraFields($this->db);
+		$extrafields->fetch_name_optionals_label($bank->table_element);
+		$bank->fetch_optionals();
+		
+		// Unset the Qonto ID
+		$bank->array_options['options_qonto_id'] = '';
+	
+		// Try to update the specific extrafield
+		$res = $bank->updateExtraField('qonto_id');
+		
+		if ($res < 0) {
+			dol_syslog(__METHOD__ . ": Error updating the bank line extrafield: ".$bank->error, LOG_ERR);
+			return -1;
+		}
+		
+		// Update the bank line to remove the statement reference
+		$bank->num_releve = '';
+		$res = $bank->update_conciliation($user, null, 0);
+		
+		if ($res < 0) {
+			dol_syslog(__METHOD__ . ": Error updating the bank line statement: ".$bank->error, LOG_ERR);
+			return -1;
+		}
+	
+		dol_syslog(__METHOD__ . ": bank line " . $bank_line_id . " unlinked", LOG_INFO);
+		return 1;
+	}
+	
     /**
 	 * Unified method: Update selected entries with the Qonto transaction (Single or Multiple)
 	 *
