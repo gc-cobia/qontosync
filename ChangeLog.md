@@ -5,6 +5,8 @@
 ### Added
 - Button to create a new various payment from the reconciliation interface.
 - Confirmation modal for new various payment creation.
+- Option to delete the bank reconciliation with a single button.
+- Confirmation modal for deletion of a bank reconciliation.
 
 ### Changed
 - In multi-currency mode, the module no longer pushes the exchange rate variance entry to the general journal; the data is being prepared for transfer to the accounting module.
