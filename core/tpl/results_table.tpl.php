@@ -143,7 +143,7 @@ print dol_htmloutput_events();
                                                     }
                                                     ?>
                                                     <option value="sinv_<?php print $sinv->rowid; ?>">
-                                                        <?php print dol_print_date($sinv->datev, 'day'); ?> - <?php print dol_escape_htmltag($sinv->label); ?> (<?php print $amt_display; ?>) - <?php print dol_escape_htmltag($cinv->thirdparty); ?> (<?php print dol_escape_htmltag($sinv->ref_supplier); ?>)
+                                                        <?php print dol_print_date($sinv->datev, 'day'); ?> - <?php print dol_escape_htmltag($sinv->label); ?> (<?php print $amt_display; ?>) - <?php print dol_escape_htmltag($sinv->thirdparty); ?> (<?php print dol_escape_htmltag($sinv->ref_supplier); ?>)
                                                     </option>
                                                 <?php endforeach; ?>
                                                 
