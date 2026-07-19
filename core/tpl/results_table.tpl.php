@@ -18,7 +18,7 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
 print dol_htmloutput_events();
 ?>
 
-<div style="flex: 1 1 auto; overflow-y: auto; background: var(--colorbackbody, #fff);">
+<div style="background: var(--colorbackbody, #fff); padding-bottom: 120px;">
     <form id="form_batch_link" method="post" action="<?php print dol_escape_htmltag($_SERVER["PHP_SELF"]); ?>" style="margin: 0;">
         <input type="hidden" name="token" value="<?php print newToken(); ?>">
         <input type="hidden" name="action" value="batch_link">
@@ -30,7 +30,6 @@ print dol_htmloutput_events();
                 <td><?php print $langs->trans('Label'); ?></td>
                 <td><?php print $langs->trans('Amount'); ?></td>
                 <td><?php print $langs->trans('Correspondence'); ?></td>
-	            <td style="width: 1%; white-space: nowrap;">&nbsp;</td>
 	            <td style="width: 1%; white-space: nowrap;">&nbsp;</td>
             </tr>
  
@@ -208,85 +207,82 @@ print dol_htmloutput_events();
                         <?php endif; ?>
                         
                     <td class="center">
-                        <!-- Button to access modal box -->
-                        <?php
-                        $btn_html = '<span class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;"><span class="fa fa-search"></span></span>';
-                        	
-                        // Generate dynamic URL
-                        $url_modal = dol_buildpath('/qontosync/advanced_match.php', 2) . '?qonto_id=' . urlencode($q_id) . '&bank_rowid=' . $bank_rowid . '&token=' . newToken();
-                        
-                        print dolButtonToOpenUrlInDialogPopup(
-                            'btn_adv_match_' . md5($q_id),
-                            $langs->transnoentities("AdvancedSearch"),
-                            $btn_html,
-                            $url_modal,
-                            '',
-                            '',
-                        );
-                        ?>
-                    </td>
+                        <div class="qonto-dropdown">
+                            <button type="button" class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="<?php print dol_escape_htmltag($langs->trans("Action")); ?>">
+                                <span class="fas fa-bars"></span>
+                            </button>
+                            <div class="qonto-dropdown-content">
+                                <!-- Advanced Search -->
+                                <?php
+                                $btn_html = '<span class="fa fa-search marginrightonly" style="margin-right: 5px;"></span> ' . $langs->transnoentities("AdvancedSearch");
+                                $url_modal = dol_buildpath('/qontosync/advanced_match.php', 2) . '?qonto_id=' . urlencode($q_id) . '&bank_rowid=' . $bank_rowid . '&token=' . newToken();
+                                
+                                print dolButtonToOpenUrlInDialogPopup(
+                                    'btn_adv_match_' . md5($q_id),
+                                    $langs->transnoentities("AdvancedSearch"),
+                                    $btn_html,
+                                    $url_modal,
+                                    '',
+                                    'qonto-dropdown-item',
+                                );
+                                ?>
 
-                    <td class="center">
-                        <?php
-                        if (!empty($t['trx_status']) && $t['trx_status'] === 'unlinked'):
+                                <!-- Unlink Transaction -->
+                                <?php if (!empty($t['trx_status']) && $t['trx_status'] === 'linked'): ?>
+                                <button type="button" class="btn-ask-unlink qonto-dropdown-item" data-bank-rowid="<?php print $t['linked_rowid']; ?>" title="<?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>">
+                                    <span class="fas fa-undo marginrightonly" style="margin-right: 5px;"></span> <?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>
+                                </button>
+                                <?php endif; ?>
 
-                        // Set various values
-                        $way = ($t['amount'] < 0) ? 0 : 1; 
-                        $amount = abs($t['amount']);                            
-                        $label = $t['label'];
-                        if (!empty($t['reference'])) {
-                            $label .= ' - ' . $t['reference'];
-                        }
-                        
-                        // Get payment code
-                        $mop = $qontoMatching->getPaymentModeId(
-                            isset($t['operation_type']) ? $t['operation_type'] : '', 
-                            isset($t['side']) ? $t['side'] : ''
-                        );
-                        $payment_code = '';
-                        if (!empty($mop)) {
-                            $payment_code = $langs->getLabelFromKey($db, $mop, 'c_paiement', 'id', 'code');
-                        }
+                                <!-- New various payment -->
+                                <?php
+                                if (!empty($t['trx_status']) && $t['trx_status'] === 'unlinked'):
+                                    $way = ($t['amount'] < 0) ? 0 : 1; 
+                                    $amount = abs($t['amount']);                            
+                                    $label = $t['label'];
+                                    if (!empty($t['reference'])) {
+                                        $label .= ' - ' . $t['reference'];
+                                    }
+                                    
+                                    $mop = $qontoMatching->getPaymentModeId(
+                                        isset($t['operation_type']) ? $t['operation_type'] : '', 
+                                        isset($t['side']) ? $t['side'] : ''
+                                    );
+                                    $payment_code = '';
+                                    if (!empty($mop)) {
+                                        $payment_code = $langs->getLabelFromKey($db, $mop, 'c_paiement', 'id', 'code');
+                                    }
 
-                        $dateo = isset($t['emitted_at']) ? strtotime($t['emitted_at']) : strtotime($t['settled_at']);
-                        $datev = strtotime($t['settled_at']);
+                                    $dateo = isset($t['emitted_at']) ? strtotime($t['emitted_at']) : strtotime($t['settled_at']);
+                                    $datev = strtotime($t['settled_at']);
 
-                        // Build URL for back page
-                        $back_url = dol_buildpath('/qontosync/reconciliation.php', 1) . '?bank_rowid=' . $bank_rowid;
-                        if (isset($month)) $back_url .= '&month=' . $month;
-                        if (isset($year)) $back_url .= '&year=' . $year;
-                        
-                        // Build URL with various values
-                        $various_url = dol_buildpath('/compta/bank/various_payment/card.php', 1) . '?action=add';
-                        $various_url .= '&token=' . newToken();
-                        $various_url .= '&accountid=' . $bank_rowid;
-                        $various_url .= '&amount=' . $amount;
-                        $various_url .= '&sens=' . $way;
-                        $various_url .= '&label=' . urlencode(dol_trunc($label, 255));
-                        $various_url .= '&num_payment=' . urlencode(!empty($t['reference']) ? $t['reference'] : $q_id);
-                        
-                        if (!empty($payment_code)) {
-                            $various_url .= '&paymenttype=' . urlencode($payment_code);
-                        }
+                                    $back_url = dol_buildpath('/qontosync/reconciliation.php', 1) . '?bank_rowid=' . $bank_rowid;
+                                    if (isset($month)) $back_url .= '&month=' . $month;
+                                    if (isset($year)) $back_url .= '&year=' . $year;
+                                    
+                                    $various_url = dol_buildpath('/compta/bank/various_payment/card.php', 1) . '?action=add';
+                                    $various_url .= '&token=' . newToken();
+                                    $various_url .= '&accountid=' . $bank_rowid;
+                                    $various_url .= '&amount=' . $amount;
+                                    $various_url .= '&sens=' . $way;
+                                    $various_url .= '&label=' . urlencode(dol_trunc($label, 255));
+                                    $various_url .= '&num_payment=' . urlencode(!empty($t['reference']) ? $t['reference'] : $q_id);
+                                    
+                                    if (!empty($payment_code)) {
+                                        $various_url .= '&paymenttype=' . urlencode($payment_code);
+                                    }
 
-                        $various_url .= '&datepday=' . date('d', $dateo) . '&datepmonth=' . date('m', $dateo) . '&datepyear=' . date('Y', $dateo);
-                        $various_url .= '&datevday=' . date('d', $datev) . '&datevmonth=' . date('m', $datev) . '&datevyear=' . date('Y', $datev);
-                        
-                        
-                        $various_url .= '&backtopage=' . urlencode($back_url);
-                        ?>
-                        <!-- Button to create a various payment -->
-                        <button type="button" class="button classfortooltip btn-ask-create-od" data-url="<?php print $various_url; ?>" style="padding: 0; margin: 0; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>">
-                                <span class="fas fa-plus"></span>
-                        </button>
-                        <?php endif; ?>
-
-                        <!-- Button to unlink transaction -->
-                        <?php if (!empty($t['trx_status']) && $t['trx_status'] === 'linked'): ?>
-                        <button type="button" class="button btn-ask-unlink" data-bank-rowid="<?php print $t['linked_rowid']; ?>" style="padding: 0; margin: 0; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%; vertical-align: middle; margin-left: 5px;" title="<?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>">
-                            <span class="fas fa-undo"></span>
-                        </button>
-                        <?php endif; ?>
+                                    $various_url .= '&datepday=' . date('d', $dateo) . '&datepmonth=' . date('m', $dateo) . '&datepyear=' . date('Y', $dateo);
+                                    $various_url .= '&datevday=' . date('d', $datev) . '&datevmonth=' . date('m', $datev) . '&datevyear=' . date('Y', $datev);
+                                    
+                                    $various_url .= '&backtopage=' . urlencode($back_url);
+                                ?>
+                                <button type="button" class="btn-ask-create-od qonto-dropdown-item" data-url="<?php print $various_url; ?>" title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>">
+                                    <span class="fas fa-plus marginrightonly" style="margin-right: 5px;"></span> <?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     </td>
                 </tr>
             <?php endforeach; ?>

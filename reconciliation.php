@@ -21,7 +21,8 @@ $langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compt
 
 // Load javascript files
 $arrayofjs = array(
-    '/qontosync/js/ajax_search.js' 
+    '/qontosync/js/ajax_search.js',
+    '/qontosync/js/hamburger.js'
 );
 
 llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
@@ -34,6 +35,7 @@ $bank_rowid = GETPOST('bank_rowid','int');
 $month = GETPOST('month', 'int') ? GETPOST('month', 'int') : date('m');
 $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 
+// Prepare HTML select list for bank accounts
 if (!class_exists('Form')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 $form = new Form($db);
 $bank_rowid = $bank_rowid > 0 ? $bank_rowid : '';

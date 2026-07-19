@@ -1,3 +1,6 @@
+/* QontoSync dolibarr module - CSS */
+
+/* Dark mode */
 @media (prefers-color-scheme: dark) {
     img[src*="object_qonto.svg"] {
         filter: invert(1);
@@ -29,11 +32,13 @@
     font-size: 1.2em;
 }
 
+/* Switch */
 .qontosync-switch-container {
     display: inline-flex;
     align-items: center;
 }
 
+/* Modal footer */
 .qontosync-modal-footer {
     position: fixed;
     bottom: 15px;
@@ -49,6 +54,7 @@
     justify-content: center;
 }
 
+/* Full button */
 .qontosync-btn-full {
     width: 100% !important;
     max-width: 320px !important;
@@ -71,7 +77,7 @@
     box-shadow: 0 6px 20px rgba(116, 93, 163, 0.5);
 }
 
-
+/* Badges */
 #qontosync_results_container .qonto-badge-info,
 #qontosync_advanced_wrapper .qonto-badge-info {
     background-color: #1e40af !important;
@@ -82,7 +88,59 @@
     padding: 3px 7px !important;
 }
 
+/* Dialog for creating OD */
 #dialog-confirm-create-od .select2-container {
     width: 100% !important;
     min-width: 100% !important;
+}
+
+/* Dropdown for bank entries */
+.qonto-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.qonto-dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    background-color: var(--colorbacktitle1);
+    min-width: 220px;
+    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+    z-index: 100;
+    text-align: left;
+    border-radius: 4px;
+    padding: 5px 0;
+    border: 1px solid var(--colortopbordertitle1);
+}
+
+.qonto-dropdown-content.show {
+    display: block !important;
+}
+
+.qonto-dropdown-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    color: var(--textcolor);
+    text-decoration: none;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+.qonto-dropdown-item:hover,
+a.qonto-dropdown-item:hover {
+    background-color: var(--colorbacktitle1);
+    color: var(--colortextlink) !important;
+    text-decoration: none;
+    filter: brightness(95%);
+}
+
+a.qonto-dropdown-item {
+    font-weight: normal;
+    color: var(--textcolor) !important;
 }

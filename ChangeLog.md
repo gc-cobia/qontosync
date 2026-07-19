@@ -3,6 +3,7 @@
 ## [1.3]
 
 ### Added
+- New drop down menu to access to the actions available on a Qonto transaction line.
 - Button to create a new various payment from the reconciliation interface.
 - Confirmation modal for new various payment creation.
 - Option to delete the bank reconciliation with a single button.
