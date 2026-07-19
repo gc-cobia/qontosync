@@ -92,6 +92,9 @@ class modQontosync extends DolibarrModules
 			array('QONTOSYNC_STATEMENT_FORMAT', 'chaine', '{Y}-{m}', 'Format for bank statement reference', 0),
 			// Hide linked transactions
 			array('QONTOSYNC_HIDE_LINKED', 'chaine', '0', 'Hide already linked transactions by default', 0),
+			// Badge color
+			array('QONTOSYNC_BADGE_COLOR', 'chaine', '#1e40af', 'Badge color for linked transactions', 0),
+			array('QONTOSYNC_BADGE_COLOR_DARK', 'chaine', '#1e3a8a', 'Badge color for linked transactions (dark mode)', 0),
 		);
 
         // Permissions

@@ -21,6 +21,7 @@ QontoSyncMaxMonthsTooltip=Anzahl der Monate des Verlaufs, die bei der Suche nach
 BankStatementFormat=Format der Bankauszüge
 QontoSyncStatementFormat=Freie Formatierungsmaske
 QontoSyncStatementFormatTooltip=Legen Sie den Namen der Bankauszüge (num_releve) fest. Alles innerhalb von {} wird mit den nativen PHP-date()-Tags interpretiert (z. B. Y=4-stelliges Jahr, y=2-stelliges Jahr, m=Monat mit Null, d=Tag). Z.B.: QONTO-{Y}-{m} oder {Y-m}
+ReferenceBadgeColor=Farbe des Referenz-Badges
 
 # Messages
 SetupSaved=Einstellungen wurden gespeichert.
@@ -58,21 +59,6 @@ Validate=Bestätigen
 Select=Auswählen
 Parameters=Parameter
 HideLinked=Bereits abgestimmte Transaktionen ausblenden
-
-# Core Fallbacks
-Month=Monat
-Year=Jahr
-BankAccount=Bankkonto
-Search=Suchen
-Date=Datum
-Label=Bezeichnung
-Amount=Betrag
-Action=Aktion
-BackToModuleList=Zurück zur Modulliste
-Parameter=Parameter
-Value=Wert
-Save=Speichern
-Test=Testen
 
 # Advanced Modal
 AdvancedSearch=Erweiterte Suche

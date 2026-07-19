@@ -21,6 +21,7 @@ QontoSyncMaxMonthsTooltip=Nombre de mois d'historique à analyser pour la recher
 BankStatementFormat=Format des relevés bancaires
 QontoSyncStatementFormat=Masque de formatage libre
 QontoSyncStatementFormatTooltip=Définissez le nom des relevés (num_releve). Tout ce qui est entre {} est interprété avec les balises de la fonction PHP date() (ex: Y=Année 4 chiff., y=Année 2 chiff., m=Mois avec zéro, d=Jour). Ex: QONTO-{Y}-{m} ou {Y-m} ou RELEVE-{Y}
+ReferenceBadgeColor=Couleur du badge de référence
 
 # Messages
 SetupSaved=La configuration a été enregistrée.
@@ -58,21 +59,6 @@ Validate=Valider
 Select=Sélectionner
 Parameters=Paramètres
 HideLinked=Masquer les opérations déjà rapprochées
-
-# Core Fallbacks
-Month=Mois
-Year=Année
-BankAccount=Compte bancaire
-Search=Rechercher
-Date=Date
-Label=Libellé
-Amount=Montant
-Action=Action
-BackToModuleList=Retour à la liste des modules
-Parameter=Paramètre
-Value=Valeur
-Save=Enregistrer
-Test=Tester
 
 # Advanced Modal
 AdvancedSearch=Recherche avancée

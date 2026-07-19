@@ -14,6 +14,7 @@ if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include 
 
 if (!function_exists('dolibarr_set_const')) require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 if (!function_exists('dolEncrypt')) require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
+if (!function_exists('qontosyncAdminPrepareHead')) dol_include_once('/qontosync/lib/qontosync.lib.php');
 if (!class_exists('Form')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
 
@@ -27,12 +28,9 @@ if (!$user->admin) {
 $form = new Form($db);
 
 $action = GETPOST('action', 'aZ');
-if (GETPOST('save', 'alpha')) {
-	$action = 'update';
-}
-if (GETPOST('test', 'alpha')) {
-	$action = 'test';
-}
+
+if (GETPOST('save', 'alpha')) { $action = 'update'; }
+if (GETPOST('test', 'alpha')) { $action = 'test'; }
 
 $apikey = GETPOST('QONTOSYNC_API_KEY', 'none');
 $slug = GETPOST('QONTOSYNC_SLUG', 'alphanohtml');
@@ -111,6 +109,15 @@ llxHeader('', $langs->trans("QontoSyncSetup"));
 $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.$langs->trans("BackToModuleList").'</a>';
 print load_fiche_titre($langs->trans("QontoSyncSetup"), $linkback, 'title_setup');
 
+$head = qontosyncAdminPrepareHead();
+
+print dol_get_fiche_head(
+    $head,
+    'setup',
+    'QontoSync',
+    -1,
+    'bank'
+);
 
 /**
  * Qonto API parameters
@@ -208,5 +215,7 @@ print '<input type="submit" name="test" class="button" value="'.$langs->trans("T
 print '</div>';
 
 print '</form>';
+
+print dol_get_fiche_end();
 
 llxFooter();

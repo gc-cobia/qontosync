@@ -18,6 +18,28 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
 print dol_htmloutput_events();
 ?>
 
+<style>
+<?php if (!empty(getDolGlobalString('QONTOSYNC_BADGE_COLOR'))): ?>
+@media (prefers-color-scheme: light) {
+    #qontosync_results_container .qonto-badge-info,
+    #qontosync_advanced_wrapper .qonto-badge-info {
+        background-color: <?php print getDolGlobalString('QONTOSYNC_BADGE_COLOR'); ?> !important;
+        border-color: <?php print getDolGlobalString('QONTOSYNC_BADGE_COLOR'); ?> !important;
+    }
+}
+<?php endif; ?>
+
+<?php if (!empty(getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK'))): ?>
+@media (prefers-color-scheme: dark) {
+    #qontosync_results_container .qonto-badge-info,
+    #qontosync_advanced_wrapper .qonto-badge-info {
+        background-color: <?php print getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK'); ?> !important;
+        border-color: <?php print getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK'); ?> !important;
+    }
+}
+<?php endif; ?>
+</style>
+
 <div style="background: var(--colorbackbody, #fff); padding-bottom: 120px;">
     <form id="form_batch_link" method="post" action="<?php print dol_escape_htmltag($_SERVER["PHP_SELF"]); ?>" style="margin: 0;">
         <input type="hidden" name="token" value="<?php print newToken(); ?>">
@@ -66,9 +88,9 @@ print dol_htmloutput_events();
                     <!-- if one bank line found linked with this Qonto ID -->
                     <?php elseif (!empty($t['linked_rowid'])): ?>
                         <td>
-                            <span class="badge badge-success" style="<?php print $style_badge; ?>">
+                            <a href="<?php print DOL_URL_ROOT . '/compta/bank/line.php?rowid=' . $t['linked_rowid']; ?>" target="_blank" class="badge badge-success" style="<?php print $style_badge; ?>" title="<?php print $langs->trans('BankTransaction'); ?>">
                                 <?php print $langs->trans('Linked'); ?> ( # <?php print $t['linked_rowid']; ?> )
-                            </span>
+                            </a>
                         </td>
                     
                     <!-- else print what can be linked -->

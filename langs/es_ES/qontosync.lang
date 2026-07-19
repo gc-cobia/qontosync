@@ -23,6 +23,7 @@ QontoSyncStatementFormatTooltip=Define the name of the bank statements (num_rele
 BankStatementFormat=Formato de extractos bancarios
 QontoSyncStatementFormat=Máscara de formato libre
 QontoSyncStatementFormatTooltip=Defina el nombre de los extractos (num_releve). Todo lo que esté entre {} se interpreta con las etiquetas nativas de date() de PHP (ej: Y=Año 4 díg., y=Año 2 díg., m=Mes con cero, d=Día). Ej: QONTO-{Y}-{m} o {Y-m}
+ReferenceBadgeColor=Color de la insignia de referencia
 
 # Messages
 SetupSaved=La configuración se ha guardado.
@@ -60,21 +61,6 @@ Validate=Validar
 Select=Seleccionar
 Parameters=Parámetros
 HideLinked=Ocultar operaciones ya conciliadas
-
-# Core Fallbacks
-Month=Mes
-Year=Año
-BankAccount=Cuenta bancaria
-Search=Buscar
-Date=Fecha
-Label=Concepto
-Amount=Importe
-Action=Acción
-BackToModuleList=Volver a la lista de módulos
-Parameter=Parámetro
-Value=Valor
-Save=Guardar
-Test=Probar
 
 # Advanced Modal
 AdvancedSearch=Búsqueda avanzada

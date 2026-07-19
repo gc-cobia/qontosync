@@ -8,6 +8,7 @@
 - Confirmation modal for new various payment creation.
 - Option to delete the bank reconciliation with a single button.
 - Confirmation modal for deletion of a bank reconciliation.
+- Add configurable background color for the reference badge.
 
 ### Changed
 - In multi-currency mode, the module no longer pushes the exchange rate variance entry to the general journal; the data is being prepared for transfer to the accounting module.

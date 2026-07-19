@@ -19,6 +19,7 @@ QontoSyncPMCheck=Payment mode for Checks
 BankStatementFormat=Bank statement format
 QontoSyncStatementFormat=Custom formatting mask
 QontoSyncStatementFormatTooltip=Define the name of the bank statements (num_releve). Everything inside {} is parsed using standard PHP date() tokens (e.g., Y=4-digit year, y=2-digit year, m=Month with zero, d=Day). Ex: QONTO-{Y}-{m} or {Y-m} or STATEMENT-{Y}
+ReferenceBadgeColor=Reference badge color
 
 # Messages
 SetupSaved=Setup has been saved.
@@ -56,21 +57,6 @@ Validate=Validate
 Select=Select
 Parameters=Parameters
 HideLinked=Hide already linked transactions
-
-# Core Fallbacks
-Month=Month
-Year=Year
-BankAccount=Bank Account
-Search=Search
-Date=Date
-Label=Label
-Amount=Amount
-Action=Action
-BackToModuleList=Back to module list
-Parameter=Parameter
-Value=Value
-Save=Save
-Test=Test
 
 # Advanced Modal
 AdvancedSearch=Advanced Search
