@@ -300,6 +300,15 @@ print dol_htmloutput_events();
          data-no="<?php print dol_escape_htmltag($langs->transnoentities("No")); ?>" 
          style="display: none;">
         <p><span class="fas fa-exclamation-circle" style="float:left; margin:12px 12px 20px 0;"></span><?php print $langs->trans("ConfirmNewVariousPaymentQuestion"); ?></p>
+        <?php 
+        // Add accountancy selector if double entry accounting module is enabled
+        if (!empty($conf->accounting->enabled)) {
+            print '<div style="margin-top: 20px;">';
+            print '<label for="od_accountancy_code" style="font-weight: bold; margin-bottom: 5px; display: inline-block;">' . $langs->trans("AccountingAccount") . '</label><br>';
+            print $accountancy_accounts_list;
+            print '</div>';
+        }
+        ?>
     </div>
 
     <!-- Confirmation modal for unlinking -->

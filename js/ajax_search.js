@@ -122,7 +122,12 @@ $(document).ready(function () {
     $(document).on('click', '.btn-ask-create-od', function (e) {
         e.preventDefault();
         let targetUrl = $(this).data('url');
-        
+
+        // Reset the accountancy selector to empty at the opening of the modal
+        if ($('#od_accountancy_code').length > 0) {
+            $('#od_accountancy_code').val(null).trigger('change');
+        }
+
         let $dialog = $("#dialog-confirm-create-od");
         let textYes = $dialog.data('yes') || 'Yes';
         let textNo = $dialog.data('no') || 'No';
@@ -130,21 +135,27 @@ $(document).ready(function () {
         let buttonsArray = [];
         let btnYes = {
             text: textYes,
-            click: function() {
+            click: function () {
+                // Get the accountancy code if selected
+                let accountancyCode = $('#od_accountancy_code').val();
+                if (accountancyCode) {
+                    targetUrl += '&accountancy_code=' + encodeURIComponent(accountancyCode);
+                }
+
                 $(this).dialog("close");
                 window.location.href = targetUrl;
             }
         };
         let btnNo = {
             text: textNo,
-            click: function() {
+            click: function () {
                 $(this).dialog("close");
             }
         };
-        
+
         buttonsArray.push(btnYes);
         buttonsArray.push(btnNo);
-        
+
         $dialog.dialog({
             resizable: false,
             height: "auto",
@@ -159,7 +170,7 @@ $(document).ready(function () {
     $(document).on('click', '.btn-ask-unlink', function (e) {
         e.preventDefault();
         bankRowidToUnlink = $(this).data('bank-rowid');
-        
+
         let $dialog = $("#dialog-confirm-unlink");
         let textYes = $dialog.data('yes') || 'Yes';
         let textNo = $dialog.data('no') || 'No';
@@ -167,10 +178,10 @@ $(document).ready(function () {
         let buttonsArray = [];
         let btnYes = {
             text: textYes,
-            click: function() {
+            click: function () {
                 $(this).dialog("close");
                 container.html('<div style="text-align:center; padding:50px;" class="opacitymedium"><i class="fas fa-spinner fa-pulse fa-3x"></i></div>');
-                $.post('ajax/unlink_transaction.php', { bank_line_id: bankRowidToUnlink, token: $('input[name="token"]').val() }, function(response) {
+                $.post('ajax/unlink_transaction.php', { bank_line_id: bankRowidToUnlink, token: $('input[name="token"]').val() }, function (response) {
                     loadTransactions();
                 }).fail(function (xhr, status, error) {
                     if (xhr.status === 401 || xhr.status === 403) {
@@ -183,14 +194,14 @@ $(document).ready(function () {
         };
         let btnNo = {
             text: textNo,
-            click: function() {
+            click: function () {
                 $(this).dialog("close");
             }
         };
-        
+
         buttonsArray.push(btnYes);
         buttonsArray.push(btnNo);
-        
+
         $dialog.dialog({
             resizable: false,
             height: "auto",

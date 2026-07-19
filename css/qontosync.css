@@ -81,3 +81,8 @@
     text-shadow: none !important;
     padding: 3px 7px !important;
 }
+
+#dialog-confirm-create-od .select2-container {
+    width: 100% !important;
+    min-width: 100% !important;
+}

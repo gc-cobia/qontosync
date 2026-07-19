@@ -47,7 +47,7 @@ if ($user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
     exit;
 }
 
-$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "compta"));
+$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "compta", "accountancy"));
 
 $bank_rowid = GETPOST('bank_rowid', 'int');
 $month = GETPOST('month', 'int');
@@ -91,6 +91,13 @@ if ($transactions === false) {
     if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
     $qontoMatching = new QontoMatching($db);
     $transactions = $qontoMatching->fetchTransactions($transactions, $bank_rowid);
+
+    if (!empty($conf->accounting->enabled)) {
+        // Generates the list of accounts with native search bar (Select2)
+        if (!class_exists('FormAccounting')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.formaccounting.class.php';
+        $formaccounting = new FormAccounting($db);
+        $accountancy_accounts_list = $formaccounting->select_account('', 'od_accountancy_code', 1, array(), 1, 1, 'centpercent');
+    }
 
     // Rendering the results
     include dol_buildpath('/qontosync/core/tpl/results_table.tpl.php');
