@@ -526,14 +526,14 @@ class QontoRepository
         for ($m = 1; $m <= 12; $m++) {
             // Defining the month's boundaries
             $filter_start_month = sprintf("%04d-%02d-01", $year, $m);
-            $filter_end_month = date("Y-m-t", strtotime($filter_start_month));
+            $filter_end_month = strtotime(date("Y-m-t 23:59:59", strtotime($filter_start_month)));
 
              // 1. OPENING balance for the month (Balance as of the day before the 1st of the month)
-            $veille_start = date("Y-m-d", strtotime("-1 day", strtotime($filter_start_month)));
-            $opening = $account->solde(1, $veille_start);
+            $veille_start = strtotime(date("Y-m-d 23:59:59", strtotime("-1 day", strtotime($filter_start_month))));
+            $opening = $account->solde(1, $veille_start, 'datev');
 
             // 2. Month-end CLOSING balance (Balance as of the last day of the month)
-            $closing = $account->solde(1, $filter_end_month);
+            $closing = $account->solde(1, $filter_end_month, 'datev');
 
             $balances[$m] = array(
                 'opening' => (float)$opening,
