@@ -11,7 +11,7 @@ $(document).ready(function () {
         let allSelects = $('select[name^="target_val"]');
         let selectedValues = [];
 
-        // 1. On collecte toutes les valeurs actuellement sélectionnées
+        // Collect all selected values
         allSelects.each(function () {
             let val = $(this).val();
             if (val) {
@@ -19,7 +19,7 @@ $(document).ready(function () {
             }
         });
 
-        // 2. On met à jour les options de chaque liste déroulante
+        // Update the options of each dropdown
         allSelects.each(function () {
             let currentSelect = $(this);
             let currentVal = currentSelect.val();
@@ -28,16 +28,16 @@ $(document).ready(function () {
             currentSelect.find('option').each(function () {
                 let optionVal = $(this).val();
 
-                // On ignore les options vides (le placeholder)
+                // Ignore empty options (placeholder)
                 if (optionVal) {
-                    // Si l'option est sélectionnée ailleurs, on la désactive
+                    // If the option is selected elsewhere, disable it
                     if (optionVal !== currentVal && selectedValues.includes(optionVal)) {
                         if (!$(this).prop('disabled')) {
                             $(this).prop('disabled', true);
                             hasChanged = true;
                         }
                     } else {
-                        // Sinon, on s'assure qu'elle est active
+                        // Ensure it's active
                         if ($(this).prop('disabled')) {
                             $(this).prop('disabled', false);
                             hasChanged = true;
@@ -46,7 +46,7 @@ $(document).ready(function () {
                 }
             });
 
-            // 3. Si des options ont été modifiées, on force Select2 à se rafraîchir
+            // Refresh Select2 if options changed
             if (hasChanged && currentSelect.hasClass('select2-hidden-accessible')) {
                 currentSelect.select2('destroy').select2({
                     width: 'resolve',
