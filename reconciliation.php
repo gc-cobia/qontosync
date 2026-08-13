@@ -22,7 +22,8 @@ $langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compt
 // Load javascript files
 $arrayofjs = array(
     '/qontosync/js/ajax_search.js',
-    '/qontosync/js/hamburger.js'
+    '/qontosync/js/hamburger.js',
+	'/qontosync/js/batch_matching.js'
 );
 
 llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
