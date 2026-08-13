@@ -399,6 +399,13 @@ class QontoUpdater
 				foreach ($amounts_array as $doc_id => $amount) {
 					if ($invoice->fetch($doc_id) > 0) {
 
+						// Check if the invoice is already marked as paid
+						if ($invoice->paye == 1) {
+							dol_syslog(__METHOD__ . ": Error, the customer invoice " . $doc_id . " is already marked as paid.", LOG_ERR);
+							$error++;
+							break;
+						}
+
 						// Multi-Company Security (IDOR)
 						if ($invoice->entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$invoice->entity, explode(',', getEntity('facture'))))) {
 							dol_syslog(__METHOD__ . ": Entity mismatch on customer invoice " . $doc_id, LOG_WARNING);
@@ -540,6 +547,13 @@ class QontoUpdater
 				foreach ($amounts_array as $doc_id => $amount) {
 					if ($invoice->fetch($doc_id) > 0) {
 
+						// Check if the invoice is already marked as paid
+						if ($invoice->paye == 1) {
+							dol_syslog(__METHOD__ . ": Error, the supplier invoice " . $doc_id . " is already marked as paid.", LOG_ERR);
+							$error++;
+							break;
+						}
+
 						// Multi-Company Security (IDOR)
 						if ($invoice->entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$invoice->entity, explode(',', getEntity('facture_fourn'))))) {
 							dol_syslog(__METHOD__ . ": Entity mismatch on supplier invoice " . $doc_id, LOG_WARNING);
@@ -639,6 +653,13 @@ class QontoUpdater
                 $vat = new Tva($this->db);
                 if ($vat->fetch($doc_id) > 0) {
 
+					// Check if the vat is already marked as paid
+					if ($vat->paye == 1) {
+						dol_syslog(__METHOD__ . ": Error, the VAT declaration " . $doc_id . " is already marked as paid.", LOG_ERR);
+						$error++;
+						break;
+					}	
+
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($vat->entity) ? $vat->entity : null;
 					if ($doc_entity === null) {
@@ -683,6 +704,13 @@ class QontoUpdater
                 $charge = new ChargeSociales($this->db);
                 if ($charge->fetch($doc_id) > 0) {
 
+					// Check if the social is already marked as paid
+					if ($charge->paye == 1) {
+						dol_syslog(__METHOD__ . ": Error, the social charge " . $doc_id . " is already marked as paid.", LOG_ERR);
+						$error++;
+						break;
+					}
+
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($charge->entity) ? $charge->entity : null;
 					if ($doc_entity === null) {
@@ -723,6 +751,13 @@ class QontoUpdater
 
                 $salary = new Salary($this->db);
                 if ($salary->fetch($doc_id) > 0) {
+
+					// Check if the salary is already marked as paid
+					if ($salary->paye == 1) {
+						dol_syslog(__METHOD__ . ": Error, the salary " . $doc_id . " is already marked as paid.", LOG_ERR);
+						$error++;
+						break;
+					}
 
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($salary->entity) ? $salary->entity : null;
@@ -770,6 +805,13 @@ class QontoUpdater
 
                 $expense = new ExpenseReport($this->db);
                 if ($expense->fetch($doc_id) > 0) {
+
+					// Check if the expense is already marked as paid
+					if ($expense->paye == 1) {
+						dol_syslog(__METHOD__ . ": Error, the expense report " . $doc_id . " is already marked as paid.", LOG_ERR);
+						$error++;
+						break;
+					}
 
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($expense->entity) ? $expense->entity : null;
