@@ -19,7 +19,8 @@ register_shutdown_function(function() use (&$session_is_valid) {
             ob_end_clean();
         }
         http_response_code(401);
-        echo "SESSION_EXPIRED";
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('status' => 'error', 'message' => 'SESSION_EXPIRED'));
         exit;
     }
 });
@@ -34,16 +35,18 @@ $session_is_valid = true;
 ob_end_clean();
 /*************************/
 
+header('Content-Type: application/json; charset=utf-8');
+
 // Security check
 if (GETPOST('token', 'alpha') !== currentToken()) {
     http_response_code(401);
-    echo "Invalid Token";
+    echo json_encode(array('status' => 'error', 'message' => 'Invalid Token'));
     exit;
 }
 
 if ($user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied'));
     exit;
 }
 
@@ -59,12 +62,16 @@ $qontoRepo = new QontoRepository($db);
 
 if ($bank_rowid > 0 && !$qontoRepo->isAccountAllowed($bank_rowid)) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied'));
     exit;
 }
 
 if (empty($bank_rowid) || $bank_rowid <= 0) {
-    print '<div  class="info">' . $langs->trans("NoBankSelected") . '</div>';
+    echo json_encode(array(
+        'status' => 'info',
+        'message' => $langs->transnoentities("NoBankSelected"),
+        'data' => array()
+    ));
     exit;
 }
 
@@ -88,13 +95,56 @@ $transactions = $api->getTransactions($account->iban, $dateStart, $dateEnd);
 $qonto_statements_raw = $api->getStatements($account->iban, $year);
 
 if ($transactions === false) {
-    print '<div class="error">' . $langs->trans("ErrorFetchingTransactions") . '</div>';
-} else if (empty($transactions)) {
-    print '<div class="warning">' . $langs->trans("NoTransactionsFound") . '</div>';
-} else {
-    // Matching datas
-    $months_data = $qontoMatching->matchStatements($account, $year, $transactions, $qonto_statements_raw);
-
-    // Rendering the results
-    include dol_buildpath('/qontosync/core/tpl/results_statements.tpl.php');
+    echo json_encode(array(
+        'status' => 'error',
+        'message' => $langs->transnoentities("ErrorFetchingTransactions"),
+        'data' => array()
+    ));
+    exit;
 }
+
+if (empty($transactions)) {
+    echo json_encode(array(
+        'status' => 'warning',
+        'message' => $langs->transnoentities("NoTransactionsFound"),
+        'data' => array()
+    ));
+    exit;
+}
+
+// Matching datas
+$months_data = $qontoMatching->matchStatements($account, $year, $transactions, $qonto_statements_raw);
+
+$formatted_months = array();
+
+foreach ($months_data as $m => $data) {
+    $is_future = ($year > date('Y') || ($year == date('Y') && $m > date('n')));
+
+    $diff_open = price2num($data['qonto_opening'] - $data['dolibarr_opening'], 'MT');
+    $diff_close = price2num($data['qonto_closing'] - $data['dolibarr_closing'], 'MT');
+
+    $formatted_months[] = array(
+        'month' => (int)$m,
+        'label' => ucfirst($data['label']),
+        'is_future' => (bool)$is_future,
+        'dolibarr_opening' => price($data['dolibarr_opening']),
+        'qonto_opening' => price($data['qonto_opening']),
+        'diff_open' => (float)$diff_open,
+        'diff_open_formatted' => price($diff_open),
+        'dolibarr_closing' => price($data['dolibarr_closing']),
+        'qonto_closing' => price($data['qonto_closing']),
+        'diff_close' => (float)$diff_close,
+        'diff_close_formatted' => price($diff_close),
+        'in_dolibarr' => (bool)$data['in_dolibarr'],
+        'in_qonto' => (bool)$data['in_qonto'],
+        'dolibarr_url' => !empty($data['dolibarr_url']) ? $data['dolibarr_url'] : ''
+    );
+}
+
+echo json_encode(array(
+    'status' => 'success',
+    'bank_rowid' => $bank_rowid,
+    'year' => $year,
+    'token' => newToken(),
+    'data' => $formatted_months
+));

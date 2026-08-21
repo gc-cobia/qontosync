@@ -21,9 +21,11 @@ $langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compt
 
 // Load javascript files
 $arrayofjs = array(
-    '/qontosync/js/ajax_search.js',
+    '/qontosync/js/reconciliation.js',
     '/qontosync/js/hamburger.js',
-	'/qontosync/js/batch_matching.js'
+    '/qontosync/js/batch_matching.js',
+    '/qontosync/js/advanced_matching.js',
+    '/qontosync/js/fifo.js'
 );
 
 llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
@@ -42,7 +44,22 @@ $form = new Form($db);
 $bank_rowid = $bank_rowid > 0 ? $bank_rowid : '';
 $select_comptes_html = $form->select_comptes($bank_rowid, 'bank_rowid', 0, '', 2, '', 0, '', 1);
 
-// Include the search form view
-include dol_buildpath('/qontosync/core/tpl/search.tpl.php');
+// Prepare HTML select list for months
+$array_months = array();
+for ($i = 1; $i <= 12; $i++) {
+    $array_months[$i] = sprintf("%02d", $i);
+}
+$select_month_html = $form->selectarray('month', $array_months, $month, 0, 0, 0, 'flat marginrightonly');
+
+// Prepare HTML select list for years
+$array_years = array();
+for ($i = date('Y') - 5; $i <= date('Y'); $i++) {
+    $array_years[$i] = $i;
+}
+$select_year_html = $form->selectarray('year', $array_years, $year, 0, 0, 0, 'flat marginrightonly');
+
+// Include HTML5 JS templates and modal dialogs
+include dol_buildpath('/qontosync/tpl/reconciliation.tpl.php');
+include dol_buildpath('/qontosync/tpl/advanced_modal.tpl.php');
 
 llxFooter();

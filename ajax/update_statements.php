@@ -19,7 +19,8 @@ register_shutdown_function(function() use (&$session_is_valid) {
             ob_end_clean();
         }
         http_response_code(401);
-        echo "SESSION_EXPIRED";
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('status' => 'error', 'message' => 'SESSION_EXPIRED', 'type' => 'errors'));
         exit;
     }
 });
@@ -34,16 +35,18 @@ $session_is_valid = true;
 ob_end_clean();
 /*************************/
 
+header('Content-Type: application/json; charset=utf-8');
+
 // Security check
 if (GETPOST('token', 'alpha') !== currentToken()) {
     http_response_code(401);
-    echo "Invalid Token";
+    echo json_encode(array('status' => 'error', 'message' => 'Invalid Token', 'type' => 'errors'));
     exit;
 }
 
 if ($user->socid > 0 || !$user->hasRight('qontosync', 'write')) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied', 'type' => 'errors'));
     exit;
 }
 
@@ -59,7 +62,7 @@ $qontoRepo = new QontoRepository($db);
 
 if ($bank_rowid > 0 && !$qontoRepo->isAccountAllowed($bank_rowid)) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied', 'type' => 'errors'));
     exit;
 }
 
@@ -69,7 +72,7 @@ if ($action == 'sync_ged' && $bank_rowid > 0 && $year > 0) {
     $account = new Account($db);
     if ($account->fetch($bank_rowid) <= 0) {
         http_response_code(400);
-        echo "Bank account not found";
+        echo json_encode(array('status' => 'error', 'message' => 'Bank account not found', 'type' => 'errors'));
         exit;
     }
 
@@ -84,22 +87,30 @@ if ($action == 'sync_ged' && $bank_rowid > 0 && $year > 0) {
 
     // Prepare notification messages for the next display
     if ($sync_result['success_count'] > 0 || $sync_result['error_count'] > 0) {
-        $msg = $langs->trans("FileTransferComplete") . ' (' . $sync_result['success_count'] . ')';
+        $msg = $langs->transnoentities("FileTransferComplete") . ' (' . $sync_result['success_count'] . ')';
         if ($sync_result['error_count'] > 0) {
-            $msg .= ' ' . $langs->trans("ErrorFailedToSaveFile") . ' (' . $sync_result['error_count'] . ')';
-            setEventMessages($msg, null, 'warnings');
+            $msg .= ' ' . $langs->transnoentities("ErrorFailedToSaveFile") . ' (' . $sync_result['error_count'] . ')';
+            $type = 'warnings';
+            $status = ($sync_result['success_count'] == 0) ? 'error' : 'success';
         } else {
-            setEventMessages($msg, null, 'mesgs');
+            $type = 'mesgs';
+            $status = 'success';
         }
     } else {
-        setEventMessages("Completed", null, 'mesgs');
+        $msg = "Completed";
+        $type = 'mesgs';
+        $status = 'success';
     }
 
     // Respond to JS
-    print dol_htmloutput_events();
+    echo json_encode(array(
+        'status' => $status,
+        'message' => $msg,
+        'type' => $type
+    ));
     exit;
 }
 
 http_response_code(400);
-echo "Bad Request";
+echo json_encode(array('status' => 'error', 'message' => 'Bad Request', 'type' => 'errors'));
 exit;

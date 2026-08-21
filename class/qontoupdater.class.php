@@ -18,12 +18,14 @@
 class QontoUpdater
 {
     private $db;
+	public $error = '';
+	public $errors = array();
 	private $multicurrency_enabled;
 
     public function __construct($db) {
 		global $conf;
 		$this->db = $db;
-		$this->multicurrency_enabled = !empty($conf->multicurrency->enabled);
+		$this->multicurrency_enabled = isModEnabled('multicurrency');
     }
 
 	/**
@@ -126,12 +128,17 @@ class QontoUpdater
 			return -1;
 		}
 
+		// Init SQL transaction
+		$this->db->begin();
+
 		// Try to update the specific extrafieldm
 		// Direct SQL to force NULL and bypass Dolibarr's ORM empty string conversion which breaks UNIQUE constraint)
 		$sql = "UPDATE " . MAIN_DB_PREFIX . "bank_extrafields SET qonto_id = NULL WHERE fk_object = " . (int)$bank_line_id;
 		$resql = $this->db->query($sql);
 		
-		if ($resql < 0) {
+		if (!$resql) {
+			// Rollback SQL transaction
+			$this->db->rollback();
 			dol_syslog(__METHOD__ . ": Error updating the bank line extrafield: ".$bank->error, LOG_ERR);
 			return -1;
 		}
@@ -141,12 +148,120 @@ class QontoUpdater
 		$res = $bank->update_conciliation($user, null, 0);
 		
 		if ($res < 0) {
+			// Rollback SQL transaction
+			$this->db->rollback();
 			dol_syslog(__METHOD__ . ": Error updating the bank line statement: ".$bank->error, LOG_ERR);
 			return -1;
 		}
 	
+		// Commit SQL transaction
+		$this->db->commit();
 		dol_syslog(__METHOD__ . ": bank line " . $bank_line_id . " unlinked", LOG_INFO);
 		return 1;
+	}
+	
+	/**
+	 * Create a Various Payment (Opération Diverse) and link it to a Qonto transaction
+	 *
+	 * @param string $qonto_id
+	 * @param int    $bank_rowid
+	 * @param string $accountancy_code
+	 * @return int 1 on success, -1 on error
+	 */
+	public function createVariousPayment($qonto_id, $bank_rowid, $accountancy_code = '')
+	{
+		global $conf, $user, $langs;
+
+		if (empty($qonto_id) || empty($bank_rowid)) {
+			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
+			return -1;
+		}
+
+		// Check Accounting Module is enabled, accountancy code is required
+		if (isModEnabled('accounting') && empty($accountancy_code)) {
+			dol_syslog(__METHOD__ . ": Accountancy code is empty", LOG_ERR);
+			return -1;
+		}
+
+		// Multi-tenant Security (Anti-IDOR)
+		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+		$qontoRepo = new QontoRepository($this->db);
+
+		if (!$qontoRepo->isAccountAllowed($bank_rowid)) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope: " . $bank_rowid, LOG_ERR);
+			return -1;
+		}
+
+		// Lazy load classes
+		if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
+		if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
+		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/paymentvarious.class.php';
+
+		$api = new QontoApi();
+		$qontoMatching = new QontoMatching($this->db);
+
+		// Fetch transaction details
+		$qonto_trx = $api->getTransaction($qonto_id);
+		if (empty($qonto_trx)) {
+			dol_syslog(__METHOD__ . ": Cannot fetch Qonto transaction details for ID: " . $qonto_id, LOG_ERR);
+			return -1;
+		}
+
+		// Prepare payment object
+		$payment = new PaymentVarious($this->db);
+		$payment->datev = strtotime($qonto_trx['settled_at']);
+		$payment->datep = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
+		$payment->amount = abs($qonto_trx['amount']);
+		$payment->sens = (isset($qonto_trx['side']) && $qonto_trx['side'] === 'debit') ? 0 : 1;
+		$payment->fk_account = $bank_rowid;
+		$payment->label = $qonto_trx['label'] . (!empty($qonto_trx['reference']) ? ' - ' . $qonto_trx['reference'] : '');
+		$payment->num_payment = !empty($qonto_trx['reference']) ? $qonto_trx['reference'] : $qonto_id;
+
+		$mop = $qontoMatching->getPaymentModeId(
+			isset($qonto_trx['operation_type']) ? $qonto_trx['operation_type'] : '',
+			isset($qonto_trx['side']) ? $qonto_trx['side'] : ''
+		);
+		$payment->type_payment = $mop;
+		
+		$payment->accountancy_code = $accountancy_code;
+
+		// Statement reference calculation (identical to QontoUpdater::update())
+		$ref_releve = '';
+		if (isset($qonto_trx['settled_at'])) {
+			$format_setting = getDolGlobalString('QONTOSYNC_STATEMENT_FORMAT') ?: '{Y}-{m}';
+			$time_trx = strtotime($qonto_trx['settled_at']);
+			
+			$raw_ref = preg_replace_callback('/\{([^}]+)\}/', function($matches) use ($time_trx) {
+				return date($matches[1], $time_trx);
+			}, $format_setting);
+
+			$clean_ref = dol_sanitizeFileName($raw_ref);
+
+			$ref_releve = substr($clean_ref, 0, 50);
+		}
+
+		// Init SQL transaction
+		$this->db->begin();
+
+		$res = $payment->create($user);
+
+		if ($res > 0) {
+			$payment->fetch($res);
+			$link_res = $this->linkTransaction($payment->fk_bank, $qonto_id, $ref_releve);
+			if ($link_res > 0) {
+				$this->db->commit();
+				dol_syslog(__METHOD__ . ": Various payment created and linked to Qonto ID: " . $qonto_id, LOG_INFO);
+				return 1;
+			} else {
+				$this->db->rollback();
+				dol_syslog(__METHOD__ . ": Error linking various payment to Qonto ID: " . $qonto_id, LOG_ERR);
+				return -1;
+			}
+		} else {
+			$this->db->rollback();
+			dol_syslog(__METHOD__ . ": Error creating various payment: " . $payment->error, LOG_ERR);
+			return -1;
+		}
 	}
 	
     /**
@@ -298,7 +413,7 @@ class QontoUpdater
 		switch ($type) {
 			case 'bank':
 				// Security check: Bank module is enabled
-				if (empty($conf->banque->enabled)) { dol_syslog(__METHOD__ . ": Bank module is disabled.", LOG_ERR); $error++; break; }
+				if (!isModEnabled('banque')) { dol_syslog(__METHOD__ . ": Bank module is disabled.", LOG_ERR); $error++; break; }
 				
 				// Accounting security: 1 Qonto transaction = 1 single Dolibarr bank line
 				if (count($amounts_array) > 1) {
@@ -316,6 +431,14 @@ class QontoUpdater
 				$line = new AccountLine($this->db);
 
 				if ($line->fetch($doc_id) > 0) {
+
+					// Multi-Company Security (IDOR)
+					if ((int)$line->fk_account !== (int)$bank_account_id) {
+						dol_syslog(__METHOD__ . ": Security Alert - Bank line " . $doc_id . " does not belong to authorized bank account " . $bank_account_id, LOG_WARNING);
+						$error++;
+						break;
+					}
+
 					$line->datev = strtotime($qonto_trx['settled_at']);
 					$line->dateo = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
 
@@ -337,7 +460,7 @@ class QontoUpdater
 
 			case 'cinv':
 				// Security check: Customer Invoice module is enabled
-				if (empty($conf->facture->enabled)) { dol_syslog(__METHOD__ . ": Customer Invoice module is disabled.", LOG_ERR); $error++; break; }
+				if (!isModEnabled('facture')) { dol_syslog(__METHOD__ . ": Customer Invoice module is disabled.", LOG_ERR); $error++; break; }
 
                 // Declare payment and invoice classes
 				if (!class_exists('Paiement')) require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
@@ -485,7 +608,7 @@ class QontoUpdater
 				
 			case 'sinv':
 				// Security check: Supplier Invoice module is enabled
-				if (empty($conf->fournisseur->enabled)) { dol_syslog(__METHOD__ . ": Supplier Invoice module is disabled.", LOG_ERR); $error++; break; }
+				if (!isModEnabled('fournisseur')) { dol_syslog(__METHOD__ . ": Supplier Invoice module is disabled.", LOG_ERR); $error++; break; }
 				
 				// Declare payment and invoice classes
 				if (!class_exists('PaiementFourn')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
@@ -632,7 +755,7 @@ class QontoUpdater
 			
 			case 'vat':
 				// Security check: Tax & Social module is enabled
-                if (empty($conf->tax->enabled)) { dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR); $error++; break; }
+                if (!isModEnabled('tax')) { dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR); $error++; break; }
 
 				// Declare payment and tax classes
 				if (!class_exists('PaymentVat')) require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/paymentvat.class.php';
@@ -683,7 +806,7 @@ class QontoUpdater
 			
 			case 'social':
                 // Security check: Tax & Social module is enabled
-                if (empty($conf->tax->enabled)) { dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR); $error++; break; }
+                if (!isModEnabled('tax')) { dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR); $error++; break; }
 
                 // Declare payment and social classes
                 if (!class_exists('PaymentSocialContribution')) require_once DOL_DOCUMENT_ROOT.'/compta/sociales/class/paymentsocialcontribution.class.php';
@@ -731,7 +854,7 @@ class QontoUpdater
 
 			case 'salary':
                 // Security check: Salaries module is enabled
-                if (empty($conf->salaries->enabled)) { dol_syslog(__METHOD__ . ": Salary module disabled.", LOG_ERR); $error++; break; }
+                if (!isModEnabled('salaries')) { dol_syslog(__METHOD__ . ": Salary module disabled.", LOG_ERR); $error++; break; }
 
                 // Declare payment and salary classes
                 if (!class_exists('PaymentSalary')) require_once DOL_DOCUMENT_ROOT.'/salaries/class/paymentsalary.class.php';
@@ -785,7 +908,7 @@ class QontoUpdater
 
             case 'expense':
                 // Security check: Expense Report module is enabled
-                if (empty($conf->expensereport->enabled)) { dol_syslog(__METHOD__ . ": Expense Report module disabled.", LOG_ERR); $error++; break; }
+                if (!isModEnabled('expensereport')) { dol_syslog(__METHOD__ . ": Expense Report module disabled.", LOG_ERR); $error++; break; }
 
                 // Declare payment and expense report classes
                 if (!class_exists('PaymentExpenseReport')) require_once DOL_DOCUMENT_ROOT.'/expensereport/class/paymentexpensereport.class.php';

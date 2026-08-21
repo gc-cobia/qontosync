@@ -19,7 +19,8 @@ register_shutdown_function(function() use (&$session_is_valid) {
             ob_end_clean();
         }
         http_response_code(401);
-        echo "SESSION_EXPIRED";
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('status' => 'error', 'message' => 'SESSION_EXPIRED', 'type' => 'errors'));
         exit;
     }
 });
@@ -34,16 +35,18 @@ $session_is_valid = true;
 ob_end_clean();
 /*************************/
 
+header('Content-Type: application/json; charset=utf-8');
+
 // Security check
 if (GETPOST('token', 'alpha') !== currentToken()) {
     http_response_code(401);
-    echo "Invalid Token";
+    echo json_encode(array('status' => 'error', 'message' => 'Invalid Token', 'type' => 'errors'));
     exit;
 }
 
 if ($user->socid > 0 || !$user->hasRight('qontosync', 'write')) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied', 'type' => 'errors'));
     exit;
 }
 
@@ -60,15 +63,18 @@ $qontoRepo = new QontoRepository($db);
 
 if ($bank_rowid > 0 && !$qontoRepo->isAccountAllowed($bank_rowid)) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied', 'type' => 'errors'));
     exit;
 }
 
 if ($action == 'process_advanced_match') {
     
     if (empty($qonto_id) || empty($bank_rowid) || empty($link_docs) || !is_array($link_docs)) {
-        setEventMessages($langs->trans("NoTransactionToLink"), null, 'warnings');
-        echo "NO_DOCS";
+        echo json_encode(array(
+            'status' => 'error',
+            'message' => $langs->transnoentities("NoTransactionToLink"),
+            'type' => 'warnings'
+        ));
         exit;
     }
 
@@ -82,8 +88,11 @@ if ($action == 'process_advanced_match') {
     $selected_trx = $api->getTransaction($qonto_id);
 
     if (empty($selected_trx)) {
-        setEventMessages($langs->trans("ErrorFetchingTransactions"), null, 'errors');
-        echo "API_ERROR";
+        echo json_encode(array(
+            'status' => 'error',
+            'message' => $langs->transnoentities("ErrorFetchingTransactions"),
+            'type' => 'errors'
+        ));
         exit;
     }
     
@@ -98,11 +107,9 @@ if ($action == 'process_advanced_match') {
     $amounts_array = array();
     $doc_type = '';
     $total_imputed = 0.0;
-    $error = 0;
     
     foreach ($link_docs as $doc) {
         if (count($parts = explode('_', strip_tags($doc), 2)) != 2) {
-            $error++;
             continue;
         }
         
@@ -112,9 +119,12 @@ if ($action == 'process_advanced_match') {
         if (empty($doc_type)) {
             $doc_type = $current_type;
         } elseif ($doc_type !== $current_type) {
-            setEventMessages($langs->trans("ErrorMixedDocumentTypes"), null, 'errors');
-            $error++;
-            break;
+            echo json_encode(array(
+                'status' => 'error',
+                'message' => $langs->transnoentities("ErrorMixedDocumentTypes"),
+                'type' => 'errors'
+            ));
+            exit;
         }
         
         $input_name = 'amount_' . $current_type . '_' . $doc_id;
@@ -127,36 +137,47 @@ if ($action == 'process_advanced_match') {
         }
     }
     
-    if ($error == 0 && empty($amounts_array)) {
-        setEventMessages($langs->trans("ErrorNoAmountSpecified"), null, 'errors');
-        $error++;
+    if (empty($amounts_array)) {
+        echo json_encode(array(
+            'status' => 'error',
+            'message' => $langs->transnoentities("ErrorNoAmountSpecified"),
+            'type' => 'errors'
+        ));
+        exit;
     }
 
     // Adapt sign to the document type
     $total_imputed = ($doc_type === 'sinv' || $doc_type === 'vat' || $doc_type === 'social' || $doc_type === 'salary' || $doc_type === 'expense') ? -$total_imputed : $total_imputed;
     
     // The total must EXACTLY match the transaction amount to be compatible with QontoUpdater::update()
-    if ($error == 0 && price2num($total_imputed, 'MT') != price2num($amount, 'MT')) {
-        setEventMessages($langs->trans("ErrorImputedAmountExceeds"), null, 'errors');
-        $error++;
+    if (price2num($total_imputed, 'MT') != price2num($amount, 'MT')) {
+        echo json_encode(array(
+            'status' => 'error',
+            'message' => $langs->transnoentities("ErrorImputedAmountExceeds"),
+            'type' => 'errors'
+        ));
+        exit;
     }
     
-    if ($error == 0) {
-        // Send the array to update()
-        $res = $qontoUpdater->update($doc_type, $amounts_array, $selected_trx, $bank_rowid);
-        
-        if ($res > 0) {
-            setEventMessages($langs->trans("TransactionSuccessfullyLinked"), null, 'mesgs');
-        } else {
-            setEventMessages($langs->trans("FailedToLinkTransaction"), null, 'errors');
-        }
+    // Send the array to update()
+    $res = $qontoUpdater->update($doc_type, $amounts_array, $selected_trx, $bank_rowid);
+    
+    if ($res > 0) {
+        echo json_encode(array(
+            'status' => 'success',
+            'message' => $langs->transnoentities("TransactionSuccessfullyLinked"),
+            'type' => 'mesgs'
+        ));
+    } else {
+        echo json_encode(array(
+            'status' => 'error',
+            'message' => $langs->transnoentities("FailedToLinkTransaction"),
+            'type' => 'errors'
+        ));
     }
-
-    // Respond to JS
-    echo "OK";
     exit;
 }
 
 http_response_code(400);
-echo "Bad Request";
+echo json_encode(array('status' => 'error', 'message' => 'Bad Request', 'type' => 'errors'));
 exit;

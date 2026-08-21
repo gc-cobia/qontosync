@@ -25,7 +25,7 @@ class QontoRepository
         global $conf;
 
 		$this->db = $db;
-        $this->multicurrency_enabled = !empty($conf->multicurrency->enabled);
+		$this->multicurrency_enabled = isModEnabled('multicurrency');
 	}
 
     /**
@@ -98,7 +98,7 @@ class QontoRepository
 		$date_limit = $this->db->idate(strtotime("-" . $max_months . " months"));
 		
 		// 1. Fetch unpaid customers invoices
-		if (!empty($conf->facture->enabled) && ($type === 'all' || $type === 'cinv')) {
+		if (isModEnabled('facture') && ($type === 'all' || $type === 'cinv')) {
 			$sql_c_inv = "SELECT f.rowid, f.ref, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
 
             // If multicurrency is enabled
@@ -156,7 +156,7 @@ class QontoRepository
 		}
 
 		// 2. Fetch unpaid suppliers invoices
-		if (!empty($conf->fournisseur->enabled) && ($type === 'all' || $type === 'sinv')) {
+		if (isModEnabled('fournisseur') && ($type === 'all' || $type === 'sinv')) {
 			$sql_s_inv = "SELECT f.rowid, f.ref, f.ref_supplier, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
             
             // If multicurrency is enabled
@@ -214,7 +214,7 @@ class QontoRepository
 		}
 
 		// 3. Fetch unpaid VAT declarations
-		if (!empty($conf->tax->enabled) && ($type === 'all' || $type === 'vat')) {
+		if (isModEnabled('tax') && ($type === 'all' || $type === 'vat')) {
 			$sql_vat = "SELECT rowid, label, amount, datev FROM " . MAIN_DB_PREFIX . "tva WHERE entity IN (" . getEntity('tva') . ") AND paye = 0";
 
 			$resql_vat = $this->db->query($sql_vat);
@@ -233,7 +233,7 @@ class QontoRepository
 		}
 
         // 4. Fetch unpaid Social/Tax Charges
-        if (!empty($conf->tax->enabled) && ($type === 'all' || $type === 'social')) {
+        if (isModEnabled('tax') && ($type === 'all' || $type === 'social')) {
             $sql_soc = "SELECT rowid, libelle as label, amount, date_ech FROM " . MAIN_DB_PREFIX . "chargesociales WHERE entity IN (" . getEntity('tax') . ") AND paye = 0 AND date_ech >= '" . $date_limit . "'";
             $resql_soc = $this->db->query($sql_soc);
             if ($resql_soc) {
@@ -250,7 +250,7 @@ class QontoRepository
         }
 
         // 5. Fetch unpaid Salaries
-        if (!empty($conf->salaries->enabled) && ($type === 'all' || $type === 'salary')) {
+        if (isModEnabled('salaries') && ($type === 'all' || $type === 'salary')) {
             // Get datesp (start) and dateep (end)
             $sql_sal = "SELECT s.rowid, s.label, s.amount, s.datesp, s.dateep, u.lastname, u.firstname ";
             $sql_sal .= "FROM " . MAIN_DB_PREFIX . "salary as s ";
@@ -290,7 +290,7 @@ class QontoRepository
         }
 
         // 6. Fetch unpaid Expense Reports
-        if (!empty($conf->expensereport->enabled) && ($type === 'all' || $type === 'expense')) {
+        if (isModEnabled('expensereport') && ($type === 'all' || $type === 'expense')) {
             $sql_exp = "SELECT rowid, ref as label, total_ttc as amount, date_debut ";
             $sql_exp .= "FROM " . MAIN_DB_PREFIX . "expensereport ";
             $sql_exp .= "WHERE entity IN (" . getEntity('expensereport') . ") AND fk_statut = 5 AND date_debut >= '" . $date_limit . "'";

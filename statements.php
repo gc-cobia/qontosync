@@ -21,7 +21,7 @@ $langs->loadLangs(array("qontosync@qontosync", "banks", "compta", "main"));
 
 // Load javascript files
 $arrayofjs = array(
-    '/qontosync/js/ajax_statements.js' 
+    '/qontosync/js/statements.js' 
 );
 
 llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
@@ -38,7 +38,14 @@ $form = new Form($db);
 $bank_rowid = $bank_rowid > 0 ? $bank_rowid : '';
 $select_comptes_html = $form->select_comptes($bank_rowid, 'bank_rowid', 0, '', 2, '', 0, '', 1);
 
-// Include the search form view
-include dol_buildpath('/qontosync/core/tpl/search_statements.tpl.php');
+// Prepare HTML select list for years
+$array_years = array();
+for ($i = date('Y') - 5; $i <= date('Y'); $i++) {
+    $array_years[$i] = $i;
+}
+$select_year_html = $form->selectarray('year', $array_years, $year, 0, 0, 0, 'flat marginrightonly');
+
+// Include HTML5 JS templates and view
+include dol_buildpath('/qontosync/tpl/statements.tpl.php');
 
 llxFooter();

@@ -19,7 +19,8 @@ register_shutdown_function(function() use (&$session_is_valid) {
             ob_end_clean();
         }
         http_response_code(401);
-        echo "SESSION_EXPIRED";
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('status' => 'error', 'message' => 'SESSION_EXPIRED', 'type' => 'errors'));
         exit;
     }
 });
@@ -34,16 +35,18 @@ $session_is_valid = true;
 ob_end_clean();
 /*************************/
 
+header('Content-Type: application/json; charset=utf-8');
+
 // Security check
 if (GETPOST('token', 'alpha') !== currentToken()) {
     http_response_code(401);
-    echo "Invalid Token";
+    echo json_encode(array('status' => 'error', 'message' => 'Invalid Token', 'type' => 'errors'));
     exit;
 }
 
 if ($user->socid > 0 || !$user->hasRight('qontosync', 'write')) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied', 'type' => 'errors'));
     exit;
 }
 
@@ -59,7 +62,7 @@ $qontoRepo = new QontoRepository($db);
 
 if ($bank_rowid > 0 && !$qontoRepo->isAccountAllowed($bank_rowid)) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied', 'type' => 'errors'));
     exit;
 }
 
@@ -119,20 +122,26 @@ if ($action == 'batch_link' && is_array($target_vals) && $bank_rowid > 0) {
         }
     }
 
-    // Prepare notification messages for the next display
+    // Return JSON response
     if ($success_count > 0 || $error_count > 0) {
-        $msg = $langs->trans("BatchProcessingCompleted", $success_count, $error_count);
+        $msg = $langs->transnoentities("BatchProcessingCompleted", $success_count, $error_count);
         $type = ($error_count > 0) ? 'warnings' : 'mesgs';
-        setEventMessages($msg, null, $type);
+        $status = ($error_count > 0 && $success_count == 0) ? 'error' : 'success';
+        echo json_encode(array(
+            'status' => $status,
+            'message' => $msg,
+            'type' => $type
+        ));
     } else {
-        setEventMessages($langs->trans("NoTransactionToLink"), null, 'mesgs');
+        echo json_encode(array(
+            'status' => 'success',
+            'message' => $langs->transnoentities("NoTransactionToLink"),
+            'type' => 'warnings'
+        ));
     }
-
-    // Respond to JS
-    echo "OK";
     exit;
 }
 
 http_response_code(400);
-echo "Bad Request";
+echo json_encode(array('status' => 'error', 'message' => 'Bad Request', 'type' => 'errors'));
 exit;

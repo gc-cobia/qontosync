@@ -19,7 +19,8 @@ register_shutdown_function(function() use (&$session_is_valid) {
             ob_end_clean();
         }
         http_response_code(401);
-        echo "SESSION_EXPIRED";
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('status' => 'error', 'message' => 'SESSION_EXPIRED', 'type' => 'errors'));
         exit;
     }
 });
@@ -34,16 +35,18 @@ $session_is_valid = true;
 ob_end_clean();
 /*************************/
 
+header('Content-Type: application/json; charset=utf-8');
+
 // Security check
 if (GETPOST('token', 'alpha') !== currentToken()) {
     http_response_code(401);
-    echo "Invalid Token";
+    echo json_encode(array('status' => 'error', 'message' => 'Invalid Token', 'type' => 'errors'));
     exit;
 }
 
 if ($user->socid > 0 || !$user->hasRight('qontosync', 'write')) {
     http_response_code(403);
-    echo "Permission Denied";
+    echo json_encode(array('status' => 'error', 'message' => 'Permission Denied', 'type' => 'errors'));
     exit;
 }
 
@@ -53,7 +56,7 @@ $bank_line_id = GETPOST('bank_line_id', 'int');
 
 if (empty($bank_line_id)) {
     http_response_code(400);
-    echo "Bad Request: missing bank_line_id";
+    echo json_encode(array('status' => 'error', 'message' => 'Bad Request: missing bank_line_id', 'type' => 'errors'));
     exit;
 }
 
@@ -63,10 +66,13 @@ $res = $updater->unlinkTransaction($bank_line_id);
 
 if ($res < 0) {
     http_response_code(500);
-    echo "Error unlinking transaction";
+    echo json_encode(array('status' => 'error', 'message' => 'Error unlinking transaction', 'type' => 'errors'));
     exit;
 }
 
-setEventMessages($langs->trans("TransactionSuccessfullyUnlinked"), null, 'mesgs');
-echo "OK";
+echo json_encode(array(
+    'status' => 'success',
+    'message' => $langs->transnoentities("TransactionSuccessfullyUnlinked"),
+    'type' => 'mesgs'
+));
 exit;
