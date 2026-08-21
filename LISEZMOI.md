@@ -12,10 +12,14 @@ Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionn
 - **Tableau de réconciliation** :
     - Affichage des données Qonto (Date, Libellé avec vignette de référence, ID de transaction).
     - Suggestion dynamique dans une liste déroulante des écritures bancaires, factures, déclarations de TVA, charges sociales, salaires et notes de frais Dolibarr ayant le **montant exact**.
+    - Accès direct via lien cliquable vers la fiche de l'écriture bancaire Dolibarr (`line.php`) depuis le badge de statut rapproché.
+- **Création d'Opérations Diverses** : Création à la volée d'une opération diverse (paiement divers) directement depuis la ligne de transaction Qonto avec sélection du compte comptable (`FormAccounting`) et fenêtre de confirmation.
+- **Annulation du rapprochement** : Possibilité de délier en un clic une transaction Qonto et son écriture bancaire Dolibarr liée avec boîte de dialogue de confirmation.
 - **Rapprochement avancé** : Fenêtre modale permettant d'associer manuellement une transaction à plusieurs documents (factures clients/fournisseurs, TVA, charges sociales, salaires, notes de frais) d'un même tiers et de gérer des paiements partiels. Dispose d'une **barre de recherche en temps réel (Live search)** et d'un bouton de validation flottant centré moderne et optimisé pour l'utilisation sur ordinateur.
-- **Traitement par lot (FIFO)** : Imputation des montants semi-automatique via sélection de plusieurs documents simultanément. Les rapprochements sont effectués dans l'ordre de sélection (FIFO) sur les opérations du même signe (ex: toutes les dépenses, puis toutes les recettes). Calcul à la volée du solde restant disponible à l'imputation et allocation automatique du montant complet du document sélectionné (s'il est de même signe).
+- **Traitement par lot (FIFO)** : Imputation des montants semi-automatique via sélection de plusieurs documents simultanément. Les rapprochements sont effectués dans l'ordre de sélection (FIFO) sur les opérations du même signe (ex: toutes les dépenses, puis toutes les recettes). Intègre un module anti-doublon empêchant la sélection simultanée d'un même document cible sur plusieurs lignes.
 - **Correspondance des modes de paiement** : Associez les types d'opérations Qonto (Virements, Cartes, Prélèvements, Chèques) à vos modes de paiement natifs Dolibarr.
 - **Liaison manuelle** : Bouton permettant de lier une transaction Qonto à une écriture Dolibarr existante via l'injection de l'ID Qonto dans un `extrafield`.
+- **Personnalisation graphique** : Page de configuration IHM dédiée permettant de personnaliser la couleur des badges de référence pour les modes clair et sombre.
 - **Mode Sandbox** : Testez vos intégrations en toute sécurité grâce au support du mode Sandbox de Qonto.
 
 ## Spécifications Techniques et Sécurité
@@ -23,14 +27,13 @@ Module de rapprochement bancaire manuel entre l'API Qonto et Dolibarr, fonctionn
 - **Zéro table SQL supplémentaire** : Utilisation exclusive des tables natives et d'un `extrafield` sur la table `llx_bank`.
 - **Stockage sécurisé** : Identifiants API (Clé secrète, Login/Slug) stockés dans les constantes de configuration de Dolibarr (`llx_const`) avec masquage des champs.
 - **Intégrité des données (Rollback)** : Gestion stricte des transactions SQL. En cas d'erreur pendant la création d'un paiement ou d'une liaison, toute l'opération est annulée pour éviter les données corrompues.
-- **Verrouillage métier** : Blocage backend empêchant de lier plusieurs documents pour les opérations nécessitant un ratio de "1 pour 1" (ex: TVA, Salaires, Notes de frais).
-- **Protection Anti-Doublon** : Sécurité intégrée empêchant la double soumission d'une transaction (ex: lors d'un rafraîchissement de page).
+- **Sécurité Multi-Entités & Anti-IDOR de bout en bout** : Cloisonnement strict et étanche des données entre les entités Dolibarr (Multi-Company). Les contrôles d'autorisation (`isAccountAllowed()`) sont appliqués au niveau applicatif et SQL sur l'ensemble des points d'entrée AJAX et jusqu'à la ligne d'écriture bancaire (`AccountLine::fk_account`), interdisant formellement tout rapprochement ou création d'opération diverse sur un compte non autorisé.
+- **Architecture moderne & Performance par chargement paresseux** : Découplage complet entre les API d'échange de données (flux JSON typés et légers) et les moteurs de rendu asynchrones côté client. L'utilisation systématique de `isModEnabled()` garantit une compatibilité ascendante avec les dernières versions de Dolibarr, tandis que le chargement à la demande (*lazy loading*) des classes comptables et de paiement optimise l'empreinte mémoire du serveur.
+- **Verrouillage métier & Anti-doublon** : Blocage backend empêchant de lier plusieurs documents pour les opérations nécessitant un ratio de "1 pour 1" (ex: TVA, Salaires, Notes de frais), et interdiction stricte de rapprocher des documents déjà marqués comme payés.
 - **Résilience des sessions & Anti-CSRF** : Protection complète contre l'expiration des jetons de sécurité ou des sessions (HTTP 401/403) en cas d'utilisation multi-onglets, grâce à un mécanisme d'auto-rechargement silencieux et transparent pour l'utilisateur.
-- **Protection Anti-IDOR stricte** : Ségrégation totale des comptes bancaires entre les entités (Multi-société). Les contrôles sont appliqués de manière rigoureuse sur toutes les requêtes (y compris AJAX).
 - **Sanitisation et protection XSS** : Nettoyage rigoureux des masques de formatage libres (`dol_sanitizeFileName()`) et des données API (`dol_escape_htmltag()`) pour prévenir toute erreur de troncature de données (*Data truncation*) et toute faille de type Cross-Site Scripting.
 - **Accessibilité et thèmes (Clair/Sombre)** : Ajustements CSS sur-mesure assurant un contraste de couleur optimal et une lisibilité accrue pour tous les badges de référence et statuts par défaut, s'adaptant nativement au mode clair et au mode sombre de Dolibarr.
 - **Intégration Visuelle** : Utilisation exclusive du CSS natif de Dolibarr pour garantir la compatibilité avec tous les thèmes.
-- **Hautes performances** : Requêtes SQL sur-mesure et hydratation manuelle des objets permettant de traiter instantanément des milliers de factures impayées sans surcharger le serveur.
 - **Gestion stricte des droits** : Séparation granulaire des permissions entre la simple consultation (Lecture) et le droit d'associer des écritures (Écriture/Création).
 
 ## Prérequis
@@ -61,5 +64,3 @@ Pour utiliser ce module, vous devez posséder des identifiants API Qonto. Vous p
 
 ---
 Développé pour Dolibarr.
-LISEZMOI.md
-Affichage de LISEZMOI.md.
