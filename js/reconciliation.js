@@ -510,7 +510,7 @@ $(document).ready(function () {
 
         $dialog.dialog({
             modal: true,
-            width: 1000,
+            width: $(window).width() * 0.75,
             height: Math.min($(window).height() * 0.85, 700),
             title: title,
             close: function () {
