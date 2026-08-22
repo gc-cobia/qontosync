@@ -35,6 +35,7 @@ QontoSyncProcessingAdvanced=Traitement du rapprochement complexe en cours...
 QontoSyncErrorMainWindow=Erreur : la fenêtre principale n'est pas prête.
 QontoSyncInitialMessage=Veuillez sélectionner une période et un compte bancaire, puis lancer la recherche.
 QontoSyncSearching=Recherche des transactions en cours...
+QontoSyncAllReconciled=Toutes les transactions de cette période sont déjà rapprochées.
 
 # Actions & Results
 InvalidToken=Jeton de sécurité invalide

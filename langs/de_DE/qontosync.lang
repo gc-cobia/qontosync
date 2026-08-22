@@ -35,6 +35,7 @@ QontoSyncProcessingAdvanced=Erweiterter Abgleich wird verarbeitet...
 QontoSyncErrorMainWindow=Fehler: Das Hauptfenster ist nicht bereit.
 QontoSyncInitialMessage=Bitte wählen Sie einen Zeitraum und ein Bankkonto aus und starten Sie dann die Suche.
 QontoSyncSearching=Suche nach Transaktionen...
+QontoSyncAllReconciled=Alle Transaktionen für diesen Zeitraum sind bereits abgestimmt.
 
 # Actions & Results
 InvalidToken=Ungültiges Sicherheits-Token

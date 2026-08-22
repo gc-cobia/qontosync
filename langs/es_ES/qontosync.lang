@@ -37,6 +37,7 @@ QontoSyncProcessingAdvanced=Procesamiento de conciliación avanzada en curso...
 QontoSyncErrorMainWindow=Error: la ventana principal no está lista.
 QontoSyncInitialMessage=Seleccione un período y una cuenta bancaria, luego inicie la búsqueda.
 QontoSyncSearching=Buscando transacciones...
+QontoSyncAllReconciled=Todas las transacciones de este período ya están conciliadas.
 
 # Actions & Results
 InvalidToken=Token de seguridad no válido

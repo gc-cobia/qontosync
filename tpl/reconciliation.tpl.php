@@ -136,9 +136,17 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
     </div>
 </template>
 
+<!-- Template All Reconciled Message -->
+<template id="tpl-all-linked-message">
+    <div id="qonto-all-linked-message" class="qonto-all-linked-container opacitymedium" style="text-align: center; padding: 50px; display: none;">
+        <i class="fa fa-check-circle fa-2x" style="margin-bottom: 10px; color: var(--amountpaymentcomplete, #5cb85c);"></i><br>
+        <span><?php print $langs->trans("QontoSyncAllReconciled"); ?></span>
+    </div>
+</template>
+
 <!-- Template Table Container & Batch Form -->
 <template id="tpl-results-table">
-    <div style="background: var(--colorbackbody, #fff); padding-bottom: 120px;">
+    <div id="qonto-table-wrapper" style="background: var(--colorbackbody, #fff); padding-bottom: 120px;">
         <form id="form_batch_link" method="post" action="<?php print dol_escape_htmltag($_SERVER["PHP_SELF"]); ?>" style="margin: 0;">
             <input type="hidden" name="token" value="">
             <input type="hidden" name="action" value="batch_link">

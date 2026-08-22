@@ -33,6 +33,7 @@ QontoSyncProcessingAdvanced=Processing advanced matching...
 QontoSyncErrorMainWindow=Error: the main window is not ready.
 QontoSyncInitialMessage=Please select a period and a bank account, then start the search.
 QontoSyncSearching=Searching for transactions...
+QontoSyncAllReconciled=All transactions for this period are already reconciled.
 
 # Actions & Results
 InvalidToken=Invalid security token

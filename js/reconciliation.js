@@ -95,7 +95,7 @@ $(document).ready(function () {
             const cloneInfo = tplInfo.content.cloneNode(true);
             $(cloneInfo).find('.info-label').text(trx.label || '');
             $(cloneInfo).find('.info-date').text(trx.date_formatted || '');
-            
+
             const amountEl = $(cloneInfo).find('.info-amount');
             amountEl.text((trx.amount_formatted || '0.00') + ' ' + (trx.currency || ''));
             if (trx.amount < 0) {
@@ -176,9 +176,9 @@ $(document).ready(function () {
                             const cloneRow = tplPendingRow.content.cloneNode(true);
                             const chk = $(cloneRow).find('.check_link_doc');
                             chk.val(doc.key)
-                               .attr('data-doctype', doc.doctype)
-                               .attr('data-thirdparty', doc.thirdparty)
-                               .attr('data-remain', doc.remain_for_js);
+                                .attr('data-doctype', doc.doctype)
+                                .attr('data-thirdparty', doc.thirdparty)
+                                .attr('data-remain', doc.remain_for_js);
 
                             $(cloneRow).find('.doctype-text').text(doc.doctype_label || '');
                             if (doc.is_credit_note) {
@@ -371,12 +371,37 @@ $(document).ready(function () {
 
         container.empty().append(tableNode);
 
+        const tplAllLinked = document.getElementById('tpl-all-linked-message');
+        if (tplAllLinked) {
+            container.append(tplAllLinked.content.cloneNode(true));
+        }
+
         // Initialize Select2 on newly rendered selects
         container.find('select.flat').select2({
             width: 'resolve',
             dropdownAutoWidth: false,
             minimumResultsForSearch: 5
         });
+
+        checkAllLinkedVisibility();
+    }
+
+    function checkAllLinkedVisibility() {
+        const totalRows = container.find('.trx-row').length;
+        const unlinkedRows = container.find('.trx-unlinked').length;
+
+        const isHidingLinked = $('#qontosync_eye_icon').hasClass('fa-eye-slash');
+
+        const tableWrapper = container.find('#qonto-table-wrapper');
+        const allLinkedMsg = container.find('#qonto-all-linked-message');
+
+        if (totalRows > 0 && unlinkedRows === 0 && isHidingLinked) {
+            tableWrapper.hide();
+            allLinkedMsg.show();
+        } else {
+            tableWrapper.show();
+            allLinkedMsg.hide();
+        }
     }
 
     // ==========================================
@@ -494,9 +519,9 @@ $(document).ready(function () {
         });
 
         const token = $('input[name="token"]').val() || '';
-        const fetchAdvancedUrl = 'ajax/get_advanced.php?qonto_id=' + encodeURIComponent(qontoId) + 
-                                 '&bank_rowid=' + encodeURIComponent(bankRowid) + 
-                                 '&token=' + encodeURIComponent(token);
+        const fetchAdvancedUrl = 'ajax/get_advanced.php?qonto_id=' + encodeURIComponent(qontoId) +
+            '&bank_rowid=' + encodeURIComponent(bankRowid) +
+            '&token=' + encodeURIComponent(token);
 
         fetch(fetchAdvancedUrl)
             .then(function (response) {
@@ -566,6 +591,7 @@ $(document).ready(function () {
         } else {
             eyeIcon.removeClass('fa-eye').addClass('fa-eye-slash');
         }
+        checkAllLinkedVisibility();
     });
 
     // Auto-loader if bank account is already selected
