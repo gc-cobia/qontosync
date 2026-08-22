@@ -608,6 +608,18 @@ $(document).ready(function () {
         const qontoId = $(this).attr('data-qonto-id');
         const bankRowid = $(this).attr('data-bank-rowid');
 
+        // Retrieve data from the table row
+        const tr = $(this).closest('tr');
+        const trxDate = tr.find('.trx-date').text();
+        const trxLabel = tr.find('.trx-label').text();
+        const trxAmount = tr.find('.trx-amount').text();
+        const trxAmountColor = tr.find('.trx-amount').css('color');
+
+        // Hydrate the modal
+        $('#od_dialog_date').text(trxDate);
+        $('#od_dialog_label').text(trxLabel);
+        $('#od_dialog_amount').text(trxAmount).css('color', trxAmountColor);
+
         // Reset the accountancy selector to empty
         if ($('#od_accountancy_code').length > 0) {
             $('#od_accountancy_code').val(null).trigger('change');
@@ -667,7 +679,7 @@ $(document).ready(function () {
         $dialog.dialog({
             resizable: false,
             height: "auto",
-            width: 400,
+            width: Math.min($(window).width() * 0.95, 550),
             modal: true,
             buttons: buttonsArray
         });
@@ -730,7 +742,7 @@ $(document).ready(function () {
         $dialog.dialog({
             resizable: false,
             height: "auto",
-            width: 400,
+            width: Math.min($(window).width() * 0.95, 400),
             modal: true,
             buttons: buttonsArray
         });

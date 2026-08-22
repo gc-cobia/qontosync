@@ -257,6 +257,11 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
      data-no="<?php print dol_escape_htmltag($langs->transnoentities("No")); ?>" 
      style="display: none;">
     <p><span class="fas fa-exclamation-circle" style="float:left; margin:12px 12px 20px 0;"></span><?php print $langs->trans("ConfirmNewVariousPaymentQuestion"); ?></p>
+    <div class="info" style="margin-bottom: 15px; padding: 10px;">
+        <div style="margin-bottom: 5px;"><strong><?php print $langs->trans("Date"); ?> :</strong> <span id="od_dialog_date"></span></div>
+        <div style="margin-bottom: 5px;"><strong><?php print $langs->trans("Label"); ?> :</strong> <span id="od_dialog_label"></span></div>
+        <div><strong><?php print $langs->trans("Amount"); ?> :</strong> <span id="od_dialog_amount" style="font-weight: bold;"></span></div>
+    </div>
     <?php 
     // Add accountancy selector if double entry accounting module is enabled
     if (isModEnabled('accounting')) {
