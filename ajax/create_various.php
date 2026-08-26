@@ -75,7 +75,7 @@ if (empty($qonto_id)) {
 if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
 $qontoUpdater = new QontoUpdater($db);
 
-$res = $qontoUpdater->createVariousPayment($qonto_id, $bank_rowid, $accountancy_code);
+$res = $qontoUpdater->createVariousPayment($qonto_id, $bank_rowid, $accountancy_code, 'od_attached_file');
 
 if ($res > 0) {
     echo json_encode(array(

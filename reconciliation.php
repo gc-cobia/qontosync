@@ -17,7 +17,7 @@ if ($user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
     accessforbidden();
 }
 
-$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compta"));
+$langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compta", "other"));
 
 // Load javascript files
 $arrayofjs = array(

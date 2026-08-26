@@ -625,6 +625,9 @@ $(document).ready(function () {
             $('#od_accountancy_code').val(null).trigger('change');
         }
 
+        // Reset the attached file input
+        $('#od_attached_file').val('');
+
         const $dialog = $("#dialog-confirm-create-od");
         const textYes = $dialog.data('yes') || 'Yes';
         const textNo = $dialog.data('no') || 'No';
@@ -634,24 +637,26 @@ $(document).ready(function () {
                 text: textYes,
                 click: async function () {
                     const accountancyCode = $('#od_accountancy_code').val() || '';
+                    const tokenVal = $('input[name="token"]').val() || '';
+
+                    const formData = new FormData();
+                    formData.append('token', tokenVal);
+                    formData.append('qonto_id', qontoId);
+                    formData.append('bank_rowid', bankRowid);
+                    formData.append('accountancy_code', accountancyCode);
+
+                    const fileInput = document.getElementById('od_attached_file');
+                    if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                        formData.append('od_attached_file', fileInput.files[0]);
+                    }
+
                     $(this).dialog("close");
                     displaySpinner(langProcessBatch);
-
-                    const tokenVal = $('input[name="token"]').val() || '';
-                    const params = new URLSearchParams({
-                        token: tokenVal,
-                        qonto_id: qontoId,
-                        bank_rowid: bankRowid,
-                        accountancy_code: accountancyCode
-                    });
 
                     try {
                         const response = await fetch(createVariousUrl, {
                             method: 'POST',
-                            body: params,
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                            }
+                            body: formData
                         });
 
                         if (response.status === 401 || response.status === 403) {

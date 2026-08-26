@@ -166,9 +166,10 @@ class QontoUpdater
 	 * @param string $qonto_id
 	 * @param int    $bank_rowid
 	 * @param string $accountancy_code
+	 * @param string $fileparam
 	 * @return int 1 on success, -1 on error
 	 */
-	public function createVariousPayment($qonto_id, $bank_rowid, $accountancy_code = '')
+	public function createVariousPayment($qonto_id, $bank_rowid, $accountancy_code = '', $fileparam = 'od_attached_file')
 	{
 		global $conf, $user, $langs;
 
@@ -247,9 +248,25 @@ class QontoUpdater
 
 		if ($res > 0) {
 			$payment->fetch($res);
+
 			$link_res = $this->linkTransaction($payment->fk_bank, $qonto_id, $ref_releve);
 			if ($link_res > 0) {
 				$this->db->commit();
+
+				// Handle attached file if provided
+				if (!empty($fileparam) && !empty($_FILES[$fileparam]['name'])) {
+					if (!function_exists('dol_add_file_process')) {
+						require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+					}
+					$bank_dir_output = !empty($conf->bank->dir_output) ? $conf->bank->dir_output : (DOL_DATA_ROOT . '/bank');
+					$upload_dir = $bank_dir_output . '/' . dol_sanitizeFileName((string) $payment->id);
+					$upload_res = dol_add_file_process($upload_dir, 0, 1, $fileparam, '', null, '', 1, $payment);
+					if ($upload_res < 0) {
+						dol_syslog(__METHOD__ . ": Warning: Failed to process attached file for payment various ID " . $payment->id, LOG_WARNING);
+					} else {
+						dol_syslog(__METHOD__ . ": Attached file successfully added for payment various ID " . $payment->id, LOG_INFO);
+					}
+				}
 				dol_syslog(__METHOD__ . ": Various payment created and linked to Qonto ID: " . $qonto_id, LOG_INFO);
 				return 1;
 			} else {

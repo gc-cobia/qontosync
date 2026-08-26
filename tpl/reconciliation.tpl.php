@@ -274,6 +274,10 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
         print '</div>';
     }
     ?>
+    <div style="margin-top: 15px;">
+        <label for="od_attached_file" style="font-weight: bold; margin-bottom: 5px; display: inline-block;"><?php print dol_escape_htmltag($langs->trans("AttachANewFile")); ?></label><br>
+        <input type="file" id="od_attached_file" name="od_attached_file" class="flat minwidth200" style="width: 100%; max-width: 100%; box-sizing: border-box;" />
+    </div>
 </div>
 
 <!-- Confirmation modal for unlinking -->

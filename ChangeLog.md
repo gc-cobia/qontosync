@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4]
+
+### Added
+- Various Payments creation: Integrated on-the-fly Various Payment (Opération Diverse) creation modal with direct attachment upload support.
+
 ## [1.3]
 
 ### Security
