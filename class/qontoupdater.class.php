@@ -401,7 +401,7 @@ class QontoUpdater
 
 		// Extract transfer/check number if available
 		$num_chq = '';
-		if ($op_type == 'check') {
+		if ($op_type == 'cheque' || $op_type == 'check') {
 			$num_chq = isset($qonto_trx['check']['check_number']) ? $qonto_trx['check']['check_number'] : '';
 		} elseif ($op_type == 'direct_debit_collection') {
 			$num_chq = isset($qonto_trx['direct_debit_collection']['unique_mandate_reference']) ? $qonto_trx['direct_debit_collection']['unique_mandate_reference'] : '';
