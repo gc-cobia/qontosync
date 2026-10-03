@@ -87,7 +87,7 @@ class QontoMatching
 			return getDolGlobalInt('QONTOSYNC_PM_CARD') ?: '';
 		} elseif ($op_type == 'direct_debit' || $op_type == 'direct_debit_collection' || $op_type == 'financing_installment') {
 			return getDolGlobalInt('QONTOSYNC_PM_DD') ?: '';
-		} elseif ($op_type == 'check') {
+		} elseif ($op_type == 'cheque' || $op_type == 'check') {
 			return getDolGlobalInt('QONTOSYNC_PM_CHECK') ?: '';
 		} elseif ($op_type == 'qonto_fee') {
 			if ($side === 'credit') {
