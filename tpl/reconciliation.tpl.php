@@ -184,23 +184,23 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
         <td class="trx-correspondence-cell" style="width: 350px; min-width: 350px; max-width: 350px;"></td>
         <td class="center trx-action-cell" style="width: 1%; white-space: nowrap;">
             <div class="qonto-dropdown">
-                <button type="button" class="button" style="padding: 0; margin: 0; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; min-width: unset; border-radius: 50%;" title="<?php print dol_escape_htmltag($langs->trans("Action")); ?>">
+                <button type="button" class="button qonto-dropdown-toggle" aria-haspopup="true" aria-expanded="false" title="<?php print dol_escape_htmltag($langs->trans("Action")); ?>">
                     <span class="fas fa-bars"></span>
                 </button>
-                <div class="qonto-dropdown-content">
+                <div class="qonto-dropdown-content" role="menu">
                     <!-- Advanced Search -->
-                    <a href="#" class="qonto-dropdown-item btn-open-advanced-match" title="<?php print dol_escape_htmltag($langs->trans("AdvancedSearch")); ?>" data-title="<?php print dol_escape_htmltag($langs->trans("AdvancedSearch")); ?>">
-                        <span class="fa fa-search marginrightonly" style="margin-right: 5px;"></span> <?php print $langs->transnoentities("AdvancedSearch"); ?>
-                    </a>
+                    <button type="button" role="menuitem" class="btn-open-advanced-match qonto-dropdown-item" title="<?php print dol_escape_htmltag($langs->trans("AdvancedSearch")); ?>">
+                        <span class="fa fa-search marginrightonly"></span><?php print dol_escape_htmltag($langs->transnoentities("AdvancedSearch")); ?>
+                    </button>
 
                     <!-- Unlink Transaction -->
-                    <button type="button" class="btn-ask-unlink qonto-dropdown-item" style="display: none;" title="<?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>">
-                        <span class="fas fa-undo marginrightonly" style="margin-right: 5px;"></span> <?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>
+                    <button type="button" role="menuitem" class="btn-ask-unlink qonto-dropdown-item" style="display: none;" title="<?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>">
+                        <span class="fas fa-undo marginrightonly"></span><?php print dol_escape_htmltag($langs->transnoentities("UnlinkTransaction")); ?>
                     </button>
 
                     <!-- New Various Payment -->
-                    <button type="button" class="btn-ask-create-od qonto-dropdown-item" style="display: none;" title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>">
-                        <span class="fas fa-plus marginrightonly" style="margin-right: 5px;"></span> <?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>
+                    <button type="button" role="menuitem" class="btn-ask-create-od qonto-dropdown-item" style="display: none;" title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>">
+                        <span class="fas fa-plus marginrightonly"></span><?php print dol_escape_htmltag($langs->transnoentities("NewVariousPayment")); ?>
                     </button>
                 </div>
             </div>
