@@ -3,7 +3,15 @@
 ## [1.4]
 
 ### Added
-- Various Payments creation: Integrated on-the-fly Various Payment (Opération Diverse) creation modal with direct attachment upload support.
+- Various Payments creation: Integrated on-the-fly Various Payment (Opération Diverse) creation modal with direct attachment upload.
+
+### Changed
+- feat: add "all reconciled" message and hide table when all transactions are cleared.
+- refactor: make reconciliation dialog width responsive to window size.
+
+### Fixed
+- fix: map Qonto 'cheque' operation type to the check payment mode (Ko-Greg).
+- fix: truncate payment number to 50 characters (Ko-Greg).
 
 ## [1.3]
 
