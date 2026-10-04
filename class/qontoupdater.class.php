@@ -409,6 +409,9 @@ class QontoUpdater
 			$num_chq = isset($qonto_trx['reference']) ? $qonto_trx['reference'] : '';
 		}
 
+		// Payment and bank line number columns are varchar(50)
+		$num_chq = dol_substr($num_chq, 0, 50);
+
 		// Extract statement reference
 		$ref_releve = '';
 		if (isset($qonto_trx['settled_at'])) {
