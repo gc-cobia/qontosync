@@ -6,6 +6,11 @@
  * @license    GPLv3
  */
 
+if (!defined('DOL_DOCUMENT_ROOT')) {
+    http_response_code(403);
+    exit('Access Forbidden');
+}
+
 /**
  * SECURITY WARNING - SQL INJECTIONS
  * As this module relies on standard Dolibarr $db abstraction (no prepared statements),

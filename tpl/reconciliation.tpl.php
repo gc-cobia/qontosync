@@ -7,6 +7,7 @@
  */
 
 if (!defined('DOL_DOCUMENT_ROOT')) {
+    http_response_code(403);
     exit('Access Forbidden');
 }
 

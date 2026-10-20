@@ -6,6 +6,11 @@
  * @license    GPLv3
  */
 
+if (!defined('DOL_DOCUMENT_ROOT')) {
+    http_response_code(403);
+    exit('Access Forbidden');
+}
+
 class QontoApi
 {
 	// Set default URL for Qonto API

@@ -7,9 +7,12 @@
  */
 
 if (!defined('DOL_DOCUMENT_ROOT')) {
+    http_response_code(403);
     exit('Access Forbidden');
 }
+
 ?>
+
 <div style="display: flex; flex-direction: column; height: calc(100vh - 160px); gap: 15px;">
     
     <form id="qontosync_search_form" method="post" style="margin: 0; flex-shrink: 0;"
