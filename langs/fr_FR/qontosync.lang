@@ -5,23 +5,49 @@ QontoSyncSetup=Configuration de QontoSync
 PermissionReadQontoSync=Consulter les transactions QontoSync
 PermissionWriteQontoSync=Lier et valider les transactions Qonto
 
-# Parameters
+## Parameters
+# Configuration
 QontoAPIKey=Clé API Qonto (Secret Key)
 QontoSlug=Identifiant Qonto (Slug)
 QontoSandboxMode=Mode Bac à sable (Sandbox)
 QontoSandboxToken=Jeton Sandbox (Staging Token)
-QontoSyncToleranceDays=Tolérance de date pour le rapprochement
-QontoSyncToleranceDaysTooltip=Nombre de jours avant et après la transaction Qonto pour chercher une écriture bancaire correspondante (ex: 7).
-QontoSyncPMTransfer=Mode de paiement pour les Virements (Virements reçus / émis)
-QontoSyncPMCard=Mode de paiement pour les Cartes (Paiements CB)
-QontoSyncPMDD=Mode de paiement pour les Prélèvements (Direct Debit)
-QontoSyncPMCheck=Mode de paiement pour les Chèques
-QontoSyncMaxMonths=Historique maximum des factures (en mois)
-QontoSyncMaxMonthsTooltip=Nombre de mois d'historique à analyser pour la recherche des factures impayées (ex: 24). Un nombre élevé peut ralentir le chargement.
-BankStatementFormat=Format des relevés bancaires
-QontoSyncStatementFormat=Masque de formatage libre
-QontoSyncStatementFormatTooltip=Définissez le nom des relevés (num_releve). Tout ce qui est entre {} est interprété avec les balises de la fonction PHP date() (ex: Y=Année 4 chiff., y=Année 2 chiff., m=Mois avec zéro, d=Jour). Ex: QONTO-{Y}-{m} ou {Y-m} ou RELEVE-{Y}
-ReferenceBadgeColor=Couleur du badge de référence
+# Reconciliation
+Reconciliation=Rapprochement
+QontoPaymentsMethodsCorrespondences=Correspondances types de paiements
+QontoPMTransfer=Mode de paiement pour les Virements (reçus / émis)
+QontoPMCard=Mode de paiement pour les Cartes bancaire
+QontoPMDD=Mode de paiement pour les Prélèvements
+QontoPMCheck=Mode de paiement pour les Chèques
+QontoBankStatementFormat=Format des relevés bancaires
+QontoStatementFormat=Masque de formatage libre
+QontoStatementFormatTooltip=Définissez le nom des relevés (num_releve). Tout ce qui est entre {} est interprété avec les balises de la fonction PHP date() (ex: Y=Année 4 chiff., y=Année 2 chiff., m=Mois avec zéro, d=Jour). Ex: QONTO-{Y}-{m} ou {Y-m} ou RELEVE-{Y}
+QontoTXCorrespondences=Correspondances des documents
+QontoToleranceDays=Tolérance de date pour le rapprochement
+QontoToleranceDaysTooltip=Nombre de jours avant et après la transaction Qonto pour chercher une écriture bancaire correspondante (ex: 7).
+QontoMaxMonths=Historique maximum des factures (en mois)
+QontoMaxMonthsTooltip=Nombre de mois d'historique à analyser pour la recherche des factures impayées (ex: 24). Un nombre élevé peut ralentir le chargement.
+QontoView=Paramètres d'affichage
+QontoReferenceBadgeColor=Couleur du badge de référence
+QontoDarkThemeMode=Mode sombre
+# E-Invoicing
+EInvoicing=Facturation Électronique
+QontoLiveEInvoicingStatus=Statut de la facturation électronique en direct sur Qonto
+QontoReceivingStatus=Statut réception
+QontoSendingStatus=Statut émission
+QontoEInvoicingEnabled=Activer la facturation électronique
+QontoEInvoicingEnabledTooltip=Permet de synchroniser les factures électroniques avec Qonto.
+QontoSuppliersParam=Paramètres fournisseurs
+QontoEInvoicingAutoThirdparty=Création automatique des fournisseurs
+QontoEInvoicingAutoThirdpartyTooltip=Crée automatiquement le fournisseur dans Dolibarr s'il n'existe pas lors de l'import d'une facture.
+QontoEInvoicingAutoImport=Import automatique des factures d'achat
+QontoEInvoicingAutoImportTooltip=Importe automatiquement les factures d'achat électroniques depuis Qonto lors de la synchronisation.
+QontoEInvoicingAutoValidate=Validation automatique des factures d'achat
+QontoEInvoicingAutoValidateTooltip=Valide automatiquement les factures d'achat créées lors de l'import.
+QontoCustomersParam=Paramètres clients
+QontoEInvoicingAutoExport=Export automatique des factures de vente
+QontoEInvoicingAutoExportTooltip=Exporte automatiquement les factures de vente vers Qonto lors de la synchronisation.
+QontoEInvoicingAutoUpdate=Mise à jour automatique des factures de vente
+QontoEInvoicingAutoUpdateTooltip=Met à jour automatiquement les factures clients sur Qonto lors de leur modification dans Dolibarr.
 
 # Messages
 SetupSaved=La configuration a été enregistrée.

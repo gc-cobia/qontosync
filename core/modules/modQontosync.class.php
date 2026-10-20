@@ -78,12 +78,19 @@ class modQontosync extends DolibarrModules
 
 		// Constants
 		$this->const = array(
+			/**
+			 * API Settings
+			 */
 		    // API configuration
 			array('QONTOSYNC_API_KEY', 'chaine', '', 'Qonto API Key', 0),
 			array('QONTOSYNC_SLUG', 'chaine', '', 'Qonto Login/Slug', 0),
 			// Sandbox
 			array('QONTOSYNC_SANDBOX', 'chaine', '0', 'Qonto Sandbox Mode', 0),
 			array('QONTOSYNC_SANDBOX_TOKEN', 'chaine', '', 'Qonto Sandbox Token', 0),
+
+			/**
+			 * Reconciliation Settings
+			 */
 			// Payment mode
 			array('QONTOSYNC_PM_TRANSFER', 'chaine', '', 'Payment Mode for Transfer', 0),
 			array('QONTOSYNC_PM_CARD', 'chaine', '', 'Payment Mode for Card', 0),
@@ -100,6 +107,19 @@ class modQontosync extends DolibarrModules
 			// Badge color
 			array('QONTOSYNC_BADGE_COLOR', 'chaine', '#1e40af', 'Badge color for linked transactions', 0),
 			array('QONTOSYNC_BADGE_COLOR_DARK', 'chaine', '#1e3a8a', 'Badge color for linked transactions (dark mode)', 0),
+
+			/**
+			 * E-Invoicing Settings
+			 */
+			// Global settings
+			array('QONTOSYNC_EI_ENABLED', 'chaine', '0', 'Enable Qonto E-Invoicing', 0),
+			// Supplier settings
+			array('QONTOSYNC_EI_SUPP_AUTO_THIRDPARTY', 'chaine', '0', 'Automatically create unknown thirdparties upon supplier e-invoicing import', 0),
+			array('QONTOSYNC_EI_SUPP_AUTO_IMPORT', 'chaine', '0', 'Automatically import supplier e-invoices upon synchronization', 0),
+			array('QONTOSYNC_EI_SUPP_AUTO_VALIDATE', 'chaine', '0', 'Automatically validate supplier e-invoices upon import', 0),
+			// Customer settings
+			array('QONTOSYNC_EI_CUST_AUTO_EXPORT', 'chaine', '0', 'Automatically export customer e-invoices upon synchronization', 0),
+			array('QONTOSYNC_EI_CUST_AUTO_UPDATE', 'chaine', '0', 'Automatically update customer e-invoices upon export', 0),
 		);
 
         // Permissions

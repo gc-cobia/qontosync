@@ -343,4 +343,31 @@ class QontoApi
 
 		return false;
 	}
+
+	/**
+	 * Get e-invoicing settings from Qonto API
+	 *
+	 * "sending_status": "enabled", "disabled"
+	 * "receiving_status": "enabled", "disabled", "pending_creation", "pending_deletion"
+	 * @return array|bool Array containing sending_status and receiving_status, or false on error
+	 */
+	public function getEInvoicingSettings()
+	{
+		$endpoint = "/v2/einvoicing/settings";
+		$response = $this->sendRequest($endpoint);
+
+		if ($response === false) {
+			return false;
+		}
+
+		$data = json_decode($response, true);
+
+		if (!is_array($data)) {			
+			return false;
+		}
+
+		dol_syslog(__METHOD__ . ": Retrieve e-invoicing settings from Qonto." , LOG_DEBUG);
+
+		return $data;
+	}
 }

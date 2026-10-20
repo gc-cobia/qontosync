@@ -15,17 +15,14 @@ if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include 
 if (!function_exists('dolibarr_set_const')) require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 if (!function_exists('dolEncrypt')) require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
 if (!function_exists('qontosyncAdminPrepareHead')) dol_include_once('/qontosync/lib/qontosync.lib.php');
-if (!class_exists('Form')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
 
-$langs->loadLangs(array("admin", "qontosync@qontosync", "bills", "banks", "compta"));
+$langs->loadLangs(array("admin", "qontosync@qontosync"));
 
 // Check if user is admin
 if (!$user->admin) {
 	accessforbidden();
 }
-
-$form = new Form($db);
 
 $action = GETPOST('action', 'aZ');
 
@@ -36,13 +33,6 @@ $apikey = GETPOST('QONTOSYNC_API_KEY', 'none');
 $slug = GETPOST('QONTOSYNC_SLUG', 'alphanohtml');
 $sandbox = getDolGlobalInt('QONTOSYNC_SANDBOX');
 $sandbox_token = GETPOST('QONTOSYNC_SANDBOX_TOKEN', 'alphanohtml');
-$pm_transfer = GETPOST('QONTOSYNC_PM_TRANSFER', 'int');
-$pm_card = GETPOST('QONTOSYNC_PM_CARD', 'int');
-$pm_dd = GETPOST('QONTOSYNC_PM_DD', 'int');
-$pm_check = GETPOST('QONTOSYNC_PM_CHECK', 'int');
-$tolerance_days = GETPOST('QONTOSYNC_TOLERANCE_DAYS', 'int');
-$max_months = GETPOST('QONTOSYNC_MAX_MONTHS', 'int');
-$statement_format = GETPOST('QONTOSYNC_STATEMENT_FORMAT', 'alphanohtml');
 
 $has_apikey = getDolGlobalString('QONTOSYNC_API_KEY');
 $display_apikey = !empty($has_apikey) ? '****************' : '';
@@ -64,15 +54,6 @@ if ($action == 'update') {
 	    
 		dolibarr_set_const($db, 'QONTOSYNC_SLUG', $slug, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($db, 'QONTOSYNC_SANDBOX_TOKEN', $sandbox_token, 'chaine', 0, '', $conf->entity);
-
-		dolibarr_set_const($db, 'QONTOSYNC_PM_TRANSFER', $pm_transfer, 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($db, 'QONTOSYNC_PM_CARD', $pm_card, 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($db, 'QONTOSYNC_PM_DD', $pm_dd, 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($db, 'QONTOSYNC_PM_CHECK', $pm_check, 'chaine', 0, '', $conf->entity);
-		
-		dolibarr_set_const($db, 'QONTOSYNC_TOLERANCE_DAYS', $tolerance_days, 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($db, 'QONTOSYNC_MAX_MONTHS', $max_months, 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($db, 'QONTOSYNC_STATEMENT_FORMAT', $statement_format, 'chaine', 0, '', $conf->entity);
 
 		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
 	}
@@ -150,60 +131,6 @@ print '</tr>';
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSandboxToken").'</td>';
 print '<td><input type="text" size="60" name="QONTOSYNC_SANDBOX_TOKEN" value="'.dol_escape_htmltag(getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN')).'"></td>';
-print '</tr>';
-
-/**
- * Payments parameters
- */
-print '<tr class="liste_titre"><td colspan="2">'.$langs->trans("Payments").'</td></tr>';
-
-print '<tr class="oddeven">';
-print '<td>'.$langs->trans("QontoSyncPMTransfer").'</td>';
-print '<td>' . $form->select_types_paiements(getDolGlobalString('QONTOSYNC_PM_TRANSFER'), 'QONTOSYNC_PM_TRANSFER', '', 0, 1, 0, 0, 1, 'minwidth200 flat', 1) . '</td>';
-print '</tr>';
-
-print '<tr class="oddeven">';
-print '<td>'.$langs->trans("QontoSyncPMCard").'</td>';
-print '<td>' . $form->select_types_paiements(getDolGlobalString('QONTOSYNC_PM_CARD'), 'QONTOSYNC_PM_CARD', '', 0, 1, 0, 0, 1, 'minwidth200 flat', 1) . '</td>';
-print '</tr>';
-
-print '<tr class="oddeven">';
-print '<td>'.$langs->trans("QontoSyncPMDD").'</td>';
-print '<td>' . $form->select_types_paiements(getDolGlobalString('QONTOSYNC_PM_DD'), 'QONTOSYNC_PM_DD', '', 0, 1, 0, 0, 1, 'minwidth200 flat', 1) . '</td>';
-print '</tr>';
-
-print '<tr class="oddeven">';
-print '<td>'.$langs->trans("QontoSyncPMCheck").'</td>';
-print '<td>' . $form->select_types_paiements(getDolGlobalString('QONTOSYNC_PM_CHECK'), 'QONTOSYNC_PM_CHECK', '', 0, 1, 0, 0, 1, 'minwidth200 flat', 1) . '</td>';
-print '</tr>';
-
-/**
- * Bank statement format
- */
-print '<tr class="liste_titre"><td colspan="2">'.$langs->trans("BankStatementFormat").'</td></tr>';
-
-print '<tr class="oddeven">';
-print '<td>'.$langs->trans("QontoSyncStatementFormat").'<br><span class="opacitymedium small">'.$langs->trans("QontoSyncStatementFormatTooltip").'</span></td>';
-$val_statement_format = getDolGlobalString('QONTOSYNC_STATEMENT_FORMAT') !== '' ? getDolGlobalString('QONTOSYNC_STATEMENT_FORMAT') : '{Y}-{m}';
-print '<td><input type="text" size="60" name="QONTOSYNC_STATEMENT_FORMAT" value="'.dol_escape_htmltag($val_statement_format).'"></td>';
-print '</tr>';
-
-/**
- * Correspondence parameters
- */
-print '<tr class="liste_titre"><td colspan="2">'.$langs->trans("Correspondence").'</td></tr>';
-
-print '<tr class="oddeven">';
-print '<td>'.$langs->trans("QontoSyncToleranceDays").'<br><span class="opacitymedium small">'.$langs->trans("QontoSyncToleranceDaysTooltip").'</span></td>';
-// if empty, set 7 by default
-$val_tolerance = getDolGlobalString('QONTOSYNC_TOLERANCE_DAYS') !== '' ? getDolGlobalString('QONTOSYNC_TOLERANCE_DAYS') : '7';
-print '<td><input type="number" min="0" max="365" size="5" name="QONTOSYNC_TOLERANCE_DAYS" value="'.$val_tolerance.'"></td>';
-print '</tr>';
-print '<tr class="oddeven">';
-print '<td>'.$langs->trans("QontoSyncMaxMonths").'<br><span class="opacitymedium small">'.$langs->trans("QontoSyncMaxMonthsTooltip").'</span></td>';
-// if empty, set 24 by default
-$val_max_months = getDolGlobalString('QONTOSYNC_MAX_MONTHS') !== '' ? getDolGlobalString('QONTOSYNC_MAX_MONTHS') : '24';
-print '<td><input type="number" min="1" max="120" size="5" name="QONTOSYNC_MAX_MONTHS" value="'.$val_max_months.'"></td>';
 print '</tr>';
 
 print '</table>';
