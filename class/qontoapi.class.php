@@ -46,7 +46,7 @@ class QontoApi
 		if (!empty($savedApiKey)) {
 		    $decryptedKey = dolDecrypt($savedApiKey, $conf->file->instance_unique_id);
 		    if (empty($decryptedKey)) {
-		        $decryptedKey = $savedApiKey;
+				dol_syslog(__METHOD__ . ": Unable to decrypt the API key (key is corrupted or instance_unique_id has been modified)", LOG_ERR);
 		    }
 		}
 		
