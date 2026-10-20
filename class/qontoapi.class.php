@@ -56,7 +56,10 @@ class QontoApi
 
 		$this->apiKey = trim($apiKeyVal);
 		$this->slug = trim($slugVal);
-		$this->sandbox = ($sandbox !== null) ? (bool)$sandbox : (bool)getDolGlobalString('QONTOSYNC_SANDBOX');
+    	$this->sandbox = ($sandbox !== null) 
+          ? (bool) $sandbox 
+			// TODO: move to getDolGlobalBool('QONTOSYNC_SANDBOX') only when next LTS reach v22
+          : (function_exists('getDolGlobalBool') ? getDolGlobalBool('QONTOSYNC_SANDBOX') : (bool) getDolGlobalInt('QONTOSYNC_SANDBOX'));
 		$this->sandboxToken = trim($sandboxTokenVal);
 		$this->baseUrl = $this->sandbox ? self::BASE_URL_SANDBOX : self::BASE_URL_PROD;
 
