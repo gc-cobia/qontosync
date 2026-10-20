@@ -34,7 +34,7 @@ class modQontosync extends DolibarrModules
 		$this->module_position = '50';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
 		$this->description = "Manual bank reconciliation module between Qonto API and Dolibarr.";
-		$this->version = '1.3';
+		$this->version = '1.4';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'qonto.svg@qontosync';
 
