@@ -34,7 +34,7 @@ if (GETPOST('test', 'alpha')) { $action = 'test'; }
 
 $apikey = GETPOST('QONTOSYNC_API_KEY', 'none');
 $slug = GETPOST('QONTOSYNC_SLUG', 'alphanohtml');
-$sandbox = GETPOST('QONTOSYNC_SANDBOX', 'int') ? 1 : 0;
+$sandbox = getDolGlobalInt('QONTOSYNC_SANDBOX');
 $sandbox_token = GETPOST('QONTOSYNC_SANDBOX_TOKEN', 'alphanohtml');
 $pm_transfer = GETPOST('QONTOSYNC_PM_TRANSFER', 'int');
 $pm_card = GETPOST('QONTOSYNC_PM_CARD', 'int');
@@ -63,7 +63,6 @@ if ($action == 'update') {
 	    }
 	    
 		dolibarr_set_const($db, 'QONTOSYNC_SLUG', $slug, 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($db, 'QONTOSYNC_SANDBOX', $sandbox, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($db, 'QONTOSYNC_SANDBOX_TOKEN', $sandbox_token, 'chaine', 0, '', $conf->entity);
 
 		dolibarr_set_const($db, 'QONTOSYNC_PM_TRANSFER', $pm_transfer, 'chaine', 0, '', $conf->entity);
@@ -145,7 +144,7 @@ print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSandboxMode").'</td>';
-print '<td><input type="checkbox" name="QONTOSYNC_SANDBOX" value="1"'.(getDolGlobalString('QONTOSYNC_SANDBOX') ? ' checked="checked"' : '').'></td>';
+print '<td>'.ajax_constantonoff('QONTOSYNC_SANDBOX').'</td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
