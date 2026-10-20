@@ -136,7 +136,6 @@ foreach ($transactions as $t) {
         'trx_status' => !empty($t['trx_status']) ? $t['trx_status'] : 'unlinked',
         'linked_rowid' => !empty($t['linked_rowid']) ? (int) $t['linked_rowid'] : 0,
         'linked_url' => !empty($t['linked_rowid']) ? (DOL_URL_ROOT . '/compta/bank/line.php?rowid=' . (int) $t['linked_rowid']) : '',
-        'advanced_url' => dol_buildpath('/qontosync/advanced_match.php', 2) . '?qonto_id=' . urlencode($q_id) . '&bank_rowid=' . $bank_rowid . '&token=' . newToken(),
         'various_payment_url' => '',
         'has_matches' => false,
         'matches' => array(
