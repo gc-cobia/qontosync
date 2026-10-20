@@ -21,7 +21,7 @@ class QontoMatching
 	{
 		global $conf;
 		$this->db = $db;
-		$this->multicurrency_enabled = !empty($conf->multicurrency->enabled);
+		$this->multicurrency_enabled = isModEnabled('multicurrency');
 	}
 
 	/**
