@@ -55,19 +55,27 @@ print '<form method="post" action="'.dol_escape_htmltag($_SERVER["PHP_SELF"]).'"
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="update">';
 
-// Qonto live status banner
+// LIVE STATUS BANNER
 print '<table class="noborder centpercent">';
 
 print '<tr class="oddeven">';
 print '<td><strong>'.$langs->trans("QontoLiveEInvoicingStatus").'</strong></td>';
-print '<td>';
 
-$rec_badge_class = (strtolower($live_receiving_status) === 'enabled') ? 'badge-status4' : 'badge-status8';
-$send_badge_class = (strtolower($live_sending_status) === 'enabled') ? 'badge-status4' : 'badge-status8';
+if (getDolGlobalInt('QONTOSYNC_SANDBOX')) {
+	print '<td>';
+    print '<span class="badge badge-status8">' . dol_escape_htmltag($langs->trans("QontoCanNotInSandbox")) . '</span>';
+	print '</td>';
+} else {
+	print '<td>';
 
-print '<span class="badge '.$rec_badge_class.'">'.$langs->trans("QontoReceivingStatus").': '.dol_escape_htmltag($live_receiving_status ? $live_receiving_status : $langs->trans("Disabled")).'</span> ';
-print '<span class="badge '.$send_badge_class.'">'.$langs->trans("QontoSendingStatus").': '.dol_escape_htmltag($live_sending_status ? $live_sending_status : $langs->trans("Disabled")).'</span>';
-print '</td>';
+	$rec_badge_class = (strtolower($live_receiving_status) === 'enabled') ? 'badge-status4' : 'badge-status8';
+	$send_badge_class = (strtolower($live_sending_status) === 'enabled') ? 'badge-status4' : 'badge-status8';
+
+	print '<span class="badge '.$rec_badge_class.'">'.$langs->trans("QontoReceivingStatus").': '.dol_escape_htmltag($live_receiving_status ? $live_receiving_status : $langs->trans("Disabled")).'</span> ';
+	print '<span class="badge '.$send_badge_class.'">'.$langs->trans("QontoSendingStatus").': '.dol_escape_htmltag($live_sending_status ? $live_sending_status : $langs->trans("Disabled")).'</span>';
+	print '</td>';
+}
+
 print '</tr>';
 
 // EINVOICING ACTIVATION

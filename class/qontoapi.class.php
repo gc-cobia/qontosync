@@ -353,6 +353,11 @@ class QontoApi
 	 */
 	public function getEInvoicingSettings()
 	{
+		if ($this->sandbox) {
+			dol_syslog(__METHOD__ . ": This endpoint is not compatible with sandbox." , LOG_WARNING);
+			return false;
+		}
+
 		$endpoint = "/v2/einvoicing/settings";
 		$response = $this->sendRequest($endpoint);
 
@@ -370,4 +375,84 @@ class QontoApi
 
 		return $data;
 	}
+
+	/**
+	 * Get supplier invoices list from Qonto API
+	 *
+	 * @param array $params Query parameters (filter[status], page, per_page, etc.)
+	 * @return array|bool Array with supplier_invoices and meta, or false on error	 */
+	public function getSupplierInvoices($parameters = [])
+	{
+		if (!is_array($parameters)) {
+			return false;
+		}
+
+		$base_endpoint = "/v2/supplier_invoices";
+		$base_endpoint .= "?" . http_build_query($parameters);
+
+		$invoices = [];
+		$current_page = 1;
+
+		do {
+			$endpoint = $base_endpoint . "&page=" . $current_page;
+			$response = $this->sendRequest($endpoint);
+			
+			if ($response === false) {
+				return false;
+			}
+
+			$data = json_decode($response, true);
+			
+			if (isset($data['supplier_invoices']) && is_array($data['supplier_invoices'])) {
+				$invoices = array_merge($invoices, $data['supplier_invoices']);
+			}
+
+			// Check if there is a next page according to Qonto API meta object
+			if (isset($data['meta']) && !empty($data['meta']['next_page'])) {
+				$current_page = (int) $data['meta']['next_page'];
+			} else {
+				$current_page = null;
+			}
+			
+		} while ($current_page !== null);
+
+		dol_syslog(__METHOD__ . ": Retrieve supplier invoices from Qonto." , LOG_DEBUG);
+
+		return $invoices;
+	}
+
+	/**
+     * Retrieve an attachment and its temporary download URL
+     *
+     * @param string $attachment_id UUID of the attachment
+     * @return array|bool Attachment array or false on error
+     */
+    public function getAttachment($attachment_id)
+    {
+        if (empty($attachment_id)) {
+            return false;
+        }
+
+        $endpoint = "/v2/attachments/" . urlencode(trim($attachment_id));
+		$response = $this->sendRequest($endpoint);
+
+        if ($response === false) {
+            return false;
+        }
+
+		$data = json_decode($response, true);
+
+        if (isset($data['attachment']) && is_array($data['attachment'])) {
+            $attachment =$data['attachment'];
+
+			if (!empty($attachment['url'])) {
+                $attachment['url'] = str_replace(array('\\u0026', '\u0026'), '&', $attachment['url']);
+            }
+
+			dol_syslog(__METHOD__ . ": Attachment URL retrieved for ID " . $attachment_id, LOG_DEBUG);
+            return $attachment;
+        }
+
+        return false;
+    }
 }
