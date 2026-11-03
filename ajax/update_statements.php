@@ -57,7 +57,7 @@ $bank_rowid = GETPOST('bank_rowid', 'int');
 $year = GETPOST('year', 'int');
 
 // Multi-company security segregation (Bank account entity verification)
-if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php', 'QontoRepository');
 $qontoRepo = new QontoRepository($db);
 
 if ($bank_rowid > 0 && !$qontoRepo->isAccountAllowed($bank_rowid)) {
@@ -76,14 +76,14 @@ if ($action == 'sync_ged' && $bank_rowid > 0 && $year > 0) {
         exit;
     }
 
-    if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
-    if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
+    if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
+    if (!class_exists('QontoGed')) dol_include_once('/qontosync/class/qontoged.class.php', 'QontoGED');
 
     $api = new QontoApi();
-    $qontoUpdater = new QontoUpdater($db);
+    $qontoGed = new QontoGed($db);
 
     // Prepare the data
-    $sync_result = $qontoUpdater->syncStatementsGED($account, $year, $api);
+    $sync_result = $qontoGed->syncStatementsGED($account, $year, $api);
 
     // Prepare notification messages for the next display
     if ($sync_result['success_count'] > 0 || $sync_result['error_count'] > 0) {
