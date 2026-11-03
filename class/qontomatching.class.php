@@ -415,4 +415,88 @@ class QontoMatching
 
 		return $months_data;
 	}
+
+	/**
+     * Analyze and categorize qonto supplier invoices
+     *
+     * @param array $qontoInvoices Brut invoices from qonto API
+     * @return array Invoices enriched with a status and their rowid
+     */
+    public function matchSupplierInvoices(array $qontoInvoices): array
+    {
+        if (empty($qontoInvoices)) {
+			return [];
+		}
+
+		if (!class_exists('QontoRepository')) {
+			dol_include_once('/qontosync/class/qontorepository.class.php', 'QontoRepository');
+		}
+        $repo = new QontoRepository($this->db);
+
+		$uuids = [];
+
+        foreach ($qontoInvoices as $inv) {
+            $uuid = trim((string) ($inv['id'] ?? ''));
+
+            if ($uuid !== '') {
+                $uuids[] = $uuid;
+            }
+        }
+
+        // 1. Looking for invoices linked by ref_ext
+        $linked = !empty($uuids) ? $repo->getLinkedInvoices($uuids) : [];
+
+        // 2. Preparing tuples for unlinked invoices
+        $criteria = [];
+        $mapUuidToKey = [];
+
+        foreach ($qontoInvoices as $inv) {
+            $uuid = trim((string) ($inv['id'] ?? ''));
+			
+            if ($uuid === '' || isset($linked[$uuid])) {
+                continue;
+            }
+
+            $ref = trim((string) ($inv['invoice_number'] ?? ''));
+			$rawTin = $inv['tin_number'] ?? ($inv['seller']['tin'] ?? ($inv['tin'] ?? ''));
+            $cleanDigits = preg_replace('/\D/', '', (string) $rawTin);
+            $siren = dol_substr($cleanDigits, 0, 9);
+
+            if ($ref !== '' && dol_strlen($siren) === 9) {
+                $key = dol_strtolower($ref) . '|' . $siren;
+                $mapUuidToKey[$uuid] = $key;
+                $criteria[] = [
+					'ref'	=> $ref,
+					'siren'	=> $siren,
+				];
+            }
+        }
+
+        // 3. Looking for existing invoices in database
+        $matchedByPair = !empty($criteria) ? $repo->getMatchedInvoices($criteria) : [];
+
+        // 4. Qualification for each invoices
+        $result = [];
+		
+        foreach ($qontoInvoices as $inv) {
+            $uuid = trim((string) ($inv['id'] ?? ''));
+            $inv['dolibarr_rowid'] = null;
+
+            if (isset($linked[$uuid])) {
+                $inv['match_status'] = 'linked';       // Already linked in database
+                $inv['dolibarr_rowid'] = $linked[$uuid];
+
+            } elseif (isset($mapUuidToKey[$uuid], $matchedByPair[$mapUuidToKey[$uuid]])) {
+                $inv['match_status'] = 'matched';      // Exist in database without qonto UUID
+                $inv['dolibarr_rowid'] = $matchedByPair[$mapUuidToKey[$uuid]];
+
+            } else {
+                $inv['match_status'] = 'not_found';    // Unknow in database
+            }
+
+            $result[] = $inv;
+        }
+
+        return $result;
+    }
 }

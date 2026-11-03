@@ -82,3 +82,25 @@ ConfirmNewVariousPaymentQuestion=Are you sure you want to create a new various p
 UnlinkTransaction=Unlink transaction
 ConfirmUnlinkTransaction=Are you sure you want to unlink this Qonto transaction from its Dolibarr bank entry?
 TransactionSuccessfullyUnlinked=Transaction successfully unlinked.
+
+# Supplier E-Invoicing Import
+QontoEInvoicingNotEnabled=E-invoicing is not enabled in QontoSync configuration.
+QontoEInvoicingModuleRequired=The community module EInvoicing must be installed and enabled to import supplier invoices.
+QontoEInvoicingNoAttachment=No attachment (Factur-X / XML) found on this Qonto invoice.
+QontoEInvoicingUnsupportedProtocol=E-invoicing protocol not supported by EInvoicing (%s).
+QontoEInvoicingUnknownFormat=Unrecognized file format (the document must be a Factur-X PDF or a CII XML file).
+QontoEInvoicingPdfNotFacturX=The PDF file retrieved from Qonto is a standard PDF and does not contain an embedded Factur-X XML.
+QontoEInvoicingImportError=Error while importing supplier invoice via EInvoicing.
+QontoEInvoicingInvoiceNotFound=Qonto invoice not found.
+QontoEInvoicingInvoiceImported=Supplier invoice successfully imported into Dolibarr (#%s).
+QontoEInvoicingInvoiceLinked=Supplier invoice (#%s) successfully linked to Qonto.
+QontoEInvoicingLinkError=Error while linking supplier invoice to Qonto.
+QontoEInvoicingWarningLinkFailed=Warning: invoice #%s was created but its Qonto UUID (%s) could not be saved.
+QontoEInvoicingWarningAutoValidateFailed=Warning: automatic validation of invoice %s failed (%s).
+QontoEInvoicingBatchCompleted=Synchronization completed: %s invoice(s) successfully processed, %s failed.
+QontoEInvoicingImportAll=Sync all
+QontoEInvoicingLinkVerb=Link
+QontoEInvoicingStatusImported=Imported
+QontoEInvoicingStatusMatched=Exists in DB
+QontoEInvoicingStatusMatchedTooltip=Existing invoice in database without Qonto UUID
+QontoEInvoicingStatusNotImported=Not imported

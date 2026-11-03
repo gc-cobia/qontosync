@@ -110,3 +110,25 @@ ConfirmNewVariousPaymentQuestion=Êtes-vous sûr de vouloir créer un nouveau pa
 UnlinkTransaction=Délier la transaction
 ConfirmUnlinkTransaction=Êtes-vous sûr de vouloir délier cette transaction Qonto de son écriture bancaire dans Dolibarr ?
 TransactionSuccessfullyUnlinked=Transaction déliée avec succès.
+
+# Supplier E-Invoicing Import
+QontoEInvoicingNotEnabled=La facturation électronique n'est pas activée dans la configuration de QontoSync.
+QontoEInvoicingModuleRequired=Le module communautaire EInvoicing (Facturation électronique) doit être installé et activé pour importer les factures fournisseurs.
+QontoEInvoicingNoAttachment=Aucune pièce jointe (Factur-X / XML) trouvée sur cette facture Qonto.
+QontoEInvoicingUnsupportedProtocol=Protocole de facturation électronique non pris en charge par EInvoicing (%s).
+QontoEInvoicingUnknownFormat=Format de fichier non reconnu (le document doit être un PDF Factur-X ou un fichier XML CII).
+QontoEInvoicingPdfNotFacturX=Le fichier PDF récupéré sur Qonto est un PDF standard et ne contient pas de XML Factur-X embarqué.
+QontoEInvoicingImportError=Erreur lors de l'importation de la facture fournisseur via EInvoicing.
+QontoEInvoicingInvoiceNotFound=Facture Qonto introuvable.
+QontoEInvoicingInvoiceImported=Facture fournisseur importée avec succès dans Dolibarr (#%s).
+QontoEInvoicingInvoiceLinked=Facture fournisseur (#%s) liée avec succès à Qonto.
+QontoEInvoicingLinkError=Erreur lors de la liaison de la facture fournisseur avec Qonto.
+QontoEInvoicingWarningLinkFailed=Avertissement : la facture #%s a été créée mais son identifiant Qonto (%s) n'a pas pu être enregistré.
+QontoEInvoicingWarningAutoValidateFailed=Avertissement : la validation automatique de la facture %s a échoué (%s).
+QontoEInvoicingBatchCompleted=Synchronisation terminée : %s facture(s) traitée(s) avec succès, %s échec(s).
+QontoEInvoicingImportAll=Tout synchroniser
+QontoEInvoicingLinkVerb=Lier
+QontoEInvoicingStatusImported=Importée
+QontoEInvoicingStatusMatched=Existe en base
+QontoEInvoicingStatusMatchedTooltip=Facture existante en base sans UUID Qonto
+QontoEInvoicingStatusNotImported=Non importée

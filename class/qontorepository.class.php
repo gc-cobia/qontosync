@@ -575,4 +575,113 @@ class QontoRepository
         
         return 0.0;
     }
+
+    /**
+     * Search for invoices by pairs (ref_supplier, siren)
+     *
+     * @param array $criteria Data php table of ['ref', 'siren']"
+     * @return array [ref_lowercase|siren => rowid]
+     */
+    public function getMatchedInvoices(array $criteria): array
+    {
+        if (!isModEnabled('fournisseur')) {
+            dol_syslog(__METHOD__ . ': Supplier module is not enabled', LOG_ERR);
+            return [];
+        }
+
+        if (empty($criteria)) {
+            return [];
+        }
+
+        $tuples = [];
+
+        foreach ($criteria as $item) {
+            $ref   = trim((string) ($item['ref'] ?? ''));
+            $siren = trim((string) ($item['siren'] ?? ''));
+
+            if ($ref === '' || dol_strlen($siren) !== 9) {
+                continue;
+            }
+
+            $tuples[] = "('" . $this->db->escape($ref) . "', '" . $this->db->escape($siren) . "')";
+        }
+
+        if (empty($tuples)) {
+            return [];
+        }
+
+        $sql  = "SELECT f.rowid, f.ref_supplier, s.siren ";
+        $sql .= "FROM " . MAIN_DB_PREFIX . "facture_fourn AS f ";
+        $sql .= "INNER JOIN " . MAIN_DB_PREFIX . "societe AS s ON f.fk_soc = s.rowid ";
+        $sql .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") ";
+        $sql .= "AND (f.ref_supplier, s.siren) IN (" . implode(', ', array_unique($tuples)) . ")";
+
+        $resql = $this->db->query($sql);
+
+        $matches = [];
+
+        if ($resql) {
+            while ($obj = $this->db->fetch_object($resql)) {
+                $cleanRef = dol_strtolower(trim((string) $obj->ref_supplier));
+                $cleanSiren = dol_substr(preg_replace('/\D/', '', (string) $obj->siren), 0, 9);
+                $matches[$cleanRef . '|' . $cleanSiren] = (int) $obj->rowid;
+            }
+            
+           $this->db->free($resql);
+        }
+
+        return $matches;
+    }
+
+    /**
+     * Retrieves supplier invoices already linked to a given list of qonto UUIDs
+     *
+     * @param array $uuids List of qonto UUIDs to check
+     * @return array [uuid_qonto => rowid]
+     */
+    public function getLinkedInvoices(array $uuids = []): array
+    {
+        if (!isModEnabled('fournisseur')) {
+            dol_syslog(__METHOD__ . ': Supplier module is not enabled', LOG_ERR);
+            return [];
+        }
+
+        if (empty($uuids)) {
+            return [];
+        }
+
+        $escaped = [];
+
+        foreach ($uuids as $id) {
+            $clean = trim((string) $id);
+
+            if ($clean !== '') {
+                $escaped[] = "'" . $this->db->escape($clean) . "'";
+            }
+        }
+
+        if (empty($escaped)) {
+            return [];
+        }
+
+        $sql  = "SELECT f.rowid, f.ref_ext ";
+        $sql .= "FROM " . MAIN_DB_PREFIX . "facture_fourn AS f ";
+        $sql .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") ";
+        $sql .= "AND f.ref_ext IN (" . implode(', ', array_unique($escaped)) . ")";
+
+        $resql = $this->db->query($sql);
+
+        $matches = [];
+
+        if ($resql) {
+            while ($obj = $this->db->fetch_object($resql)) {
+                $matches[$obj->ref_ext] = (int) $obj->rowid;
+            }
+
+            $this->db->free($resql);
+        }
+
+        return $matches;
+    }
+
 }
