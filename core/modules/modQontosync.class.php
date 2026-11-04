@@ -115,6 +115,11 @@ class modQontosync extends DolibarrModules
 			array('QONTOSYNC_EI_ENABLED', 'chaine', '0', 'Enable Qonto E-Invoicing', 0),
 			// Supplier settings
 			array('QONTOSYNC_EI_SUPP_AUTO_THIRDPARTY', 'chaine', '0', 'Automatically create unknown thirdparties upon supplier e-invoicing import', 0),
+			array('QONTOSYNC_EI_SUPP_COMPLETE_THIRDPARTY', 'chaine', '0', 'Complete existing thirdparty info upon supplier e-invoicing import', 0),
+			array('QONTOSYNC_EI_SUPP_AUTO_PRODUCT', 'chaine', '0', 'Automatically create unknown products/services upon supplier e-invoicing import', 0),
+			array('QONTOSYNC_EI_SUPP_FREE_LINES', 'chaine', '0', 'Import unknown products as free description lines upon supplier e-invoicing import', 0),
+			array('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT', 'chaine', '0', 'Use a catch-all product for unknown lines upon supplier e-invoicing import', 0),
+			array('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT_ID', 'chaine', '', 'Catch-all product ID for supplier e-invoicing import', 0),
 			array('QONTOSYNC_EI_SUPP_AUTO_IMPORT', 'chaine', '0', 'Automatically import supplier e-invoices upon synchronization', 0),
 			array('QONTOSYNC_EI_SUPP_AUTO_VALIDATE', 'chaine', '0', 'Automatically validate supplier e-invoices upon import', 0),
 			// Customer settings

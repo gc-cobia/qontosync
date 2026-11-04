@@ -20,6 +20,24 @@ BankStatementFormat=Bank statement format
 QontoSyncStatementFormat=Custom formatting mask
 QontoSyncStatementFormatTooltip=Define the name of the bank statements (num_releve). Everything inside {} is parsed using standard PHP date() tokens (e.g., Y=4-digit year, y=2-digit year, m=Month with zero, d=Day). Ex: QONTO-{Y}-{m} or {Y-m} or STATEMENT-{Y}
 ReferenceBadgeColor=Reference badge color
+QontoSuppliersParam=Supplier parameters
+QontoEInvoicingAutoThirdparty=Automatic creation of suppliers
+QontoEInvoicingAutoThirdpartyTooltip=Automatically create the supplier in Dolibarr if it does not exist when importing an invoice.
+QontoEInvoicingCompleteThirdparty=Complete existing supplier information
+QontoEInvoicingCompleteThirdpartyTooltip=Complete missing contact details and identifiers on existing supplier records when importing an e-invoice.
+QontoEInvoicingAutoProduct=Automatic creation of products and services
+QontoEInvoicingAutoProductTooltip=Automatically create unknown products or services in Dolibarr when importing a supplier invoice.
+QontoEInvoicingFreeLines=Import lines without known product as free lines
+QontoEInvoicingFreeLinesTooltip=When automatic product creation is disabled and no product matches, import the line as a free description line (no linked product).
+QontoEInvoicingCatchallProduct=Use a catch-all fallback product/service
+QontoEInvoicingCatchallProductTooltip=Assign a fallback product or service to lines where no product could be resolved (when automatic product creation is disabled).
+QontoEInvoicingCatchallProductId=Catch-all fallback product/service
+QontoEInvoicingCatchallProductIdTooltip=Product or service used as last resort when no matching product or vendor default routing was found.
+QontoEInvoicingCatchallProductLocked=Enable the option above to select the fallback product/service.
+QontoEInvoicingAutoImport=Automatic import of purchase invoices
+QontoEInvoicingAutoImportTooltip=Automatically import electronic purchase invoices from Qonto during synchronization.
+QontoEInvoicingAutoValidate=Automatic validation of purchase invoices
+QontoEInvoicingAutoValidateTooltip=Automatically validate purchase invoices created during import.
 
 # Messages
 SetupSaved=Setup has been saved.
@@ -104,3 +122,4 @@ QontoEInvoicingStatusImported=Imported
 QontoEInvoicingStatusMatched=Exists in DB
 QontoEInvoicingStatusMatchedTooltip=Existing invoice in database without Qonto UUID
 QontoEInvoicingStatusNotImported=Not imported
+QontoEInvoicingImportedPrivateNote=Imported from Qonto (Electronic invoice)

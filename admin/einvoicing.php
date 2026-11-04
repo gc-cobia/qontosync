@@ -12,14 +12,35 @@ if (! $res && file_exists("../../../main.inc.php")) $res = @include "../../../ma
 if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../../../main.inc.php";
 if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
+if (!function_exists('dolibarr_set_const')) require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 if (!function_exists('qontosyncAdminPrepareHead')) dol_include_once('/qontosync/lib/qontosync.lib.php');
+if (!class_exists('Form')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
 
-$langs->loadLangs(array("admin", "qontosync@qontosync"));
+$langs->loadLangs(array("admin", "products", "qontosync@qontosync"));
 
 // Check if user is admin
 if (!$user->admin) {
 	accessforbidden();
+}
+
+$form = new Form($db);
+
+$action = GETPOST('action', 'aZ09');
+if (GETPOST('save', 'alpha')) {
+	$action = 'update';
+}
+
+if ($action === 'update') {
+	if (GETPOST('token', 'alpha') !== currentToken()) {
+		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
+	} else {
+		if (GETPOSTISSET('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT_ID')) {
+			$catchallProdId = GETPOSTINT('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT_ID');
+			dolibarr_set_const($db, 'QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT_ID', ($catchallProdId > 0 ? (string) $catchallProdId : ''), 'chaine', 0, '', $conf->entity);
+		}
+		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
+	}
 }
 
 // Fetch live e-invoicing settings for display
@@ -91,6 +112,43 @@ print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoEInvoicingAutoThirdparty").'<br><span class="opacitymedium small">'.$langs->trans("QontoEInvoicingAutoThirdpartyTooltip").'</span></td>';
 print '<td>'.ajax_constantonoff('QONTOSYNC_EI_SUPP_AUTO_THIRDPARTY').'</td>';
 print '</tr>';
+
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans("QontoEInvoicingCompleteThirdparty").'<br><span class="opacitymedium small">'.$langs->trans("QontoEInvoicingCompleteThirdpartyTooltip").'</span></td>';
+print '<td>'.ajax_constantonoff('QONTOSYNC_EI_SUPP_COMPLETE_THIRDPARTY').'</td>';
+print '</tr>';
+
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans("QontoEInvoicingAutoProduct").'<br><span class="opacitymedium small">'.$langs->trans("QontoEInvoicingAutoProductTooltip").'</span></td>';
+print '<td>'.ajax_constantonoff('QONTOSYNC_EI_SUPP_AUTO_PRODUCT', array(), null, 0, 0, 1).'</td>';
+print '</tr>';
+
+if (!getDolGlobalInt('QONTOSYNC_EI_SUPP_AUTO_PRODUCT')) {
+	if (!getDolGlobalInt('MAIN_DISABLE_FREE_LINES')) {
+		print '<tr class="oddeven">';
+		print '<td>'.$langs->trans("QontoEInvoicingFreeLines").'<br><span class="opacitymedium small">'.$langs->trans("QontoEInvoicingFreeLinesTooltip").'</span></td>';
+		print '<td>'.ajax_constantonoff('QONTOSYNC_EI_SUPP_FREE_LINES').'</td>';
+		print '</tr>';
+	}
+
+	print '<tr class="oddeven">';
+	print '<td>'.$langs->trans("QontoEInvoicingCatchallProduct").'<br><span class="opacitymedium small">'.$langs->trans("QontoEInvoicingCatchallProductTooltip").'</span></td>';
+	print '<td>'.ajax_constantonoff('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT', array(), null, 0, 0, 1).'</td>';
+	print '</tr>';
+
+	print '<tr class="oddeven">';
+	print '<td>'.$langs->trans("QontoEInvoicingCatchallProductId").'<br><span class="opacitymedium small">'.$langs->trans("QontoEInvoicingCatchallProductIdTooltip").'</span></td>';
+	print '<td>';
+	if (getDolGlobalInt('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT')) {
+		print $form->select_produits((int) getDolGlobalInt('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT_ID'), 'QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT_ID', '', 0, 0, -1, 2, '', 0, array(), 0, '1', 0, 'minwidth300 maxwidth500', 0, '', null, 1, 1);
+		print ' <input type="submit" name="save" class="button smallpaddingimp valignmiddle" value="'.$langs->trans("Save").'">';
+	} else {
+		print '<span class="opacitymedium">'.$langs->trans("QontoEInvoicingCatchallProductLocked").'</span>';
+	}
+	print '</td>';
+	print '</tr>';
+}
+
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoEInvoicingAutoImport").'<br><span class="opacitymedium small">'.$langs->trans("QontoEInvoicingAutoImportTooltip").'</span></td>';
 print '<td>'.ajax_constantonoff('QONTOSYNC_EI_SUPP_AUTO_IMPORT').'</td>';

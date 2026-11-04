@@ -205,6 +205,37 @@ class QontoEInvoicing
     }
 
     /**
+     * Bridge QontoSync supplier e-invoicing parameters to einvoicing global constants in memory ($conf->global).
+     * This ensures QontoSync supplier settings apply during import even when einvoicing is in TESTPDP ("None") mode
+     * without writing EINVOICING_* constants to the database.
+     *
+     * @return void
+     */
+    protected function applySupplierConfigOverrides(): void
+    {
+        global $conf;
+
+        $autoThirdparty = (int) getDolGlobalInt('QONTOSYNC_EI_SUPP_AUTO_THIRDPARTY');
+        $completeThirdparty = (int) getDolGlobalInt('QONTOSYNC_EI_SUPP_COMPLETE_THIRDPARTY');
+        $autoProduct = (int) getDolGlobalInt('QONTOSYNC_EI_SUPP_AUTO_PRODUCT');
+        $freeLines = (!$autoProduct && !getDolGlobalInt('MAIN_DISABLE_FREE_LINES'))
+            ? (int) getDolGlobalInt('QONTOSYNC_EI_SUPP_FREE_LINES')
+            : 0;
+        $catchallProduct = !$autoProduct
+            ? (int) getDolGlobalInt('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT')
+            : 0;
+        $catchallProductId = (int) getDolGlobalInt('QONTOSYNC_EI_SUPP_CATCHALL_PRODUCT_ID');
+
+        $conf->global->EINVOICING_PDP = 'Qonto';
+        $conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = (string) $autoThirdparty;
+        $conf->global->EINVOICING_THIRDPARTIES_COMPLETE_INFO = (string) $completeThirdparty;
+        $conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = (string) $autoProduct;
+        $conf->global->EINVOICING_IMPORT_AS_FREE_LINES = (string) $freeLines;
+        $conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL = (string) $catchallProduct;
+        $conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID = $catchallProductId > 0 ? (string) $catchallProductId : '';
+    }
+
+    /**
      * Import a supplier invoice directly from raw file content (Factur-X PDF or CII XML) via einvoicing
      *
      * @param string      $fileContent         Raw binary PDF (Factur-X) or XML (CII) content
@@ -223,6 +254,9 @@ class QontoEInvoicing
         if (!$this->isReady() || !$this->loadEInvoicingClasses()) {
             return ['res' => -1, 'message' => $this->error];
         }
+
+        // Apply QontoSync supplier configuration overrides to $conf->global in memory
+        $this->applySupplierConfigOverrides();
 
         $langs->loadLangs(['qontosync@qontosync', 'einvoicing@einvoicing', 'bills', 'suppliers', 'companies']);
 
@@ -314,36 +348,43 @@ class QontoEInvoicing
         $facId = (int) $res['res'];
         $created = (int) ($res['created'] ?? 1);
 
-        // Fetch the native Dolibarr supplier invoice object to link ref_ext and optionally auto-validate
-        if ($qontoUuid !== '' || getDolGlobalInt('QONTOSYNC_EI_SUPP_AUTO_VALIDATE')) {
-            if (!class_exists('FactureFournisseur')) {
-                require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
-            }
-            $supplierInvoice = new FactureFournisseur($this->db);
-            if ($supplierInvoice->fetch($facId) > 0) {
-                // Link the Dolibarr supplier invoice to the Qonto UUID via update_ref_ext()
-                if ($qontoUuid !== '') {
-                    if ($supplierInvoice->update_ref_ext($qontoUuid) <= 0) {
-                        $this->warnings[] = $langs->trans('QontoEInvoicingWarningLinkFailed', $facId, $qontoUuid);
-                        dol_syslog(__METHOD__ . ': update_ref_ext failed for supplier invoice #' . $facId . ': ' . $supplierInvoice->error, LOG_WARNING);
-                    }
+        // Fetch the native Dolibarr supplier invoice object to update note_private, link ref_ext, and optionally auto-validate
+        if (!class_exists('FactureFournisseur')) {
+            require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+        }
+        $supplierInvoice = new FactureFournisseur($this->db);
+        if ($supplierInvoice->fetch($facId) > 0) {
+            // Replace the hardcoded "Imported from PDP" private note set by einvoicing with our translated note
+            if ($created === 1 || $supplierInvoice->note_private === 'Imported from PDP') {
+                $privateNote = $langs->trans('QontoEInvoicingImportedPrivateNote');
+                if ($supplierInvoice->note_private !== '' && $supplierInvoice->note_private !== 'Imported from PDP') {
+                    $privateNote = $supplierInvoice->note_private . "\n" . $privateNote;
                 }
+                $supplierInvoice->update_note($privateNote, '_private');
+            }
 
-                // Optional automatic validation of the newly imported supplier invoice
-                if (getDolGlobalInt('QONTOSYNC_EI_SUPP_AUTO_VALIDATE') && (int) $supplierInvoice->statut === FactureFournisseur::STATUS_DRAFT) {
-                    if (class_exists('SupplierInvoiceHelper') && SupplierInvoiceHelper::totalsMismatchBlocks($facId)) {
-                        $this->warnings[] = $langs->trans('EInvoiceTotalsMismatchCannotAutoValidate', $supplierInvoice->ref);
-                    } else {
-                        $valRes = $supplierInvoice->validate($user);
-                        if ($valRes < 0) {
-                            $this->warnings[] = $langs->trans('QontoEInvoicingWarningAutoValidateFailed', $supplierInvoice->ref, $supplierInvoice->error);
-                            dol_syslog(__METHOD__ . ': Auto-validation failed for supplier invoice #' . $facId . ': ' . $supplierInvoice->error, LOG_WARNING);
-                        }
+            // Link the Dolibarr supplier invoice to the Qonto UUID via update_ref_ext()
+            if ($qontoUuid !== '') {
+                if ($supplierInvoice->update_ref_ext($qontoUuid) <= 0) {
+                    $this->warnings[] = $langs->trans('QontoEInvoicingWarningLinkFailed', $facId, $qontoUuid);
+                    dol_syslog(__METHOD__ . ': update_ref_ext failed for supplier invoice #' . $facId . ': ' . $supplierInvoice->error, LOG_WARNING);
+                }
+            }
+
+            // Optional automatic validation of the newly imported supplier invoice
+            if (getDolGlobalInt('QONTOSYNC_EI_SUPP_AUTO_VALIDATE') && (int) $supplierInvoice->statut === FactureFournisseur::STATUS_DRAFT) {
+                if (class_exists('SupplierInvoiceHelper') && SupplierInvoiceHelper::totalsMismatchBlocks($facId)) {
+                    $this->warnings[] = $langs->trans('EInvoiceTotalsMismatchCannotAutoValidate', $supplierInvoice->ref);
+                } else {
+                    $valRes = $supplierInvoice->validate($user);
+                    if ($valRes < 0) {
+                        $this->warnings[] = $langs->trans('QontoEInvoicingWarningAutoValidateFailed', $supplierInvoice->ref, $supplierInvoice->error);
+                        dol_syslog(__METHOD__ . ': Auto-validation failed for supplier invoice #' . $facId . ': ' . $supplierInvoice->error, LOG_WARNING);
                     }
                 }
-            } elseif ($qontoUuid !== '') {
-                $this->warnings[] = $langs->trans('QontoEInvoicingWarningLinkFailed', $facId, $qontoUuid);
             }
+        } elseif ($qontoUuid !== '') {
+            $this->warnings[] = $langs->trans('QontoEInvoicingWarningLinkFailed', $facId, $qontoUuid);
         }
 
         return [
