@@ -26,8 +26,10 @@ class QontoMatching
 
 	/**
 	 * Load existing links into the PHP cache for a given bank account.
-	 * * @param int $bank_id
+	 *
+	 * @param int  $bank_id
 	 * @param bool $force_reload
+	 * @return int 1 on success, -1 on error
 	 */
 	public function loadLinksCache($bank_id, $force_reload = false)
 	{
@@ -41,6 +43,8 @@ class QontoMatching
             $qontoRepo = new QontoRepository($this->db);
 			$this->links_cache[$bank_id] = $qontoRepo->getLinkedQontoIds($bank_id);
 		}
+
+		return 1;
 	}
 
 	/**

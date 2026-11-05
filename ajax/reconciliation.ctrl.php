@@ -690,13 +690,21 @@ class ReconciliationController {
     /**
      * Create various payment for a transaction.
      * 
-     * @param array $data Array containing bank_rowid, qonto_id, and accountancy_code
+     * @param array $data Array containing bank_rowid, qonto_id, accountancy_code, and optional attached_file
      * @return array Associative array with http_code for result or error
      */
     public function createVariousPayment(array $data) {
+        global $user, $langs;
+
+        // Security check
+        if ($user->socid > 0 || !$user->hasRight('qontosync', 'write')) {
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
+
         $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
         $qonto_id = ($data['qonto_id'] ?? '');
         $accountancy_code = ($data['accountancy_code'] ?? '');
+        $attached_file = $data['attached_file'] ?? null;
 
         if ($bank_rowid <= 0) {
             return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
@@ -710,12 +718,36 @@ class ReconciliationController {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
+        // Validate attached file upfront if provided (Fail-Fast before creating payment)
+        $has_attachment = (!empty($attached_file) && is_array($attached_file) && (!empty($attached_file['filename']) || !empty($attached_file['content'])));
+        $qontoGed = null;
+
+        if ($has_attachment) {
+            if (!class_exists('QontoGed')) dol_include_once('/qontosync/class/qontoged.class.php');
+            $qontoGed = new QontoGed($this->db);
+
+            if ($qontoGed->validateAttachment($attached_file) <= 0) {
+                return ['http_code' => 400, 'error' => 'FAILED_TO_SAVE_ATTACHMENT'];
+            }
+        }
+
         if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
         $qontoUpdater = new QontoUpdater($this->db);
 
-        $res = $qontoUpdater->createVariousPayment($qonto_id, $bank_rowid, $accountancy_code, 'od_attached_file');
-        if ($res <= 0) {
-            return ['http_code' => 500, 'error' => 'FAILED_TO_LINK_TRANSACTION'];
+        // Step 1: Create the various payment
+        $payment_id = $qontoUpdater->createVariousPayment($qonto_id, $bank_rowid, $accountancy_code);
+        if ($payment_id <= 0) {
+            return ['http_code' => 400, 'error' => 'FAILED_TO_CREATE_PAYMENT'];
+        }
+
+        // Step 2: Handle GED file attachment if provided
+        if ($has_attachment && $qontoGed !== null) {
+            $saved = $qontoGed->saveVariousPaymentAttachment((int) $payment_id, $attached_file);
+            if ($saved <= 0) {
+                // Cancel first operation if second operation fails
+                $qontoUpdater->cancelVariousPayment((int) $payment_id);
+                return ['http_code' => 400, 'error' => 'FAILED_TO_SAVE_ATTACHMENT'];
+            }
         }
 
         return [

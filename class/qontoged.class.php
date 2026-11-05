@@ -19,19 +19,13 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
  */
 class QontoGed
 {
-    /**
-     * @var DoliDB|null
-     */
+    /** @var DoliDB|null */
     private $db;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     public $error = '';
 
-    /**
-     * @var array
-     */
+    /** @var array */
     public $errors = [];
 
     /**
@@ -50,26 +44,24 @@ class QontoGed
      * @param string      $url          Target HTTPS URL
      * @param string|null $destFilePath Optional local file path to write directly to disk (null = return content string)
      * @param int         $timeout      cURL timeout in seconds
-     * @return string|bool              Raw file content (when $destFilePath is null), true (when saved to $destFilePath), or false on error
+     * @return string|int|false         Raw file content (when $destFilePath is null) or false on error; 1 (when saved to $destFilePath) or <0 on error
      */
     private function downloadUrl(string $url, ?string $destFilePath = null, int $timeout = 60)
     {
         global $conf;
 
-        $this->error = '';
         $url = trim($url);
         if ($url === '') {
-            $this->error = 'ErrorFileNotFound';
-            return false;
+            dol_syslog(__METHOD__ . ': URL is empty', LOG_ERR);
+            return ($destFilePath !== null ? -1 : false);
         }
 
         $fp = null;
         if ($destFilePath !== null) {
             $fp = fopen($destFilePath, 'w+');
             if ($fp === false) {
-                $this->error = 'ErrorFailedToSaveFile';
                 dol_syslog(__METHOD__ . ': Unable to open the file for writing: ' . $destFilePath, LOG_ERR);
-                return false;
+                return -1;
             }
         }
 
@@ -97,12 +89,13 @@ class QontoGed
 
         $response = curl_exec($ch);
         if ($response === false) {
-            $this->error = curl_error($ch);
-            dol_syslog(__METHOD__ . ': cURL error while downloading URL: ' . $this->error, LOG_ERR);
+            $curl_err = curl_error($ch);
+            dol_syslog(__METHOD__ . ': cURL error while downloading URL: ' . $curl_err, LOG_ERR);
             curl_close($ch);
             if ($fp !== null) {
                 fclose($fp);
                 @unlink($destFilePath);
+                return -1;
             }
             return false;
         }
@@ -116,17 +109,15 @@ class QontoGed
                 if (!empty($conf->global->MAIN_UMASK)) {
                     @chmod($destFilePath, octdec($conf->global->MAIN_UMASK));
                 }
-                return true;
+                return 1;
             }
 
             @unlink($destFilePath);
-            $this->error = 'ErrorHTTPCode' . $httpCode;
             dol_syslog(__METHOD__ . ': Failed to download file to ' . $destFilePath . '. HTTP Code: ' . $httpCode, LOG_ERR);
-            return false;
+            return -1;
         }
 
         if ($httpCode !== 200 || $response === '') {
-            $this->error = 'ErrorHTTPCode' . $httpCode;
             dol_syslog(__METHOD__ . ': HTTP error ' . $httpCode . ' while downloading content into memory', LOG_ERR);
             return false;
         }
@@ -143,8 +134,6 @@ class QontoGed
      */
     public function downloadAttachment($attachment_id, $api = null)
     {
-        $this->error = '';
-
         if ($api === null) {
             if (!class_exists('QontoApi')) {
                 dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
@@ -154,7 +143,7 @@ class QontoGed
 
         $attachment = $api->getAttachment($attachment_id);
         if (empty($attachment) || empty($attachment['url'])) {
-            $this->error = !empty($api->error) ? $api->error : 'ErrorFileNotFound';
+            dol_syslog(__METHOD__ . ': Cannot fetch attachment metadata or URL for ID ' . $attachment_id . (!empty($api->error) ? ' (' . $api->error . ')' : ''), LOG_ERR);
             return false;
         }
 
@@ -194,7 +183,7 @@ class QontoGed
         $qonto_statements_raw = $api->getStatements($account->iban, $year);
 
         if ($qonto_statements_raw === false) {
-            $this->error = $api->error;
+            dol_syslog(__METHOD__ . ': Failed to retrieve statements from Qonto API for IBAN ' . $account->iban . (!empty($api->error) ? ' (' . $api->error . ')' : ''), LOG_ERR);
             $result['api_error'] = true;
             return $result;
         }
@@ -246,18 +235,113 @@ class QontoGed
 
                 // Secure download via common cURL method
                 if (!empty($statement_url)) {
-                    if ($this->downloadUrl($statement_url, $dest_file_path, 60) === true) {
+                    if ($this->downloadUrl($statement_url, $dest_file_path, 60) > 0) {
                         $result['success_count']++;
                         $result['valid_refs'][] = $ref_releve;
                         dol_syslog(__METHOD__ . ': Statement downloaded successfully for period ' . $period_key . ' to ' . $dest_file_path, LOG_INFO);
                     } else {
                         $result['error_count']++;
-                        dol_syslog(__METHOD__ . ': Failed to download statement for period ' . $period_key . ': ' . $this->error, LOG_ERR);
+                        dol_syslog(__METHOD__ . ': Failed to download statement for period ' . $period_key . ' from ' . $statement_url, LOG_ERR);
                     }
                 }
             }
         }
 
         return $result;
+    }
+
+    /**
+     * Validate an attached file (filename and base64 content) before processing
+     *
+     * @param array $attached_file Array with 'filename' and 'content' (Base64)
+     * @return int                 >0 if OK, <0 if KO
+     */
+    public function validateAttachment(array $attached_file): int
+    {
+        if (empty($attached_file['filename']) || empty($attached_file['content'])) {
+            dol_syslog(__METHOD__ . ': Missing filename or content in attached file', LOG_ERR);
+            return -1;
+        }
+
+        if (!function_exists('dol_sanitizeFileName')) {
+            require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+        }
+
+        $clean_filename = dol_sanitizeFileName(trim($attached_file['filename']));
+        if (empty($clean_filename)) {
+            dol_syslog(__METHOD__ . ': Sanitized filename is empty', LOG_ERR);
+            return -1;
+        }
+
+        if (!function_exists('isAFileWithExecutableContent')) {
+            require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
+        }
+
+        if (isAFileWithExecutableContent($clean_filename) && !getDolGlobalString('MAIN_DOCUMENT_IS_OUTSIDE_WEBROOT_SO_NOEXE_NOT_REQUIRED')) {
+            dol_syslog(__METHOD__ . ': Upload rejected - executable or forbidden extension: ' . $clean_filename, LOG_WARNING);
+            return -1;
+        }
+
+        $binary_content = base64_decode($attached_file['content'], true);
+        if ($binary_content === false || $binary_content === '') {
+            dol_syslog(__METHOD__ . ': Base64 decode failed or empty content for file ' . $clean_filename, LOG_ERR);
+            return -1;
+        }
+
+        return 1;
+    }
+
+    /**
+     * Save an attached file for a Various Payment into Dolibarr GED
+     *
+     * @param int   $payment_id    PaymentVarious ID (rowid)
+     * @param array $attached_file Array with 'filename' and 'content' (Base64)
+     * @return int                 >0 if OK, <0 if KO
+     */
+    public function saveVariousPaymentAttachment(int $payment_id, array $attached_file): int
+    {
+        global $conf;
+
+        if ($payment_id <= 0) {
+            dol_syslog(__METHOD__ . ': Invalid payment ID: ' . $payment_id, LOG_ERR);
+            return -1;
+        }
+
+        if ($this->validateAttachment($attached_file) <= 0) {
+            return -1;
+        }
+
+        if (!function_exists('dol_sanitizeFileName')) {
+            require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+        }
+
+        $clean_filename = dol_sanitizeFileName(trim($attached_file['filename']));
+        $binary_content = base64_decode($attached_file['content'], true);
+
+        $bank_dir_output = !empty($conf->bank->dir_output) ? $conf->bank->dir_output : (DOL_DATA_ROOT . '/bank');
+        $upload_dir = $bank_dir_output . '/' . dol_sanitizeFileName((string) $payment_id);
+
+        if (!file_exists($upload_dir)) {
+            if (!dol_mkdir($upload_dir)) {
+                dol_syslog(__METHOD__ . ': Unable to create upload directory: ' . $upload_dir, LOG_ERR);
+                return -1;
+            }
+        }
+
+        $dest_file_path = $upload_dir . '/' . $clean_filename;
+        $write_res = file_put_contents($dest_file_path, $binary_content);
+
+        if ($write_res === false) {
+            @unlink($dest_file_path);
+            dol_syslog(__METHOD__ . ': Failed to write attached file to ' . $dest_file_path, LOG_ERR);
+            return -1;
+        }
+
+        if (!empty($conf->global->MAIN_UMASK)) {
+            @chmod($dest_file_path, octdec($conf->global->MAIN_UMASK));
+        }
+
+        dol_syslog(__METHOD__ . ': Attached file successfully saved to ' . $dest_file_path, LOG_INFO);
+        return 1;
     }
 }

@@ -208,15 +208,35 @@ $(document).ready(function () {
         }
     }
 
+    /**
+     * Convert an HTML5 File object to raw Base64 string
+     * @param {File} file
+     * @returns {Promise<string>}
+     */
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64Data = (reader.result && typeof reader.result === 'string')
+                    ? (reader.result.split(',')[1] || '')
+                    : '';
+                resolve(base64Data);
+            };
+            reader.onerror = error => reject(error);
+            reader.readAsDataURL(file);
+        });
+    }
+
     // New various payment (createVariousPayment)
-    async function newVariousPayment(qontoId, bankRowid, accountancyCode) {
+    async function newVariousPayment(qontoId, bankRowid, accountancyCode, attachedFile = null) {
         displaySpinner(langProcessBatch);
 
         try {
             const data = await apiCall('createVariousPayment', {
                 qonto_id: qontoId,
                 bank_rowid: parseInt(bankRowid, 10) || 0,
-                accountancy_code: accountancyCode || ''
+                accountancy_code: accountancyCode || '',
+                attached_file: attachedFile
             });
 
             if (data.error) {
@@ -720,10 +740,28 @@ $(document).ready(function () {
         const buttonsArray = [
             {
                 text: textYes,
-                click: function () {
+                click: async function () {
+                    const $thisDialog = $(this);
                     const accountancyCode = $('#od_accountancy_code').val() || '';
-                    $(this).dialog("close");
-                    newVariousPayment(qontoId, bankRowid, accountancyCode);
+                    const fileInput = document.getElementById('od_attached_file');
+
+                    let attachedFile = null;
+                    if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                        const file = fileInput.files[0];
+                        try {
+                            const base64Content = await fileToBase64(file);
+                            attachedFile = {
+                                filename: file.name,
+                                content: base64Content
+                            };
+                        } catch (err) {
+                            displayAlert('error', (typeof langAjaxError !== 'undefined' ? langAjaxError : 'Error') + ' : ' + err.message);
+                            return;
+                        }
+                    }
+
+                    $thisDialog.dialog("close");
+                    await newVariousPayment(qontoId, bankRowid, accountancyCode, attachedFile);
                 }
             },
             {

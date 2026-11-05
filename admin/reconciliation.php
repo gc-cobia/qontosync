@@ -38,8 +38,8 @@ $tolerance_days = GETPOST('QONTOSYNC_TOLERANCE_DAYS', 'int');
 $max_months = GETPOST('QONTOSYNC_MAX_MONTHS', 'int');
 $statement_format = GETPOST('QONTOSYNC_STATEMENT_FORMAT', 'alphanohtml');
 
-$badge_color = GETPOST('QONTOSYNC_BADGE_COLOR', 'alphanohtml');
-$badge_color_dark = GETPOST('QONTOSYNC_BADGE_COLOR_DARK', 'alphanohtml');
+$badge_color = GETPOST('QONTOSYNC_BADGE_COLOR', 'none');
+$badge_color_dark = GETPOST('QONTOSYNC_BADGE_COLOR_DARK', 'none');
 
 // Update constants
 if ($action == 'update') {

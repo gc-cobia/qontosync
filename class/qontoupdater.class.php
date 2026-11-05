@@ -171,10 +171,9 @@ class QontoUpdater
 	 * @param string $qonto_id
 	 * @param int    $bank_rowid
 	 * @param string $accountancy_code
-	 * @param string $fileparam
-	 * @return int 1 on success, -1 on error
+	 * @return int Payment ID (> 0) on success, -1 on error
 	 */
-	public function createVariousPayment($qonto_id, $bank_rowid, $accountancy_code = '', $fileparam = 'od_attached_file')
+	public function createVariousPayment($qonto_id, $bank_rowid, $accountancy_code = '')
 	{
 		global $conf, $user, $langs;
 
@@ -257,23 +256,8 @@ class QontoUpdater
 			$link_res = $this->linkTransaction($payment->fk_bank, $qonto_id, $ref_releve);
 			if ($link_res > 0) {
 				$this->db->commit();
-
-				// Handle attached file if provided
-				if (!empty($fileparam) && !empty($_FILES[$fileparam]['name'])) {
-					if (!function_exists('dol_add_file_process')) {
-						require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-					}
-					$bank_dir_output = !empty($conf->bank->dir_output) ? $conf->bank->dir_output : (DOL_DATA_ROOT . '/bank');
-					$upload_dir = $bank_dir_output . '/' . dol_sanitizeFileName((string) $payment->id);
-					$upload_res = dol_add_file_process($upload_dir, 0, 1, $fileparam, '', null, '', 1, $payment);
-					if ($upload_res < 0) {
-						dol_syslog(__METHOD__ . ": Warning: Failed to process attached file for payment various ID " . $payment->id, LOG_WARNING);
-					} else {
-						dol_syslog(__METHOD__ . ": Attached file successfully added for payment various ID " . $payment->id, LOG_INFO);
-					}
-				}
-				dol_syslog(__METHOD__ . ": Various payment created and linked to Qonto ID: " . $qonto_id, LOG_INFO);
-				return 1;
+				dol_syslog(__METHOD__ . ": Various payment created and linked to Qonto ID: " . $qonto_id . " (ID: " . $payment->id . ")", LOG_INFO);
+				return (int) $payment->id;
 			} else {
 				$this->db->rollback();
 				dol_syslog(__METHOD__ . ": Error linking various payment to Qonto ID: " . $qonto_id, LOG_ERR);
@@ -284,6 +268,73 @@ class QontoUpdater
 			dol_syslog(__METHOD__ . ": Error creating various payment: " . $payment->error, LOG_ERR);
 			return -1;
 		}
+	}
+
+	/**
+	 * Cancel and delete a previously created Various Payment and its associated bank line
+	 *
+	 * @param int $payment_id PaymentVarious ID
+	 * @return int 1 on success, -1 on error
+	 */
+	public function cancelVariousPayment($payment_id)
+	{
+		global $conf, $user;
+
+		$payment_id = (int) $payment_id;
+		if ($payment_id <= 0) {
+			dol_syslog(__METHOD__ . ": Invalid payment ID: " . $payment_id, LOG_ERR);
+			return -1;
+		}
+
+		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/paymentvarious.class.php';
+		if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/account.class.php';
+
+		$payment = new PaymentVarious($this->db);
+		$res = $payment->fetch($payment_id);
+		if ($res <= 0) {
+			dol_syslog(__METHOD__ . ": Cannot fetch various payment ID: " . $payment_id, LOG_ERR);
+			return -1;
+		}
+
+		$fk_bank = (int) $payment->fk_bank;
+
+		$this->db->begin();
+
+		// Delete the PaymentVarious record
+		$del_payment = $payment->delete($user);
+		if ($del_payment < 0) {
+			$this->db->rollback();
+			dol_syslog(__METHOD__ . ": Error deleting various payment ID " . $payment_id . ": " . $payment->error, LOG_ERR);
+			return -1;
+		}
+
+		// Delete the corresponding bank line if present
+		if ($fk_bank > 0) {
+			$accountline = new AccountLine($this->db);
+			if ($accountline->fetch($fk_bank) > 0) {
+				$del_line = $accountline->delete($user);
+				if ($del_line < 0) {
+					$this->db->rollback();
+					dol_syslog(__METHOD__ . ": Error deleting bank line ID " . $fk_bank . ": " . $accountline->error, LOG_ERR);
+					return -1;
+				}
+			}
+		}
+
+		$this->db->commit();
+
+		// Clean up any generated GED directory for this payment
+		if (!function_exists('dol_sanitizeFileName') || !function_exists('dol_delete_dir_recursive')) {
+			require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+		}
+		$bank_dir_output = !empty($conf->bank->dir_output) ? $conf->bank->dir_output : (DOL_DATA_ROOT . '/bank');
+		$upload_dir = $bank_dir_output . '/' . dol_sanitizeFileName((string) $payment_id);
+		if (is_dir($upload_dir)) {
+			dol_delete_dir_recursive($upload_dir);
+		}
+
+		dol_syslog(__METHOD__ . ": Various payment and bank line cancelled successfully for ID: " . $payment_id, LOG_INFO);
+		return 1;
 	}
 	
     /**

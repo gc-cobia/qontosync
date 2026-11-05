@@ -6,6 +6,11 @@
  * @license    GPLv3
  */
 
+if (!defined('DOL_DOCUMENT_ROOT')) {
+    http_response_code(403);
+    exit('Access Forbidden');
+}
+
 dol_include_once('/einvoicing/class/protocols/CIIProtocol.class.php');
 
 /**

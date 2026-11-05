@@ -139,12 +139,12 @@ class StatementsController {
         }
 
         if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
-        if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
-
         $api = new QontoApi();
-        $qontoUpdater = new QontoUpdater($this->db);
 
-        $sync_result = $qontoUpdater->syncStatementsGED($account, $year, $api);
+        if (!class_exists('QontoGed')) dol_include_once('/qontosync/class/qontoged.class.php', 'QontoGed');
+        $qontoGed = new QontoGed($this->db);
+
+        $sync_result = $qontoGed->syncStatementsGED($account, $year, $api);
 
         if (!empty($sync_result['api_error'])) {
             return ['http_code' => 500, 'error' => 'ERROR_FETCHING_STATEMENTS'];
