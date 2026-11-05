@@ -246,7 +246,7 @@ class ReconciliationController {
         }
 
         if (empty($matches) || !is_array($matches)) {
-            return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
+            return ['http_code' => 400, 'error' => 'NO_TRANSACTION_TO_LINK'];
         }
 
         if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');

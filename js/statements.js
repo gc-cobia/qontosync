@@ -68,7 +68,7 @@ $(document).ready(function () {
             const data = await apiCall('getStatements', payloadData);
 
             if (data.error) {
-                displayAlert('error', data.error);
+                displayAlert('error', translateError(data.error));
             } else {
                 renderStatements(data);
             }
@@ -101,35 +101,31 @@ $(document).ready(function () {
             btn.prop('disabled', false);
 
             if (data.error) {
-                displayAlert('error', data.error);
+                showNotification(data.error, 'error');
             } else if (data.error_count > 0) {
+                const translationsElem = document.getElementById('qonto-statements-translations');
+                const batchPattern = (translationsElem && translationsElem.dataset.successSyncBatch) ? translationsElem.dataset.successSyncBatch : 'Synchronization completed: %s statement(s) downloaded, %s failed.';
+                const successCount = (data.success_count !== undefined) ? data.success_count : 0;
+                const errorCount = (data.error_count !== undefined) ? data.error_count : 0;
+                let msg = batchPattern;
+                if (msg.includes('%s')) {
+                    msg = msg.replace('%s', successCount).replace('%s', errorCount);
+                } else {
+                    msg = msg + ' (' + successCount + ' OK, ' + errorCount + ' KO)';
+                }
+                showNotification(msg, 'warning');
                 loadStatements();
             } else {
-                // Turn available badges into open buttons
-                $('.qonto-sync-available').each(function () {
-                    const url = $(this).attr('data-url') || $(this).data('url');
-                    const text = $(this).attr('data-open-text') || $(this).data('open-text');
-                    const linkA = document.createElement('a');
-                    linkA.href = url;
-                    linkA.target = '_blank';
-                    linkA.className = 'badge badge-success';
-                    linkA.style.color = 'white';
-                    linkA.style.textDecoration = 'none';
-                    linkA.style.padding = '6px';
-
-                    const icon = document.createElement('i');
-                    icon.className = 'fas fa-file-pdf marginrightonly';
-                    linkA.appendChild(icon);
-                    linkA.appendChild(document.createTextNode(text));
-
-                    $(this).replaceWith(linkA);
-                });
+                const translationsElem = document.getElementById('qonto-statements-translations');
+                const msg = (translationsElem && translationsElem.dataset.successSync) ? translationsElem.dataset.successSync : 'Bank statements successfully synchronized.';
+                showNotification(msg, 'success');
+                loadStatements();
             }
 
         } catch (error) {
             btn.html(originalHtml);
             btn.prop('disabled', false);
-            displayAlert('error', langAjaxError + ' : ' + error.message);
+            showNotification(langAjaxError + ' : ' + error.message, 'error');
         }
     }
 
@@ -163,13 +159,31 @@ $(document).ready(function () {
         }
         const textSpan = clone.querySelector('.qonto-alert-text');
         if (textSpan) {
-            textSpan.textContent = message;
+            textSpan.textContent = translateError(message);
         }
         container.empty().append(clone);
     }
 
+    function translateError(errorCode) {
+        if (!errorCode || typeof errorCode !== 'string') return errorCode || '';
+        const translationsElem = document.getElementById('qonto-statements-translations');
+        if (translationsElem) {
+            // e.g. NO_BANK_SELECTED -> errorNoBankSelected
+            const parts = errorCode.toLowerCase().split('_');
+            const camelKey = 'error' + parts.map(function (w) {
+                return w.charAt(0).toUpperCase() + w.slice(1);
+            }).join('');
+            if (translationsElem.dataset && translationsElem.dataset[camelKey]) {
+                return translationsElem.dataset[camelKey];
+            }
+        }
+        return errorCode;
+    }
+
     function showNotification(message, type) {
         if (!message) return;
+
+        const displayMsg = (type === 'errors' || type === 'error' || type === 'warnings' || type === 'warning') ? translateError(message) : message;
 
         // Mapping PHP (Dolibarr) types to JS (jnotify)
         let jnType = 'success'; // Default
@@ -177,10 +191,10 @@ $(document).ready(function () {
         if (type === 'errors' || type === 'error') jnType = 'error';
 
         if (typeof $.jnotify === 'function') {
-            $.jnotify(message, jnType);
+            $.jnotify(displayMsg, jnType);
         } else {
             // Native Dolibarr notifications fallback 
-            alert(message);
+            alert(displayMsg);
         }
     }
 

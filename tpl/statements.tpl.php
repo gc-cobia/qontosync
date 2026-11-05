@@ -72,7 +72,17 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 <div id="qonto-statements-translations" style="display:none;" 
      data-open="<?php print dol_escape_htmltag($langs->trans('OpenVerb')); ?>" 
      data-available="<?php print dol_escape_htmltag($langs->trans('Available')); ?>" 
-     data-not-available="<?php print dol_escape_htmltag($langs->trans('NotAvailable')); ?>">
+     data-not-available="<?php print dol_escape_htmltag($langs->trans('NotAvailable')); ?>"
+     data-success-sync="<?php print dol_escape_htmltag($langs->trans('StatementsSuccessfullySynchronized')); ?>"
+     data-success-sync-batch="<?php print dol_escape_htmltag($langs->transnoentities('StatementsSyncBatchCompleted', '%s', '%s')); ?>"
+     data-error-no-bank-selected="<?php print dol_escape_htmltag($langs->trans('NoBankSelected')); ?>"
+     data-error-permission-denied="<?php print dol_escape_htmltag($langs->trans('PermissionDenied')); ?>"
+     data-error-invalid-parameters="<?php print dol_escape_htmltag($langs->trans('InvalidParameters')); ?>"
+     data-error-bank-account-not-found="<?php print dol_escape_htmltag($langs->trans('BankAccountNotFound')); ?>"
+     data-error-error-fetching-transactions="<?php print dol_escape_htmltag($langs->trans('ErrorFetchingTransactions')); ?>"
+     data-error-no-transactions-found="<?php print dol_escape_htmltag($langs->trans('NoTransactionsFound')); ?>"
+     data-error-error-fetching-statements="<?php print dol_escape_htmltag($langs->trans('ErrorFetchingStatements')); ?>"
+     data-error-invalid-token="<?php print dol_escape_htmltag($langs->trans('InvalidToken')); ?>">
 </div>
 
 <!-- ========================================== -->

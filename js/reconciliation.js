@@ -69,7 +69,7 @@ $(document).ready(function () {
             const data = await apiCall('getTransactions', payloadData);
 
             if (data.error) {
-                displayAlert('error', data.error);
+                displayAlert('error', translateError(data.error));
             } else {
                 renderTransactions(data);
             }
@@ -103,6 +103,11 @@ $(document).ready(function () {
             }
         });
 
+        if (Object.keys(matches).length === 0) {
+            showNotification('NO_TRANSACTION_TO_LINK', 'warning');
+            return;
+        }
+
         displaySpinner(langProcessBatch);
 
         try {
@@ -112,13 +117,26 @@ $(document).ready(function () {
             });
 
             if (data.error) {
-                displayAlert('error', data.error);
+                showNotification(data.error, 'error');
+                loadTransactions();
             } else {
+                const translationsElem = document.getElementById('qonto-js-translations');
+                const batchPattern = (translationsElem && translationsElem.dataset.successBatchCompleted) ? translationsElem.dataset.successBatchCompleted : '%s transaction(s) linked, %s failed.';
+                const successCount = (data.success_count !== undefined) ? data.success_count : 0;
+                const errorCount = (data.error_count !== undefined) ? data.error_count : 0;
+                let msg = batchPattern;
+                if (msg.includes('%s')) {
+                    msg = msg.replace('%s', successCount).replace('%s', errorCount);
+                } else {
+                    msg = msg + ' (' + successCount + ' OK, ' + errorCount + ' KO)';
+                }
+                showNotification(msg, (errorCount > 0 ? 'warning' : 'success'));
                 loadTransactions();
             }
 
         } catch (error) {
-            displayAlert('error', langAjaxError + ' : ' + error.message);
+            showNotification(langAjaxError + ' : ' + error.message, 'error');
+            loadTransactions();
         }
     }
 
@@ -198,6 +216,9 @@ $(document).ready(function () {
                 showNotification(data.error, 'error');
             } else {
                 $('#qonto-advanced-dialog').dialog('close');
+                const translationsElem = document.getElementById('qonto-js-translations');
+                const msg = (translationsElem && translationsElem.dataset.successTransactionLinked) ? translationsElem.dataset.successTransactionLinked : 'Transaction successfully linked';
+                showNotification(msg, 'success');
                 loadTransactions();
             }
 
@@ -240,13 +261,18 @@ $(document).ready(function () {
             });
 
             if (data.error) {
-                displayAlert('error', data.error);
+                showNotification(data.error, 'error');
+                loadTransactions();
             } else {
+                const translationsElem = document.getElementById('qonto-js-translations');
+                const msg = (translationsElem && translationsElem.dataset.successVariousPaymentCreated) ? translationsElem.dataset.successVariousPaymentCreated : 'Various payment created successfully';
+                showNotification(msg, 'success');
                 loadTransactions();
             }
 
         } catch (error) {
-            displayAlert('error', langAjaxError + ' : ' + error.message);
+            showNotification(langAjaxError + ' : ' + error.message, 'error');
+            loadTransactions();
         }
     }
 
@@ -261,13 +287,18 @@ $(document).ready(function () {
             });
 
             if (data.error) {
-                displayAlert('error', data.error);
+                showNotification(data.error, 'error');
+                loadTransactions();
             } else {
+                const translationsElem = document.getElementById('qonto-js-translations');
+                const msg = (translationsElem && translationsElem.dataset.successTransactionUnlinked) ? translationsElem.dataset.successTransactionUnlinked : 'Transaction successfully unlinked';
+                showNotification(msg, 'success');
                 loadTransactions();
             }
 
         } catch (error) {
-            displayAlert('error', langAjaxError + ' : ' + error.message);
+            showNotification(langAjaxError + ' : ' + error.message, 'error');
+            loadTransactions();
         }
     }
 
@@ -307,8 +338,26 @@ $(document).ready(function () {
         container.empty().append(clone);
     }
 
+    function translateError(errorCode) {
+        if (!errorCode || typeof errorCode !== 'string') return errorCode || '';
+        const translationsElem = document.getElementById('qonto-js-translations');
+        if (translationsElem) {
+            // e.g. FAILED_TO_CREATE_PAYMENT -> errorFailedToCreatePayment
+            const parts = errorCode.toLowerCase().split('_');
+            const camelKey = 'error' + parts.map(function (w) {
+                return w.charAt(0).toUpperCase() + w.slice(1);
+            }).join('');
+            if (translationsElem.dataset && translationsElem.dataset[camelKey]) {
+                return translationsElem.dataset[camelKey];
+            }
+        }
+        return errorCode;
+    }
+
     function showNotification(message, type) {
         if (!message) return;
+
+        const displayMsg = (type === 'errors' || type === 'error' || type === 'warnings' || type === 'warning') ? translateError(message) : message;
 
         // Mapping PHP (Dolibarr) types to JS (jnotify)
         let jnType = 'success'; // Default
@@ -316,10 +365,10 @@ $(document).ready(function () {
         if (type === 'errors' || type === 'error') jnType = 'error';
 
         if (typeof $.jnotify === 'function') {
-            $.jnotify(message, jnType);
+            $.jnotify(displayMsg, jnType);
         } else {
             // Native Dolibarr notifications fallback 
-            alert(message);
+            alert(displayMsg);
         }
     }
 
@@ -755,7 +804,7 @@ $(document).ready(function () {
                                 content: base64Content
                             };
                         } catch (err) {
-                            displayAlert('error', (typeof langAjaxError !== 'undefined' ? langAjaxError : 'Error') + ' : ' + err.message);
+                            showNotification((typeof langAjaxError !== 'undefined' ? langAjaxError : 'Error') + ' : ' + err.message, 'error');
                             return;
                         }
                     }

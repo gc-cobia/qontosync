@@ -114,7 +114,28 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
      data-optgroup-vat="<?php print dol_escape_htmltag($langs->trans('VAT')); ?>"
      data-optgroup-social="<?php print dol_escape_htmltag($langs->trans('SocialContributions')); ?>"
      data-optgroup-salary="<?php print dol_escape_htmltag($langs->trans('Salaries')); ?>"
-     data-optgroup-expense="<?php print dol_escape_htmltag($langs->trans('ExpenseReports')); ?>">
+     data-optgroup-expense="<?php print dol_escape_htmltag($langs->trans('ExpenseReports')); ?>"
+     data-error-failed-to-create-payment="<?php print dol_escape_htmltag($langs->trans('FailedToCreatePayment')); ?>"
+     data-error-failed-to-save-attachment="<?php print dol_escape_htmltag($langs->trans('FailedToSaveAttachment')); ?>"
+     data-error-failed-to-link-transaction="<?php print dol_escape_htmltag($langs->trans('FailedToLinkTransaction')); ?>"
+     data-error-error-unlinking-transaction="<?php print dol_escape_htmltag($langs->trans('ErrorUnlinkingTransaction')); ?>"
+     data-error-permission-denied="<?php print dol_escape_htmltag($langs->trans('PermissionDenied')); ?>"
+     data-error-invalid-parameters="<?php print dol_escape_htmltag($langs->trans('InvalidParameters')); ?>"
+     data-error-bank-account-not-found="<?php print dol_escape_htmltag($langs->trans('BankAccountNotFound')); ?>"
+     data-error-no-bank-selected="<?php print dol_escape_htmltag($langs->trans('NoBankSelected')); ?>"
+     data-error-no-transaction-to-link="<?php print dol_escape_htmltag($langs->trans('NoTransactionToLink')); ?>"
+     data-error-error-fetching-transactions="<?php print dol_escape_htmltag($langs->trans('ErrorFetchingTransactions')); ?>"
+     data-error-no-transactions-found="<?php print dol_escape_htmltag($langs->trans('NoTransactionsFound')); ?>"
+     data-error-no-transaction-found="<?php print dol_escape_htmltag($langs->trans('TransactionNotFound')); ?>"
+     data-error-transaction-not-found="<?php print dol_escape_htmltag($langs->trans('TransactionNotFound')); ?>"
+     data-error-error-mixed-document-types="<?php print dol_escape_htmltag($langs->trans('ErrorMixedDocumentTypes')); ?>"
+     data-error-error-no-amount-specified="<?php print dol_escape_htmltag($langs->trans('ErrorNoAmountSpecified')); ?>"
+     data-error-error-imputed-amount-exceeds="<?php print dol_escape_htmltag($langs->trans('ErrorImputedAmountExceeds')); ?>"
+     data-error-invalid-token="<?php print dol_escape_htmltag($langs->trans('InvalidToken')); ?>"
+     data-success-transaction-linked="<?php print dol_escape_htmltag($langs->trans('TransactionSuccessfullyLinked')); ?>"
+     data-success-transaction-unlinked="<?php print dol_escape_htmltag($langs->trans('TransactionSuccessfullyUnlinked')); ?>"
+     data-success-various-payment-created="<?php print dol_escape_htmltag($langs->trans('VariousPaymentCreatedSuccessfully')); ?>"
+     data-success-batch-completed="<?php print dol_escape_htmltag($langs->transnoentities('BatchProcessingCompleted', '%s', '%s')); ?>">
 </div>
 
 <!-- ========================================== -->
