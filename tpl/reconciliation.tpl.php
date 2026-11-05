@@ -24,7 +24,6 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
           data-lang-processing-advanced="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncProcessingAdvanced")); ?>"
           data-lang-searching="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncSearching")); ?>">
 
-        <input type="hidden" name="action" value="search">
         <input type="hidden" name="token" value="<?php print newToken(); ?>">
     	
         <div class="divadvancedsearchfield centpercent" style="box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 15px; background-color: var(--colorbacktitle1); border: 1px solid var(--colortopbordertitle1); border-radius: 6px;">

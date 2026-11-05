@@ -9,11 +9,247 @@ $(document).ready(function () {
     const container = $('#qontosync_results_container');
     const searchForm = $('#qontosync_search_form');
 
-    const fetchUrl = 'ajax/get_transactions.php';
-    const updateUrl = 'ajax/update_batch.php';
-    const updateAdvancedUrl = 'ajax/update_advanced.php';
-    const unlinkUrl = 'ajax/unlink_transaction.php';
-    const createVariousUrl = 'ajax/create_various.php';
+    // ==========================================
+    // CONTROLER ENGINE
+    // ==========================================
+
+    const routerUrl = 'ajax/router.php';
+
+    async function apiCall(action, data = {}) {
+        const tokenVal = $('input[name="token"]').val() || '';
+
+        const payload = {
+            token: tokenVal,
+            controller: 'reconciliation',
+            action: action,
+            data: data
+        };
+
+        const response = await fetch(routerUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            throw new Error("Session expirée ou permission refusée");
+        }
+
+        const result = await response.json().catch(() => null);
+
+        if (!result) {
+            throw new Error('HTTP ' + response.status + ' ' + response.statusText);
+        }
+
+        if (!response.ok && !result.error) {
+            throw new Error('HTTP ' + response.status + ' ' + response.statusText);
+        }
+
+        return result;
+    }
+
+    // ==========================================
+    // ASYNC FETCH FUNCTIONS
+    // ==========================================
+
+    // Load transactions (getTransactions)
+    async function loadTransactions() {
+        displaySpinner(langSearching);
+
+        const payloadData = {
+            month: parseInt(searchForm.find('[name="month"]').val(), 10) || 0,
+            year: parseInt(searchForm.find('[name="year"]').val(), 10) || 0,
+            bank_rowid: parseInt(searchForm.find('[name="bank_rowid"]').val(), 10) || 0
+        };
+
+        try {
+            const data = await apiCall('getTransactions', payloadData);
+
+            if (data.error) {
+                displayAlert('error', data.error);
+            } else {
+                renderTransactions(data);
+            }
+
+        } catch (error) {
+            displayAlert('error', langAjaxError + ' : ' + error.message);
+        }
+    }
+
+    // Batch link transactions (batchLink)
+    async function batchLink() {
+        const tableWrapper = container.find('#qonto-table-wrapper');
+        const bankRowid = parseInt(tableWrapper.attr('data-bank-rowid') || searchForm.find('[name="bank_rowid"]').val(), 10) || 0;
+
+        const matches = {};
+        container.find('select.trx-select').each(function () {
+            const selectEl = $(this);
+            const val = selectEl.val();
+            if (!val) return;
+
+            const qontoId = selectEl.attr('data-qonto-id');
+            const selectedOpt = selectEl.find('option:selected');
+            const type = selectedOpt.attr('data-type');
+            const docId = parseInt(selectedOpt.attr('data-doc-id'), 10) || 0;
+
+            if (qontoId && type && docId > 0) {
+                matches[qontoId] = {
+                    type: type,
+                    doc_id: docId
+                };
+            }
+        });
+
+        displaySpinner(langProcessBatch);
+
+        try {
+            const data = await apiCall('batchLink', {
+                bank_rowid: bankRowid,
+                matches: matches
+            });
+
+            if (data.error) {
+                displayAlert('error', data.error);
+            } else {
+                loadTransactions();
+            }
+
+        } catch (error) {
+            displayAlert('error', langAjaxError + ' : ' + error.message);
+        }
+    }
+
+    // Load advanced info (getAdvancedInfo)
+    async function loadAdvancedInfo(buttonEl) {
+        const $btn = $(buttonEl);
+        const qontoId = $btn.attr('data-qonto-id') || '';
+        const bankRowid = parseInt($btn.attr('data-bank-rowid') || searchForm.find('[name="bank_rowid"]').val(), 10) || 0;
+        const title = $btn.attr('title') || 'Advanced Search';
+
+        $('#qonto-advanced-dialog').remove();
+        const $dialog = $('<div id="qonto-advanced-dialog"></div>');
+
+        const tplWrapper = document.getElementById('tpl-advanced-wrapper');
+        if (tplWrapper) {
+            $dialog.append(tplWrapper.content.cloneNode(true));
+        }
+
+        $dialog.dialog({
+            modal: true,
+            width: $(window).width() * 0.75,
+            height: Math.min($(window).height() * 0.85, 700),
+            title: title,
+            close: function () {
+                $(this).dialog('destroy').remove();
+            }
+        });
+
+        try {
+            const data = await apiCall('getAdvancedInfo', {
+                qonto_id: qontoId,
+                bank_rowid: bankRowid
+            });
+
+            if (data.error) {
+                showError(data.error);
+            } else {
+                renderAdvancedModal(data, bankRowid);
+            }
+
+        } catch (error) {
+            showError(langAjaxError + ' : ' + error.message);
+        }
+    }
+
+    // Batch link advanced matching (batchLinkAdvanced)
+    async function batchLinkAdvanced(formEl) {
+        const modalForm = $(formEl);
+        modalForm.find('.action-buttons').hide();
+        modalForm.find('#advanced_match_loader').show();
+
+        const qontoId = modalForm.find('input[name="qonto_id"]').val() || '';
+        const bankRowid = parseInt(modalForm.find('input[name="bank_rowid"]').val(), 10) || 0;
+        const linkDocs = [];
+        const amounts = {};
+
+        modalForm.find('.check_link_doc:checked').each(function () {
+            const docKey = $(this).val();
+            if (docKey) {
+                linkDocs.push(docKey);
+                const amtVal = $(this).closest('tr').find('.amount_input').val() || '0';
+                amounts[docKey] = amtVal;
+            }
+        });
+
+        try {
+            const data = await apiCall('batchLinkAdvanced', {
+                bank_rowid: bankRowid,
+                qonto_id: qontoId,
+                link_doc: linkDocs,
+                amounts: amounts
+            });
+
+            if (data.error) {
+                modalForm.find('#advanced_match_loader').hide();
+                modalForm.find('.action-buttons').show();
+                showNotification(data.error, 'error');
+            } else {
+                $('#qonto-advanced-dialog').dialog('close');
+                loadTransactions();
+            }
+
+        } catch (error) {
+            modalForm.find('#advanced_match_loader').hide();
+            modalForm.find('.action-buttons').show();
+            showNotification(langAjaxError + ' : ' + error.message, 'error');
+        }
+    }
+
+    // New various payment (createVariousPayment)
+    async function newVariousPayment(qontoId, bankRowid, accountancyCode) {
+        displaySpinner(langProcessBatch);
+
+        try {
+            const data = await apiCall('createVariousPayment', {
+                qonto_id: qontoId,
+                bank_rowid: parseInt(bankRowid, 10) || 0,
+                accountancy_code: accountancyCode || ''
+            });
+
+            if (data.error) {
+                displayAlert('error', data.error);
+            } else {
+                loadTransactions();
+            }
+
+        } catch (error) {
+            displayAlert('error', langAjaxError + ' : ' + error.message);
+        }
+    }
+
+    // Unlink transaction (unlinkTransaction)
+    async function unlinkTransaction(bankRowid, bankLineId) {
+        displaySpinner(langProcessBatch);
+
+        try {
+            const data = await apiCall('unlinkTransaction', {
+                bank_rowid: parseInt(bankRowid, 10) || 0,
+                bank_line_id: parseInt(bankLineId, 10) || 0
+            });
+
+            if (data.error) {
+                displayAlert('error', data.error);
+            } else {
+                loadTransactions();
+            }
+
+        } catch (error) {
+            displayAlert('error', langAjaxError + ' : ' + error.message);
+        }
+    }
 
     // Fetching translations from HTML
     const langAjaxError = searchForm.data('lang-ajax-error') || 'Error';
@@ -162,9 +398,8 @@ $(document).ready(function () {
                 const clonePending = tplPending.content.cloneNode(true);
 
                 // Populate hidden inputs
-                $(clonePending).find('input[name="token"]').val(data.token || $('input[name="token"]').val() || '');
                 $(clonePending).find('input[name="qonto_id"]').val(trx.id || '');
-                $(clonePending).find('input[name="bank_rowid"]').val(bankRowid || $('input[name="bank_rowid"]').val() || searchForm.find('select[name="bank_rowid"]').val() || '');
+                $(clonePending).find('input[name="bank_rowid"]').val(bankRowid || searchForm.find('[name="bank_rowid"]').val() || '');
                 $(clonePending).find('#qonto_trx_amount').val(trx.amount_abs || 0);
 
                 const tbody = $(clonePending).find('.pending-documents-tbody');
@@ -229,15 +464,11 @@ $(document).ready(function () {
         if (!tplTable || !tplRow) return;
 
         const tableNode = tplTable.content.cloneNode(true);
-        const formBatch = tableNode.querySelector('#form_batch_link');
+        const tableWrapper = tableNode.querySelector('#qonto-table-wrapper');
         const tbody = tableNode.querySelector('.qonto-transactions-tbody');
-        const bankRowidInput = formBatch ? formBatch.querySelector('input[name="bank_rowid"]') : null;
 
-        if (formBatch) {
-            const tokenInput = formBatch.querySelector('input[name="token"]');
-            if (tokenInput) tokenInput.value = data.token || '';
-
-            if (bankRowidInput) bankRowidInput.value = data.bank_rowid || '';
+        if (tableWrapper) {
+            tableWrapper.setAttribute('data-bank-rowid', data.bank_rowid || '');
         }
 
         const translationsElem = document.getElementById('qonto-js-translations');
@@ -313,6 +544,7 @@ $(document).ready(function () {
                         const sanitizedId = t.id.replace(/[^a-zA-Z0-9_-]/g, '_');
                         select.name = 'target_val[' + t.id + ']';
                         select.id = 'form_select_' + sanitizedId;
+                        select.setAttribute('data-qonto-id', t.id);
 
                         groupKeys.forEach(function (grp) {
                             const items = (t.matches && t.matches[grp.key]) ? t.matches[grp.key] : [];
@@ -327,7 +559,9 @@ $(document).ready(function () {
                                     if (tplOption) {
                                         const optNode = tplOption.content.cloneNode(true);
                                         const opt = optNode.querySelector('option');
-                                        opt.value = item.value;
+                                        opt.value = item.type + '_' + item.doc_id;
+                                        opt.setAttribute('data-type', item.type);
+                                        opt.setAttribute('data-doc-id', item.doc_id);
                                         opt.textContent = item.label;
                                         optgroup.appendChild(opt);
                                     }
@@ -354,14 +588,15 @@ $(document).ready(function () {
             if (isLinked) {
                 const unlinkBtn = tr.querySelector('.btn-ask-unlink');
                 if (unlinkBtn) {
-                    unlinkBtn.setAttribute('data-bank-rowid', t.linked_rowid);
+                    unlinkBtn.setAttribute('data-bank-line-id', t.linked_rowid);
+                    unlinkBtn.setAttribute('data-bank-rowid', data.bank_rowid || '');
                     unlinkBtn.style.display = 'block';
                 }
             } else if (t.trx_status === 'unlinked') {
                 const odBtn = tr.querySelector('.btn-ask-create-od');
                 if (odBtn) {
                     odBtn.setAttribute('data-qonto-id', t.id);
-                    odBtn.setAttribute('data-bank-rowid', bankRowidInput ? bankRowidInput.value : (data.bank_rowid || ''));
+                    odBtn.setAttribute('data-bank-rowid', data.bank_rowid || '');
                     odBtn.style.display = 'block';
                 }
             }
@@ -405,51 +640,6 @@ $(document).ready(function () {
     }
 
     // ==========================================
-    // ASYNC FETCH FUNCTIONS
-    // ==========================================
-
-    async function loadTransactions() {
-        displaySpinner(langSearching);
-
-        const formData = new URLSearchParams(new FormData(searchForm[0]));
-
-        try {
-            const response = await fetch(fetchUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                }
-            });
-
-            if (response.status === 401 || response.status === 403) {
-                window.location.reload();
-                return;
-            }
-
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status + ' ' + response.statusText);
-            }
-
-            const data = await response.json();
-
-            if (data.status === 'error') {
-                displayAlert('error', data.message || langAjaxError);
-            } else if (data.status === 'warning') {
-                displayAlert('warning', data.message || '');
-            } else if (data.status === 'info') {
-                displayAlert('info', data.message || '');
-            } else if (data.status === 'success') {
-                renderTransactions(data);
-            } else {
-                displayAlert('error', langAjaxError);
-            }
-        } catch (error) {
-            displayAlert('error', langAjaxError + ' : ' + error.message);
-        }
-    }
-
-    // ==========================================
     // EVENT HANDLERS
     // ==========================================
 
@@ -462,124 +652,19 @@ $(document).ready(function () {
     // Validate all batch matches
     $(document).on('click', '#btn_validate_conciliation', function (e) {
         e.preventDefault();
-        $('#form_batch_link').trigger('submit');
+        batchLink();
     });
 
-    $(document).on('submit', '#form_batch_link', async function (e) {
-        e.preventDefault();
-        displaySpinner(langProcessBatch);
-
-        const formData = new URLSearchParams(new FormData(this));
-
-        try {
-            const response = await fetch(updateUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                }
-            });
-
-            if (response.status === 401 || response.status === 403) {
-                window.location.reload();
-                return;
-            }
-
-            const data = await response.json();
-            showNotification(data.message, data.type);
-
-            loadTransactions();
-        } catch (error) {
-            displayAlert('error', langAjaxError + ' : ' + error.message);
-        }
-    });
-
-    // Open Advanced Match in Dialog
+    // Open Advanced Match (hamburger menu)
     $(document).on('click', '.btn-open-advanced-match', function (e) {
         e.preventDefault();
-        const qontoId = $(this).attr('data-qonto-id') || $(this).closest('tr').find('.trx-id-display').text().replace('ID: ', '').trim();
-        const bankRowid = $(this).attr('data-bank-rowid') || $('input[name="bank_rowid"]').val() || searchForm.find('select[name="bank_rowid"]').val() || '';
-        const title = $(this).attr('data-title') || $(this).attr('title') || 'Recherche avancée';
-
-        const $dialog = $('<div id="qonto-advanced-dialog"></div>');
-
-        const tplWrapper = document.getElementById('tpl-advanced-wrapper');
-        if (tplWrapper) {
-            $dialog.append(tplWrapper.content.cloneNode(true));
-        }
-
-        $dialog.dialog({
-            modal: true,
-            width: $(window).width() * 0.75,
-            height: Math.min($(window).height() * 0.85, 700),
-            title: title,
-            close: function () {
-                $(this).dialog('destroy').remove();
-            }
-        });
-
-        const token = $('input[name="token"]').val() || '';
-        const fetchAdvancedUrl = 'ajax/get_advanced.php?qonto_id=' + encodeURIComponent(qontoId) +
-            '&bank_rowid=' + encodeURIComponent(bankRowid) +
-            '&token=' + encodeURIComponent(token);
-
-        fetch(fetchAdvancedUrl)
-            .then(function (response) {
-                if (response.status === 401 || response.status === 403) {
-                    window.location.reload();
-                    return;
-                }
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
-                }
-                return response.json();
-            })
-            .then(function (data) {
-                if (data.status === 'error') {
-                    showError(data.message || 'Une erreur est survenue.');
-                    return;
-                }
-                renderAdvancedModal(data, bankRowid);
-            })
-            .catch(function (error) {
-                showError(error.message || 'Erreur lors de la récupération des données.');
-            });
+        loadAdvancedInfo(this);
     });
 
     // Intercept advanced matching form submission
-    $(document).on('submit', '#form_advanced_matching', async function (e) {
+    $(document).on('submit', '#form_advanced_matching', function (e) {
         e.preventDefault();
-
-        const modalForm = $(this);
-        modalForm.find('.action-buttons').hide();
-        modalForm.find('#advanced_match_loader').show();
-
-        const formData = new URLSearchParams(new FormData(this));
-
-        try {
-            const response = await fetch(updateAdvancedUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                }
-            });
-
-            if (response.status === 401 || response.status === 403) {
-                window.location.reload();
-                return;
-            }
-
-            const data = await response.json();
-            showNotification(data.message, data.type);
-
-            $('#qonto-advanced-dialog').dialog('close');
-            loadTransactions();
-        } catch (error) {
-            modalForm.find('#advanced_match_loader').hide();
-            modalForm.find('.action-buttons').show();
-            showNotification(langAjaxError + ' : ' + error.message, 'error');
-        }
+        batchLinkAdvanced(this);
     });
 
     // Toggle switch to hide/show linked transactions
@@ -635,42 +720,10 @@ $(document).ready(function () {
         const buttonsArray = [
             {
                 text: textYes,
-                click: async function () {
+                click: function () {
                     const accountancyCode = $('#od_accountancy_code').val() || '';
-                    const tokenVal = $('input[name="token"]').val() || '';
-
-                    const formData = new FormData();
-                    formData.append('token', tokenVal);
-                    formData.append('qonto_id', qontoId);
-                    formData.append('bank_rowid', bankRowid);
-                    formData.append('accountancy_code', accountancyCode);
-
-                    const fileInput = document.getElementById('od_attached_file');
-                    if (fileInput && fileInput.files && fileInput.files.length > 0) {
-                        formData.append('od_attached_file', fileInput.files[0]);
-                    }
-
                     $(this).dialog("close");
-                    displaySpinner(langProcessBatch);
-
-                    try {
-                        const response = await fetch(createVariousUrl, {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        if (response.status === 401 || response.status === 403) {
-                            window.location.reload();
-                            return;
-                        }
-
-                        const data = await response.json();
-                        showNotification(data.message, data.type);
-
-                        loadTransactions();
-                    } catch (error) {
-                        displayAlert('error', langAjaxError + ' : ' + error.message);
-                    }
+                    newVariousPayment(qontoId, bankRowid, accountancyCode);
                 }
             },
             {
@@ -691,10 +744,10 @@ $(document).ready(function () {
     });
 
     // Confirmation modal for unlinking
-    let bankRowidToUnlink = null;
     $(document).on('click', '.btn-ask-unlink', function (e) {
         e.preventDefault();
-        bankRowidToUnlink = $(this).attr('data-bank-rowid');
+        const bankLineIdToUnlink = $(this).attr('data-bank-line-id');
+        const bankRowidToUnlink = $(this).attr('data-bank-rowid') || searchForm.find('[name="bank_rowid"]').val();
 
         const $dialog = $("#dialog-confirm-unlink");
         const textYes = $dialog.data('yes') || 'Yes';
@@ -703,37 +756,9 @@ $(document).ready(function () {
         const buttonsArray = [
             {
                 text: textYes,
-                click: async function () {
+                click: function () {
                     $(this).dialog("close");
-                    displaySpinner(langProcessBatch);
-
-                    const tokenVal = $('input[name="token"]').val() || '';
-                    const params = new URLSearchParams({
-                        bank_line_id: bankRowidToUnlink,
-                        token: tokenVal
-                    });
-
-                    try {
-                        const response = await fetch(unlinkUrl, {
-                            method: 'POST',
-                            body: params,
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                            }
-                        });
-
-                        if (response.status === 401 || response.status === 403) {
-                            window.location.reload();
-                            return;
-                        }
-
-                        const data = await response.json();
-                        showNotification(data.message, data.type);
-
-                        loadTransactions();
-                    } catch (error) {
-                        displayAlert('error', langAjaxError + ' : ' + error.message);
-                    }
+                    unlinkTransaction(bankRowidToUnlink, bankLineIdToUnlink);
                 }
             },
             {

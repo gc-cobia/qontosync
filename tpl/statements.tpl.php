@@ -21,7 +21,6 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
           data-lang-processing-advanced="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncProcessingAdvanced")); ?>"
           data-lang-searching="<?php print dol_escape_htmltag($langs->transnoentities("QontoSyncSearching")); ?>">
 
-        <input type="hidden" name="action" value="search">
         <input type="hidden" name="token" value="<?php print newToken(); ?>">
     	
         <div class="divadvancedsearchfield centpercent" style="box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 15px; background-color: var(--colorbacktitle1); border: 1px solid var(--colortopbordertitle1); border-radius: 6px;">
@@ -95,31 +94,24 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     </div>
 </template>
 
-<!-- Template Table Container & Batch Form -->
+<!-- Template Table Container for statements -->
 <template id="tpl-statements-table">
-    <div class="div-table-responsive" style="background: var(--colorbackbody, #fff);">
-        <form id="form_batch_link" method="post" action="">
-            <input type="hidden" name="token" value="">
-            <input type="hidden" name="action" value="sync_ged">
-            <input type="hidden" name="bank_rowid" value="">
-            <input type="hidden" name="year" value="">
-
-            <table class="liste centpercent">
-                <thead>
-                    <tr class="liste_titre">
-                        <th><?php print $langs->trans("Month"); ?></th>
-                        <th class="right">Dolibarr<br><span class="small"><?php print $langs->trans("InitialBankBalance"); ?></span></th>
-                        <th class="right">Qonto<br><span class="small"><?php print $langs->trans("InitialBankBalance"); ?></span></th>
-                        <th class="right"><?php print $langs->trans("Delta"); ?></th>
-                        <th class="right">Dolibarr<br><span class="small"><?php print $langs->trans("EndBankBalance"); ?></span></th>
-                        <th class="right">Qonto<br><span class="small"><?php print $langs->trans("EndBankBalance"); ?></span></th>
-                        <th class="right"><?php print $langs->trans("Delta"); ?></th>
-                        <th class="center"><?php print $langs->trans("AccountStatements"); ?></th>
-                    </tr>
-                </thead>
-                <tbody class="qonto-statements-tbody"></tbody>
-            </table>
-        </form>
+    <div id="qonto-statements-wrapper" class="div-table-responsive" style="background: var(--colorbackbody, #fff);">
+        <table class="liste centpercent">
+            <thead>
+                <tr class="liste_titre">
+                    <th><?php print $langs->trans("Month"); ?></th>
+                    <th class="right">Dolibarr<br><span class="small"><?php print $langs->trans("InitialBankBalance"); ?></span></th>
+                    <th class="right">Qonto<br><span class="small"><?php print $langs->trans("InitialBankBalance"); ?></span></th>
+                    <th class="right"><?php print $langs->trans("Delta"); ?></th>
+                    <th class="right">Dolibarr<br><span class="small"><?php print $langs->trans("EndBankBalance"); ?></span></th>
+                    <th class="right">Qonto<br><span class="small"><?php print $langs->trans("EndBankBalance"); ?></span></th>
+                    <th class="right"><?php print $langs->trans("Delta"); ?></th>
+                    <th class="center"><?php print $langs->trans("AccountStatements"); ?></th>
+                </tr>
+            </thead>
+            <tbody class="qonto-statements-tbody"></tbody>
+        </table>
     </div>
 </template>
 

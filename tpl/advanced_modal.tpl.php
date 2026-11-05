@@ -133,8 +133,6 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
         </div>
 
         <form id="form_advanced_matching" method="post" action="">
-            <input type="hidden" name="token" value="">
-            <input type="hidden" name="action" value="process_advanced_match">
             <input type="hidden" name="qonto_id" value="">
             <input type="hidden" name="bank_rowid" value="">
             <input type="hidden" id="qonto_trx_amount" value="">

@@ -9,8 +9,129 @@ $(document).ready(function () {
     const container = $('#qontosync_results_container');
     const searchForm = $('#qontosync_search_form');
 
-    const fetchUrl = 'ajax/get_statements.php';
-    const updateUrl = 'ajax/update_statements.php';
+    // ==========================================
+    // CONTROLER ENGINE
+    // ==========================================
+
+    const routerUrl = 'ajax/router.php';
+
+    async function apiCall(action, data = {}) {
+        const tokenVal = $('input[name="token"]').val() || '';
+
+        const payload = {
+            token: tokenVal,
+            controller: 'statements',
+            action: action,
+            data: data
+        };
+
+        const response = await fetch(routerUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            throw new Error("Session expirée ou permission refusée");
+        }
+
+        const result = await response.json().catch(() => null);
+
+        if (!result) {
+            throw new Error('HTTP ' + response.status + ' ' + response.statusText);
+        }
+
+        if (!response.ok && !result.error) {
+            throw new Error('HTTP ' + response.status + ' ' + response.statusText);
+        }
+
+        return result;
+    }
+
+    // ==========================================
+    // ASYNC FETCH FUNCTIONS
+    // ==========================================
+
+    // Load statements (getStatements)
+    async function loadStatements() {
+        displaySpinner(langSearching);
+
+        const payloadData = {
+            year: parseInt(searchForm.find('[name="year"]').val(), 10) || 0,
+            bank_rowid: parseInt(searchForm.find('[name="bank_rowid"]').val(), 10) || 0
+        };
+
+        try {
+            const data = await apiCall('getStatements', payloadData);
+
+            if (data.error) {
+                displayAlert('error', data.error);
+            } else {
+                renderStatements(data);
+            }
+
+        } catch (error) {
+            displayAlert('error', langAjaxError + ' : ' + error.message);
+        }
+    }
+
+    // Import / synchronize statements into GED (updateStatements)
+    async function updateStatements() {
+        const statementsWrapper = container.find('#qonto-statements-wrapper');
+        const bankRowid = parseInt(statementsWrapper.attr('data-bank-rowid') || searchForm.find('[name="bank_rowid"]').val(), 10) || 0;
+        const year = parseInt(statementsWrapper.attr('data-year') || searchForm.find('[name="year"]').val(), 10) || 0;
+
+        const btn = $('#btn_import_statements');
+        const originalHtml = btn.html();
+
+        // Change import button to loader
+        btn.html('<i class="fas fa-spinner fa-pulse marginrightonly"></i>' + langProcessBatch);
+        btn.prop('disabled', true);
+
+        try {
+            const data = await apiCall('updateStatements', {
+                bank_rowid: bankRowid,
+                year: year
+            });
+
+            btn.html(originalHtml);
+            btn.prop('disabled', false);
+
+            if (data.error) {
+                displayAlert('error', data.error);
+            } else if (data.error_count > 0) {
+                loadStatements();
+            } else {
+                // Turn available badges into open buttons
+                $('.qonto-sync-available').each(function () {
+                    const url = $(this).attr('data-url') || $(this).data('url');
+                    const text = $(this).attr('data-open-text') || $(this).data('open-text');
+                    const linkA = document.createElement('a');
+                    linkA.href = url;
+                    linkA.target = '_blank';
+                    linkA.className = 'badge badge-success';
+                    linkA.style.color = 'white';
+                    linkA.style.textDecoration = 'none';
+                    linkA.style.padding = '6px';
+
+                    const icon = document.createElement('i');
+                    icon.className = 'fas fa-file-pdf marginrightonly';
+                    linkA.appendChild(icon);
+                    linkA.appendChild(document.createTextNode(text));
+
+                    $(this).replaceWith(linkA);
+                });
+            }
+
+        } catch (error) {
+            btn.html(originalHtml);
+            btn.prop('disabled', false);
+            displayAlert('error', langAjaxError + ' : ' + error.message);
+        }
+    }
 
     // Fetching translations from HTML
     const langAjaxError = searchForm.data('lang-ajax-error') || 'Error';
@@ -75,25 +196,19 @@ $(document).ready(function () {
         if (!tplTable || !tplRow) return;
 
         const tableNode = tplTable.content.cloneNode(true);
-        const formBatch = tableNode.querySelector('#form_batch_link');
+        const statementsWrapper = tableNode.querySelector('#qonto-statements-wrapper');
         const tbody = tableNode.querySelector('.qonto-statements-tbody');
 
-        if (formBatch) {
-            const tokenInput = formBatch.querySelector('input[name="token"]');
-            if (tokenInput) tokenInput.value = data.token || $('input[name="token"]').val() || '';
-
-            const bankRowidInput = formBatch.querySelector('input[name="bank_rowid"]');
-            if (bankRowidInput) bankRowidInput.value = data.bank_rowid || $('select[name="bank_rowid"]').val() || '';
-
-            const yearInput = formBatch.querySelector('input[name="year"]');
-            if (yearInput) yearInput.value = data.year || $('select[name="year"]').val() || '';
+        if (statementsWrapper) {
+            statementsWrapper.setAttribute('data-bank-rowid', data.bank_rowid || '');
+            statementsWrapper.setAttribute('data-year', data.year || '');
         }
 
         const transOpen = (translationsElem && translationsElem.dataset.open) ? translationsElem.dataset.open : 'Open';
         const transAvailable = (translationsElem && translationsElem.dataset.available) ? translationsElem.dataset.available : 'Available';
         const transNotAvailable = (translationsElem && translationsElem.dataset.notAvailable) ? translationsElem.dataset.notAvailable : 'Not available';
 
-        const months = data.data || [];
+        const months = data.statements || [];
 
         months.forEach(function (item) {
             const row = tplRow.content.cloneNode(true);
@@ -149,7 +264,7 @@ $(document).ready(function () {
                         linkA.style.color = 'white';
                         linkA.style.textDecoration = 'none';
                         linkA.style.padding = '6px';
-                        
+
                         const icon = document.createElement('i');
                         icon.className = 'fas fa-file-pdf marginrightonly';
                         linkA.appendChild(icon);
@@ -184,129 +299,26 @@ $(document).ready(function () {
     }
 
     // ==========================================
-    // ASYNC FETCH FUNCTIONS
-    // ==========================================
-
-    async function loadTransactions() {
-        displaySpinner(langSearching);
-
-        const formData = new URLSearchParams(new FormData(searchForm[0]));
-
-        try {
-            const response = await fetch(fetchUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                }
-            });
-
-            if (response.status === 401 || response.status === 403) {
-                window.location.reload();
-                return;
-            }
-
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status + ' ' + response.statusText);
-            }
-
-            const data = await response.json();
-
-            if (data.status === 'error') {
-                displayAlert('error', data.message || langAjaxError);
-            } else if (data.status === 'warning') {
-                displayAlert('warning', data.message || '');
-            } else if (data.status === 'info') {
-                displayAlert('info', data.message || '');
-            } else if (data.status === 'success') {
-                renderStatements(data);
-            } else {
-                displayAlert('error', langAjaxError);
-            }
-        } catch (error) {
-            displayAlert('error', langAjaxError + ' : ' + error.message);
-        }
-    }
-
-    // ==========================================
     // EVENT HANDLERS
     // ==========================================
 
     // Form search submit
     searchForm.on('submit', function (e) {
         e.preventDefault();
-        loadTransactions();
+        loadStatements();
     });
 
     // Process import statements
     $(document).on('click', '#btn_import_statements', function (e) {
         e.preventDefault();
-        $('#form_batch_link').trigger('submit');
-    });
-
-    $(document).on('submit', '#form_batch_link', async function (e) {
-        e.preventDefault();
-
-        const btn = $('#btn_import_statements');
-        const originalHtml = btn.html();
-
-        // Change import button to loader
-        btn.html('<i class="fas fa-spinner fa-pulse marginrightonly"></i>' + langProcessBatch);
-        btn.prop('disabled', true);
-
-        const formData = new URLSearchParams(new FormData(this));
-
-        try {
-            const response = await fetch(updateUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                }
-            });
-
-            if (response.status === 401 || response.status === 403) {
-                window.location.reload();
-                return;
-            }
-
-            const data = await response.json();
-            btn.html(originalHtml);
-            btn.prop('disabled', false);
-
-            showNotification(data.message, data.type);
-
-            // Turn available badges into open buttons
-            $('.qonto-sync-available').each(function () {
-                const url = $(this).attr('data-url') || $(this).data('url');
-                const text = $(this).attr('data-open-text') || $(this).data('open-text');
-                const linkA = document.createElement('a');
-                linkA.href = url;
-                linkA.target = '_blank';
-                linkA.className = 'badge badge-success';
-                linkA.style.color = 'white';
-                linkA.style.textDecoration = 'none';
-                linkA.style.padding = '6px';
-
-                const icon = document.createElement('i');
-                icon.className = 'fas fa-file-pdf marginrightonly';
-                linkA.appendChild(icon);
-                linkA.appendChild(document.createTextNode(text));
-
-                $(this).replaceWith(linkA);
-            });
-        } catch (error) {
-            btn.html(originalHtml);
-            btn.prop('disabled', false);
-            displayAlert('error', langAjaxError + ' : ' + error.message);
-        }
+        updateStatements();
     });
 
     // Auto-loader if bank account is already selected
     const bankSelect = searchForm.find('select[name="bank_rowid"]');
     if (bankSelect.length > 0 && bankSelect.val() > 0) {
         setTimeout(function () {
-            loadTransactions();
+            loadStatements();
         }, 150);
     }
 });
