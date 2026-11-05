@@ -190,7 +190,7 @@ class QontoUpdater
 		}
 
 		// Multi-tenant Security (Anti-IDOR)
-		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
+		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php', 'QontoRepository');
 		$qontoRepo = new QontoRepository($this->db);
 
 		if (!$qontoRepo->isAccountAllowed($bank_rowid)) {
@@ -199,8 +199,8 @@ class QontoUpdater
 		}
 
 		// Lazy load classes
-		if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
-		if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
+		if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
+		if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
 		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/paymentvarious.class.php';
 
 		$api = new QontoApi();
@@ -220,8 +220,8 @@ class QontoUpdater
 		$payment->amount = abs($qonto_trx['amount']);
 		$payment->sens = (isset($qonto_trx['side']) && $qonto_trx['side'] === 'debit') ? 0 : 1;
 		$payment->fk_account = $bank_rowid;
-		$payment->label = $qonto_trx['label'] . (!empty($qonto_trx['reference']) ? ' - ' . $qonto_trx['reference'] : '');
-		$payment->num_payment = !empty($qonto_trx['reference']) ? $qonto_trx['reference'] : $qonto_id;
+		$payment->label = dol_substr(($qonto_trx['label'] . (!empty($qonto_trx['reference']) ? ' - ' . $qonto_trx['reference'] : '')), 0, 255);
+		$payment->num_payment = dol_substr((!empty($qonto_trx['reference']) ? $qonto_trx['reference'] : $qonto_id), 0, 50);
 
 		$mop = $qontoMatching->getPaymentModeId(
 			isset($qonto_trx['operation_type']) ? $qonto_trx['operation_type'] : '',
@@ -243,7 +243,7 @@ class QontoUpdater
 
 			$clean_ref = dol_sanitizeFileName($raw_ref);
 
-			$ref_releve = substr($clean_ref, 0, 50);
+			$ref_releve = dol_substr($clean_ref, 0, 50);
 		}
 
 		// Init SQL transaction
