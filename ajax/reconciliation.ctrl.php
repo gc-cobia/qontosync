@@ -6,16 +6,26 @@
  * @license    GPLv3
  */
  
+/**
+ * Controller for bank reconciliation AJAX actions.
+ */
 class ReconciliationController {
     
+    /** @var DoliDB */
     private $db;
     
+    /**
+     * ReconciliationController constructor.
+     * 
+     * @param DoliDB $db Database handler
+     */
     public function __construct($db) {
         $this->db = $db;
     }
 
     /**
      * Multi-company security segregation (Bank account entity verification)
+     * 
      * @param int $bank_rowid Bank account ID
      * @return bool True if the account belongs to the current company, false otherwise
      */
@@ -28,6 +38,7 @@ class ReconciliationController {
     
     /**
      * Get transactions for a specific month and year
+     * 
      * @param array $data Array containing month, year, and bank_rowid
      * @return array Array containing http_code and transactions or error code
      */
@@ -63,7 +74,11 @@ class ReconciliationController {
         if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
         $api = new QontoApi();
 
-        $transactions = $api->getTransactions($account->iban, $dateStart, $dateEnd);
+        $transactions = $api->getTransactions([
+            'iban' => $account->iban,
+            'settled_at_from' => $dateStart . "T00:00:00.000Z",
+            'settled_at_to' => $dateEnd . "T23:59:59.999Z"
+        ]);
 
         if ($transactions === false) {
             return ['http_code' => 500, 'error' => 'ERROR_FETCHING_TRANSACTIONS'];
@@ -230,7 +245,7 @@ class ReconciliationController {
     /**
      * Link transactions in batch mode.
      * 
-     * @param array $data Array containing bank_rowid and target_val (array of target documents for each Qonto transaction)
+     * @param array $data Array containing bank_rowid and matches (array of target documents for each Qonto transaction)
      * @return array Associative array with http_code and result counts
      */
     public function batchLink(array $data) {
@@ -598,7 +613,7 @@ class ReconciliationController {
     /**
      * Batch link transaction to invoices, credit notes, etc.
      * 
-     * @param array $data Array containing bank_rowid, qonto_id, and link_docs
+     * @param array $data Array containing bank_rowid, qonto_id, link_doc, and amounts
      * @return array Associative array with http_code for result or error
      */
     public function batchLinkAdvanced(array $data) {

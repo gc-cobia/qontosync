@@ -11,30 +11,37 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     exit('Access Forbidden');
 }
 
+/**
+ * Client class for interacting with Qonto REST API v2.
+ */
 class QontoApi
 {
 	// Set default URL for Qonto API
 	const BASE_URL_PROD = "https://thirdparty.qonto.com";
 	const BASE_URL_SANDBOX = "https://thirdparty-sandbox.staging.qonto.co";
 
-	/**
-	 * @var string
-	 */
+	/** @var string */
 	public $error = '';
+	/** @var string */
 	public $traceId = '';
+	/** @var string */
 	private $apiKey;
+	/** @var string */
 	private $slug;
+	/** @var bool */
 	private $sandbox;
+	/** @var string */
 	private $sandboxToken;
+	/** @var string */
 	private $baseUrl;
 
 	/**
 	 * QontoApi constructor.
 	 *
-	 * @param string $apiKey
-	 * @param string $slug
-	 * @param bool|int|null $sandbox
-	 * @param string $sandboxToken
+	 * @param string        $apiKey       API key
+	 * @param string        $slug         Organization slug
+	 * @param bool|int|null $sandbox      Sandbox mode
+	 * @param string        $sandboxToken Sandbox token
 	 */
 	public function __construct($apiKey = '', $slug = '', $sandbox = null, $sandboxToken = '')
 	{
@@ -76,7 +83,7 @@ class QontoApi
 	 * Send a GET request to the Qonto API.
 	 *
 	 * @param string $endpoint The API endpoint path (e.g. "/v2/organization")
-	 * @return string|bool The raw JSON response string, or false on error
+	 * @return string|false The raw JSON response string, or false on error
 	 */
 	private function sendRequest($endpoint)
 	{
@@ -192,17 +199,19 @@ class QontoApi
 	/**
 	 * Get transactions from Qonto API
 	 *
-	 * @param string $iban IBAN of the bank account
-	 * @param string $dateStart ISO date YYYY-MM-DD
-	 * @param string $dateEnd ISO date YYYY-MM-DD
-	 * @return array|bool Array of transactions or false on error
+	 * @param array $parameters Query parameters (iban, settled_at_from, settled_at_to, status, sort_by, etc.)
+	 * @return array|false Array of transactions or false on error
 	 */
-	public function getTransactions($iban, $dateStart, $dateEnd)
+	public function getTransactions(array $parameters = [])
 	{
-		// Clean the IBAN by removing spaces
-		$clean_iban = str_replace(' ', '', $iban);
-		$base_endpoint = "/v2/transactions?iban=" . urlencode($clean_iban) . "&settled_at_from=" . urlencode($dateStart . "T00:00:00.000Z") . "&settled_at_to=" . urlencode($dateEnd . "T23:59:59.999Z");
-		
+		// Clean the IBAN by removing spaces if provided
+		if (!empty($parameters['iban'])) {
+			$parameters['iban'] = str_replace(' ', '', $parameters['iban']);
+		}
+
+		$base_endpoint = "/v2/transactions";
+		$base_endpoint .= "?" . http_build_query($parameters);
+
 		$all_transactions = array();
 		$current_page = 1;
 
@@ -222,7 +231,7 @@ class QontoApi
 
 			// Check if there is a next page according to Qonto API meta object
 			if (isset($data['meta']) && !empty($data['meta']['next_page'])) {
-				$current_page = (int)$data['meta']['next_page'];
+				$current_page = (int) $data['meta']['next_page'];
 			} else {
 				$current_page = null;
 			}
@@ -238,7 +247,7 @@ class QontoApi
 	 * Get a single transaction from Qonto API by its ID
 	 *
 	 * @param string $transaction_id ID of the transaction
-	 * @return array|bool Array of the transaction data or false on error
+	 * @return array|false Array of the transaction data or false on error
 	 */
 	public function getTransaction($transaction_id)
 	{
@@ -275,9 +284,9 @@ class QontoApi
 	/**
 	 * Get statements list from Qonto API filtered by IBAN and Year
 	 *
-	 * @param string $iban
-	 * @param int $year
-	 * @return array|bool Array of statements or false on error
+	 * @param string $iban IBAN of the bank account
+	 * @param int    $year Year
+	 * @return array|false Array of statements or false on error
 	 */
 	public function getStatements($iban, $year)
 	{
@@ -324,7 +333,7 @@ class QontoApi
 	 * Retrieve a specific statement from Qonto API by its ID
 	 *
 	 * @param string $statement_id ID of the statement
-	 * @return array|bool Array of the statement data or false on error
+	 * @return array|false Array of the statement data or false on error
 	 */
 	public function getStatementById($statement_id)
 	{
@@ -349,7 +358,8 @@ class QontoApi
 	 *
 	 * "sending_status": "enabled", "disabled"
 	 * "receiving_status": "enabled", "disabled", "pending_creation", "pending_deletion"
-	 * @return array|bool Array containing sending_status and receiving_status, or false on error
+	 *
+	 * @return array|false Array containing sending_status and receiving_status, or false on error
 	 */
 	public function getEInvoicingSettings()
 	{
@@ -379,14 +389,11 @@ class QontoApi
 	/**
 	 * Get supplier invoices list from Qonto API
 	 *
-	 * @param array $params Query parameters (filter[status], page, per_page, etc.)
-	 * @return array|bool Array with supplier_invoices and meta, or false on error	 */
-	public function getSupplierInvoices($parameters = [])
+	 * @param array $parameters Query parameters (filter[status], page, per_page, etc.)
+	 * @return array|false Array with supplier invoices or false on error
+	 */
+	public function getSupplierInvoices(array $parameters = [])
 	{
-		if (!is_array($parameters)) {
-			return false;
-		}
-
 		$base_endpoint = "/v2/supplier_invoices";
 		$base_endpoint .= "?" . http_build_query($parameters);
 
@@ -422,12 +429,12 @@ class QontoApi
 	}
 
 	/**
-     * Retrieve an attachment and its temporary download URL
-     *
-     * @param string $attachment_id UUID of the attachment
-     * @return array|bool Attachment array or false on error
-     */
-    public function getAttachment($attachment_id)
+	 * Retrieve an attachment and its temporary download URL
+	 *
+	 * @param string $attachment_id UUID of the attachment
+	 * @return array|false Attachment array or false on error
+	 */
+	public function getAttachment($attachment_id)
     {
         if (empty($attachment_id)) {
             return false;

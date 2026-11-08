@@ -6,16 +6,26 @@
  * @license    GPLv3
  */
 
+/**
+ * Controller for bank statements AJAX actions.
+ */
 class StatementsController {
 
+    /** @var DoliDB */
     private $db;
 
+    /**
+     * StatementsController constructor.
+     * 
+     * @param DoliDB $db Database handler
+     */
     public function __construct($db) {
         $this->db = $db;
     }
 
     /**
      * Multi-company security segregation (Bank account entity verification)
+     * 
      * @param int $bank_rowid Bank account ID
      * @return bool True if the account belongs to the current company, false otherwise
      */
@@ -28,6 +38,7 @@ class StatementsController {
 
     /**
      * Get monthly bank statements comparison for a specific year and bank account
+     * 
      * @param array $data Array containing year and bank_rowid
      * @return array Array containing http_code and statements or error code
      */
@@ -63,7 +74,11 @@ class StatementsController {
         $dateStart = sprintf("%04d-01-01", $year);
         $dateEnd   = sprintf("%04d-12-31", $year);
 
-        $transactions = $api->getTransactions($account->iban, $dateStart, $dateEnd);
+        $transactions = $api->getTransactions([
+            'iban' => $account->iban,
+            'settled_at_from' => $dateStart . "T00:00:00.000Z",
+            'settled_at_to' => $dateEnd . "T23:59:59.999Z"
+        ]);
         $qonto_statements_raw = $api->getStatements($account->iban, $year);
 
         if ($transactions === false) {
@@ -112,6 +127,7 @@ class StatementsController {
 
     /**
      * Synchronize missing Qonto PDF statements into Dolibarr GED
+     * 
      * @param array $data Array containing year and bank_rowid
      * @return array Associative array with http_code and sync result counts
      */
