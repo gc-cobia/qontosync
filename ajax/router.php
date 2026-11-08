@@ -68,6 +68,11 @@ if ($user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
 
 $langs->loadLangs(['qontosync@qontosync', 'banks', 'bills', 'trips', 'compta', 'other']);
 
+// Release PHP session lock early to prevent blocking concurrent AJAX requests
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
 $controllerParam = $input['controller'] ?? null;
 $actionParam     = $input['action'] ?? null;
 $data            = $input['data'] ?? [];

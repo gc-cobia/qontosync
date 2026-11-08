@@ -84,7 +84,7 @@ $(document).ready(function () {
         const tableWrapper = container.find('#qonto-table-wrapper');
         const bankRowid = parseInt(tableWrapper.attr('data-bank-rowid') || searchForm.find('[name="bank_rowid"]').val(), 10) || 0;
 
-        const matches = {};
+        const itemsToLink = [];
         container.find('select.trx-select').each(function () {
             const selectEl = $(this);
             const val = selectEl.val();
@@ -96,48 +96,68 @@ $(document).ready(function () {
             const docId = parseInt(selectedOpt.attr('data-doc-id'), 10) || 0;
 
             if (qontoId && type && docId > 0) {
-                matches[qontoId] = {
+                itemsToLink.push({
+                    qonto_id: qontoId,
                     type: type,
                     doc_id: docId
-                };
+                });
             }
         });
 
-        if (Object.keys(matches).length === 0) {
+        if (itemsToLink.length === 0) {
             showNotification('NO_TRANSACTION_TO_LINK', 'warning');
             return;
         }
 
         displaySpinner(langProcessBatch);
 
-        try {
-            const data = await apiCall('batchLink', {
-                bank_rowid: bankRowid,
-                matches: matches
-            });
+        let successCount = 0;
+        let errorCount = 0;
+        let completedCount = 0;
+        const total = itemsToLink.length;
 
-            if (data.error) {
-                showNotification(data.error, 'error');
-                loadTransactions();
-            } else {
-                const translationsElem = document.getElementById('qonto-js-translations');
-                const batchPattern = (translationsElem && translationsElem.dataset.successBatchCompleted) ? translationsElem.dataset.successBatchCompleted : '%s transaction(s) linked, %s failed.';
-                const successCount = (data.success_count !== undefined) ? data.success_count : 0;
-                const errorCount = (data.error_count !== undefined) ? data.error_count : 0;
-                let msg = batchPattern;
-                if (msg.includes('%s')) {
-                    msg = msg.replace('%s', successCount).replace('%s', errorCount);
-                } else {
-                    msg = msg + ' (' + successCount + ' OK, ' + errorCount + ' KO)';
-                }
-                showNotification(msg, (errorCount > 0 ? 'warning' : 'success'));
-                loadTransactions();
-            }
-
-        } catch (error) {
-            showNotification(langAjaxError + ' : ' + error.message, 'error');
-            loadTransactions();
+        const spinnerText = container.find('.qonto-spinner-text');
+        if (spinnerText.length > 0) {
+            spinnerText.text(langProcessBatch + ' (0/' + total + ')');
         }
+
+        const promises = itemsToLink.map(function (item) {
+            return apiCall('batchLink', {
+                bank_rowid: bankRowid,
+                matches: {
+                    [item.qonto_id]: {
+                        type: item.type,
+                        doc_id: item.doc_id
+                    }
+                }
+            }).then(function (res) {
+                if (res && !res.error && res.success_count > 0) {
+                    successCount++;
+                } else {
+                    errorCount++;
+                }
+            }).catch(function () {
+                errorCount++;
+            }).finally(function () {
+                completedCount++;
+                if (spinnerText.length > 0) {
+                    spinnerText.text(langProcessBatch + ' (' + completedCount + '/' + total + ')');
+                }
+            });
+        });
+
+        await Promise.all(promises);
+
+        const translationsElem = document.getElementById('qonto-js-translations');
+        const batchPattern = (translationsElem && translationsElem.dataset.successBatchCompleted) ? translationsElem.dataset.successBatchCompleted : '%s transaction(s) linked, %s failed.';
+        let msg = batchPattern;
+        if (msg.includes('%s')) {
+            msg = msg.replace('%s', successCount).replace('%s', errorCount);
+        } else {
+            msg = msg + ' (' + successCount + ' OK, ' + errorCount + ' KO)';
+        }
+        showNotification(msg, (errorCount > 0 ? 'warning' : 'success'));
+        loadTransactions();
     }
 
     // Load advanced info (getAdvancedInfo)
