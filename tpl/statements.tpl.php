@@ -51,10 +51,12 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                 
             </div>
     
+    	    <?php if ($user->hasRight('qontosync', 'statements', 'import')): ?>
     	    <!-- Button for update all statements PDF -->
             <button type="button" class="butAction" id="btn_import_statements" style="border: none; cursor: pointer; display: inline-flex; align-items: center; font-size: 1em;">
                 <i class="fas fa-cloud-download-alt marginrightonly"></i><?php print $langs->trans("Import"); ?>
             </button>
+            <?php endif; ?>
     	
     	</div>
     </form>

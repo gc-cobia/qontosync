@@ -12,7 +12,7 @@ if (! $res && file_exists("../../../main.inc.php")) $res = @include "../../../ma
 if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../../../main.inc.php";
 if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
-if ($user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
+if ($user->socid > 0 || !$user->hasRight('qontosync', 'supplier_invoices', 'read')) {
     accessforbidden();
 }
 
@@ -26,6 +26,9 @@ $action = GETPOST('action', 'aZ09');
 $view_attachment_id = GETPOST('view_attachment', 'alphanohtml');
 
 if (!empty($view_attachment_id)) {
+    if (!$user->hasRight('qontosync', 'supplier_invoices', 'read_pdf')) {
+        accessforbidden();
+    }
     $qontoApi = new QontoApi();
     $attachment = $qontoApi->getAttachment($view_attachment_id);
     if (!empty($attachment['url'])) {
@@ -37,7 +40,6 @@ if (!empty($view_attachment_id)) {
 
 $eiEnabled = (bool) getDolGlobalInt('QONTOSYNC_EI_ENABLED');
 $einvoicingModEnabled = isModEnabled('einvoicing');
-$canWrite = $user->hasRight('qontosync', 'write');
 $pendingActionHtml = '';
 
 $qontoApi = null;
@@ -56,7 +58,7 @@ if ($eiEnabled) {
 /*
  * Actions
  */
-if ($eiEnabled && $canWrite && !empty($action)) {
+if ($eiEnabled && $user->hasRight('qontosync', 'supplier_invoices', 'import') && !empty($action)) {
     try {
         $einvoicingService = new QontoEInvoicing($db);
 
@@ -138,7 +140,7 @@ if (!$eiEnabled) {
     }
 
     $morehtmlright = '';
-    if ($canWrite && $nbToProcess > 0) {
+    if ($user->hasRight('qontosync', 'supplier_invoices', 'import') && $nbToProcess > 0) {
         $urlImportAll = dol_buildpath('/qontosync/supplier_invoices.php', 1) . '?action=import_all&token=' . newToken();
         $morehtmlright .= dolGetButtonTitle($langs->trans("QontoEInvoicingImportAll") . ' (' . $nbToProcess . ')', '', 'fa fa-cloud-download-alt', $urlImportAll);
     }
@@ -224,7 +226,7 @@ if (!$eiEnabled) {
             print '<td class="center nowrap">';
             $hasAction = false;
 
-            if ($canWrite && $matchStatus !== 'linked' && !empty($att_id) && $einvoicingModEnabled) {
+            if ($user->hasRight('qontosync', 'supplier_invoices', 'import') && $matchStatus !== 'linked' && !empty($att_id) && $einvoicingModEnabled) {
                 $url_import = dol_buildpath('/qontosync/supplier_invoices.php', 1) . '?action=import_invoice&qonto_id=' . urlencode($qontoId) . '&token=' . newToken();
                 print '<a href="' . dol_escape_htmltag($url_import) . '" class="button smallpaddingimp marginrightonly">';
                 print '<i class="fas fa-file-import marginrightonly"></i>' . $langs->trans("Import");
@@ -232,7 +234,7 @@ if (!$eiEnabled) {
                 $hasAction = true;
             }
 
-            if (!empty($att_id)) {
+            if ($user->hasRight('qontosync', 'supplier_invoices', 'read_pdf') && !empty($att_id)) {
                 $url_view = dol_buildpath('/qontosync/supplier_invoices.php', 1) . '?view_attachment=' . urlencode($att_id) . '&token=' . newToken();
                 print '<a href="' . dol_escape_htmltag($url_view) . '" target="_blank" class="button smallpaddingimp">';
                 print '<i class="fas fa-file-pdf marginrightonly"></i>' . $langs->trans("OpenVerb");

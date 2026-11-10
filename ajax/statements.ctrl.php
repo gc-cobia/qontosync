@@ -43,6 +43,12 @@ class StatementsController {
      * @return array Array containing http_code and statements or error code
      */
     public function getStatements(array $data) {
+        global $user;
+
+        if (!$user->hasRight('qontosync', 'statements', 'read')) {
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
+
         $year = (int) ($data['year'] ?? 0);
         $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
 
@@ -132,6 +138,12 @@ class StatementsController {
      * @return array Associative array with http_code and sync result counts
      */
     public function updateStatements(array $data) {
+        global $user;
+
+        if (!$user->hasRight('qontosync', 'statements', 'import')) {
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
+
         $year = (int) ($data['year'] ?? 0);
         $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
 

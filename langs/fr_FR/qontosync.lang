@@ -2,8 +2,15 @@ QontoSync=QontoSync
 QontoSyncSetup=Configuration de QontoSync
 
 # Permissions
-PermissionReadQontoSync=Consulter les transactions QontoSync
-PermissionWriteQontoSync=Lier et valider les transactions Qonto
+PermissionQontoSyncReconciliationRead=Rapprochement bancaire : consulter les transactions et correspondances
+PermissionQontoSyncReconciliationLink=Rapprochement bancaire : lier et rapprocher des transactions (par lot et avancé)
+PermissionQontoSyncReconciliationUnlink=Rapprochement bancaire : délier des transactions rapprochées
+PermissionQontoSyncReconciliationCreateVarious=Rapprochement bancaire : créer des paiements divers
+PermissionQontoSyncStatementsRead=Relevés bancaires : consulter le comparatif des relevés
+PermissionQontoSyncStatementsImport=Relevés bancaires : importer et synchroniser les relevés PDF en GED
+PermissionQontoSyncSupplierInvoicesRead=Factures fournisseurs : consulter la liste des factures Qonto
+PermissionQontoSyncSupplierInvoicesReadPdf=Factures fournisseurs : ouvrir et télécharger les pièces jointes PDF
+PermissionQontoSyncSupplierInvoicesImport=Factures fournisseurs : importer et synchroniser les factures dans Dolibarr
 
 ## Parameters
 # Configuration

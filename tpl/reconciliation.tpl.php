@@ -66,10 +66,12 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
     	
             </div>
     
+    	    <?php if ($user->hasRight('qontosync', 'reconciliation', 'link')): ?>
     	    <!-- Button validate all matches in right float box -->
 			<button type="button" class="butAction" id="btn_validate_conciliation" style="border: none; cursor: pointer; display: inline-flex; align-items: center; font-size: 1em;">
                 <i class="fas fa-link marginrightonly"></i><?php print $langs->trans("Validate"); ?>
             </button>
+            <?php endif; ?>
     	
     	</div>
     </form>
@@ -214,15 +216,19 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
                         <span class="fa fa-search marginrightonly"></span><?php print dol_escape_htmltag($langs->transnoentities("AdvancedSearch")); ?>
                     </button>
 
+                    <?php if ($user->hasRight('qontosync', 'reconciliation', 'unlink')): ?>
                     <!-- Unlink Transaction -->
                     <button type="button" role="menuitem" class="btn-ask-unlink qonto-dropdown-item" style="display: none;" title="<?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>">
                         <span class="fas fa-undo marginrightonly"></span><?php print dol_escape_htmltag($langs->transnoentities("UnlinkTransaction")); ?>
                     </button>
+                    <?php endif; ?>
 
+                    <?php if ($user->hasRight('qontosync', 'reconciliation', 'create_various')): ?>
                     <!-- New Various Payment -->
                     <button type="button" role="menuitem" class="btn-ask-create-od qonto-dropdown-item" style="display: none;" title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>">
                         <span class="fas fa-plus marginrightonly"></span><?php print dol_escape_htmltag($langs->transnoentities("NewVariousPayment")); ?>
                     </button>
+                    <?php endif; ?>
                 </div>
             </div>
         </td>
@@ -271,6 +277,7 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
 <!-- CONFIRMATION DIALOG MODALS                 -->
 <!-- ========================================== -->
 
+<?php if ($user->hasRight('qontosync', 'reconciliation', 'create_various')): ?>
 <!-- Confirmation modal for new various payment -->
 <div id="dialog-confirm-create-od" 
      title="<?php print dol_escape_htmltag($langs->trans("NewVariousPayment")); ?>" 
@@ -300,7 +307,9 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
         <input type="file" id="od_attached_file" name="od_attached_file" class="flat minwidth200" style="width: 100%; max-width: 100%; box-sizing: border-box;" />
     </div>
 </div>
+<?php endif; ?>
 
+<?php if ($user->hasRight('qontosync', 'reconciliation', 'unlink')): ?>
 <!-- Confirmation modal for unlinking -->
 <div id="dialog-confirm-unlink" 
      title="<?php print dol_escape_htmltag($langs->trans("UnlinkTransaction")); ?>" 
@@ -309,3 +318,4 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
      style="display: none;">
     <p><span class="fas fa-exclamation-circle" style="float:left; margin:12px 12px 20px 0;"></span><?php print $langs->trans("ConfirmUnlinkTransaction"); ?></p>
 </div>
+<?php endif; ?>

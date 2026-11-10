@@ -2,8 +2,15 @@ QontoSync=QontoSync
 QontoSyncSetup=QontoSync Setup
 
 # Permissions
-PermissionReadQontoSync=Read QontoSync transactions
-PermissionWriteQontoSync=Link and validate Qonto transactions
+PermissionQontoSyncReconciliationRead=Bank reconciliation: view transactions and correspondences
+PermissionQontoSyncReconciliationLink=Bank reconciliation: link and reconcile transactions (batch and advanced)
+PermissionQontoSyncReconciliationUnlink=Bank reconciliation: unlink reconciled transactions
+PermissionQontoSyncReconciliationCreateVarious=Bank reconciliation: create various payments
+PermissionQontoSyncStatementsRead=Bank statements: view monthly statements comparison
+PermissionQontoSyncStatementsImport=Bank statements: import and synchronize PDF statements into EDM
+PermissionQontoSyncSupplierInvoicesRead=Supplier invoices: view Qonto supplier invoices list
+PermissionQontoSyncSupplierInvoicesReadPdf=Supplier invoices: open and download PDF attachments
+PermissionQontoSyncSupplierInvoicesImport=Supplier invoices: import and synchronize invoices into Dolibarr
 
 # Parameters
 QontoAPIKey=Qonto API Key (Secret Key)

@@ -133,19 +133,80 @@ class modQontosync extends DolibarrModules
 		
 		$r = 0;
 
+		// Reconciliation page & functions
 		$r++;
-		$this->rights[$r][0] = ($this->numero * 10) + 1;
-		$this->rights[$r][1] = 'PermissionReadQontoSync';
+		$this->rights[$r][0] = ($this->numero * 100) + 1;
+		$this->rights[$r][1] = 'PermissionQontoSyncReconciliationRead';
 		$this->rights[$r][2] = 'r';
-		$this->rights[$r][3] = 1;
-		$this->rights[$r][4] = 'read';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'reconciliation';
+		$this->rights[$r][5] = 'read';
 
 		$r++;
-		$this->rights[$r][0] = ($this->numero * 10) + 2;
-		$this->rights[$r][1] = 'PermissionWriteQontoSync';
+		$this->rights[$r][0] = ($this->numero * 100) + 2;
+		$this->rights[$r][1] = 'PermissionQontoSyncReconciliationLink';
 		$this->rights[$r][2] = 'w';
-		$this->rights[$r][3] = 1;
-		$this->rights[$r][4] = 'write';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'reconciliation';
+		$this->rights[$r][5] = 'link';
+
+		$r++;
+		$this->rights[$r][0] = ($this->numero * 100) + 3;
+		$this->rights[$r][1] = 'PermissionQontoSyncReconciliationUnlink';
+		$this->rights[$r][2] = 'd';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'reconciliation';
+		$this->rights[$r][5] = 'unlink';
+
+		$r++;
+		$this->rights[$r][0] = ($this->numero * 100) + 4;
+		$this->rights[$r][1] = 'PermissionQontoSyncReconciliationCreateVarious';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'reconciliation';
+		$this->rights[$r][5] = 'create_various';
+
+		// Statements page & functions
+		$r++;
+		$this->rights[$r][0] = ($this->numero * 100) + 5;
+		$this->rights[$r][1] = 'PermissionQontoSyncStatementsRead';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'statements';
+		$this->rights[$r][5] = 'read';
+
+		$r++;
+		$this->rights[$r][0] = ($this->numero * 100) + 6;
+		$this->rights[$r][1] = 'PermissionQontoSyncStatementsImport';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'statements';
+		$this->rights[$r][5] = 'import';
+
+		// Supplier invoices page & functions
+		$r++;
+		$this->rights[$r][0] = ($this->numero * 100) + 7;
+		$this->rights[$r][1] = 'PermissionQontoSyncSupplierInvoicesRead';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'supplier_invoices';
+		$this->rights[$r][5] = 'read';
+
+		$r++;
+		$this->rights[$r][0] = ($this->numero * 100) + 8;
+		$this->rights[$r][1] = 'PermissionQontoSyncSupplierInvoicesReadPdf';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'supplier_invoices';
+		$this->rights[$r][5] = 'read_pdf';
+
+		$r++;
+		$this->rights[$r][0] = ($this->numero * 100) + 9;
+		$this->rights[$r][1] = 'PermissionQontoSyncSupplierInvoicesImport';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'supplier_invoices';
+		$this->rights[$r][5] = 'import';
 
 		// Main menu entries
 		$this->menu = array();
@@ -160,7 +221,7 @@ class modQontosync extends DolibarrModules
             'langs'     => 'qontosync@qontosync',           
             'position'  => 2000,                            
             'enabled'   => '$conf->qontosync->enabled',     
-            'perms'     => '$user->rights->qontosync->read',
+            'perms'     => '$user->hasRight(\'qontosync\', \'reconciliation\', \'read\') || $user->hasRight(\'qontosync\', \'statements\', \'read\') || (getDolGlobalInt(\'QONTOSYNC_EI_ENABLED\') && $user->hasRight(\'qontosync\', \'supplier_invoices\', \'read\'))',
             'target'    => '',
             'user'      => 2,                               
             'titre'     => 'QontoSync',
@@ -177,7 +238,7 @@ class modQontosync extends DolibarrModules
             'langs'     => 'banks',
             'position'  => 2001,
             'enabled'   => '$conf->qontosync->enabled',
-            'perms'     => '$user->rights->qontosync->read',
+            'perms'     => '$user->hasRight(\'qontosync\', \'reconciliation\', \'read\')',
             'target'    => '',
             'user'      => 2,
             'titre'     => 'Conciliation'
@@ -193,10 +254,26 @@ class modQontosync extends DolibarrModules
             'langs'     => 'banks',
             'position'  => 2002,
             'enabled'   => '$conf->qontosync->enabled',
-            'perms'     => '$user->rights->qontosync->read',
+            'perms'     => '$user->hasRight(\'qontosync\', \'statements\', \'read\')',
             'target'    => '',
             'user'      => 2,
             'titre'     => 'AccountStatements' 
+        );
+        $r++;
+
+        $this->menu[$r] = array(
+            'fk_menu'   => 'fk_mainmenu=bank,fk_leftmenu=qontosync_main', 
+            'type'      => 'left',
+            'mainmenu'  => 'bank',
+            'leftmenu'  => 'qontosync_supplier_invoices',
+            'url'       => '/qontosync/supplier_invoices.php',
+            'langs'     => 'qontosync@qontosync',
+            'position'  => 2003,
+            'enabled'   => '$conf->qontosync->enabled && getDolGlobalInt(\'QONTOSYNC_EI_ENABLED\')',
+            'perms'     => '$user->hasRight(\'qontosync\', \'supplier_invoices\', \'read\')',
+            'target'    => '',
+            'user'      => 2,
+            'titre'     => 'SupplierInvoices'
         );
         $r++;
 	}
@@ -229,7 +306,11 @@ class modQontosync extends DolibarrModules
 	 */
 	public function remove($options = '')
 	{
-		$sql = array();
+		global $conf;
+
+		$sql = array(
+			"DELETE FROM ".MAIN_DB_PREFIX."rights_def WHERE module = '".$this->db->escape($this->rights_class)."' AND entity = ".((int) $conf->entity)
+		);
 		return $this->_remove($sql, $options);
 	}
 }

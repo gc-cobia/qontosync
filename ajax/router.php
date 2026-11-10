@@ -60,7 +60,7 @@ if (empty($tokenParam) || $tokenParam !== currentToken()) {
     exit;
 }
 
-if ($user->socid > 0 || !$user->hasRight('qontosync', 'read')) {
+if ($user->socid > 0) {
     http_response_code(403);
     echo json_encode(['error' => 'PERMISSION_DENIED']);
     exit;

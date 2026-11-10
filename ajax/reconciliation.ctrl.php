@@ -43,7 +43,11 @@ class ReconciliationController {
      * @return array Array containing http_code and transactions or error code
      */
     public function getTransactions(array $data) {
-        global $conf, $langs;
+        global $user, $conf, $langs;
+
+        if (!$user->hasRight('qontosync', 'reconciliation', 'read')) {
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
 
         $month = (int) ($data['month'] ?? 0);
         $year = (int) ($data['year'] ?? 0);
@@ -249,6 +253,12 @@ class ReconciliationController {
      * @return array Associative array with http_code and result counts
      */
     public function batchLink(array $data) {
+        global $user;
+
+        if (!$user->hasRight('qontosync', 'reconciliation', 'link')) {
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
+
         $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
         $matches = $data['matches'] ?? [];
 
@@ -315,6 +325,12 @@ class ReconciliationController {
      * @return array Associative array with http_code for result
      */
     public function unlinkTransaction(array $data) {
+        global $user;
+
+        if (!$user->hasRight('qontosync', 'reconciliation', 'unlink')) {
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
+
         $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
         $bank_line_id = (int) ($data['bank_line_id'] ?? 0);
 
@@ -351,7 +367,11 @@ class ReconciliationController {
      * @return array Associative array with http_code and linked data array for result
      */
     public function getAdvancedInfo(array $data) {
-        global $conf, $langs;
+        global $user, $conf, $langs;
+
+        if (!$user->hasRight('qontosync', 'reconciliation', 'read')) {
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
 
         $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
         $qonto_id = ($data['qonto_id'] ?? '');
@@ -617,6 +637,12 @@ class ReconciliationController {
      * @return array Associative array with http_code for result or error
      */
     public function batchLinkAdvanced(array $data) {
+        global $user;
+
+        if (!$user->hasRight('qontosync', 'reconciliation', 'link')) {
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
+
         $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
         $qonto_id = ($data['qonto_id'] ?? '');
         $link_docs = $data['link_doc'] ?? [];
@@ -712,7 +738,7 @@ class ReconciliationController {
         global $user, $langs;
 
         // Security check
-        if ($user->socid > 0 || !$user->hasRight('qontosync', 'write')) {
+        if (!$user->hasRight('qontosync', 'reconciliation', 'create_various')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 

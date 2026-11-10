@@ -158,9 +158,11 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
                 </table>
             </div>
 
+            <?php if ($user->hasRight('qontosync', 'reconciliation', 'link')): ?>
             <div class="qontosync-modal-footer action-buttons">
                 <input type="submit" class="button button-save qontosync-btn-full" value="<?php print $langs->trans("Validate"); ?>">
             </div>
+            <?php endif; ?>
 
             <!-- Internal Loader during submission -->
             <div id="advanced_match_loader" class="opacitymedium" style="display: none; text-align: center; padding: 15px;">
@@ -174,7 +176,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 <template id="tpl-advanced-pending-row">
     <tr class="oddeven doc_row">
         <td class="center">
-            <input type="checkbox" class="flat check_link_doc" name="link_doc[]" value="">
+            <input type="checkbox" class="flat check_link_doc" name="link_doc[]" value=""<?php print !$user->hasRight('qontosync', 'reconciliation', 'link') ? ' disabled' : ''; ?>>
         </td>
         <td class="col-doctype">
             <span class="doctype-text"></span>
