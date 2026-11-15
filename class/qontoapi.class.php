@@ -40,10 +40,10 @@ class QontoApi
 	 *
 	 * @param string        $apiKey       API key
 	 * @param string        $slug         Organization slug
-	 * @param bool|int|null $sandbox      Sandbox mode
+	 * @param bool|null		$sandbox      Sandbox mode
 	 * @param string        $sandboxToken Sandbox token
 	 */
-	public function __construct($apiKey = '', $slug = '', $sandbox = null, $sandboxToken = '')
+	public function __construct(string $apiKey = '', string $slug = '', $sandbox = null, string $sandboxToken = '')
 	{
 		global $conf;
 
@@ -63,10 +63,7 @@ class QontoApi
 
 		$this->apiKey = trim($apiKeyVal);
 		$this->slug = trim($slugVal);
-    	$this->sandbox = ($sandbox !== null) 
-          ? (bool) $sandbox 
-			// TODO: move to getDolGlobalBool('QONTOSYNC_SANDBOX') only when next LTS reach v22
-          : (function_exists('getDolGlobalBool') ? getDolGlobalBool('QONTOSYNC_SANDBOX') : (bool) getDolGlobalInt('QONTOSYNC_SANDBOX'));
+    	$this->sandbox = ($sandbox !== null) ? (bool) $sandbox : getDolGlobalBool('QONTOSYNC_SANDBOX');
 		$this->sandboxToken = trim($sandboxTokenVal);
 		$this->baseUrl = $this->sandbox ? self::BASE_URL_SANDBOX : self::BASE_URL_PROD;
 
@@ -85,10 +82,11 @@ class QontoApi
 	 * @param string $endpoint The API endpoint path (e.g. "/v2/organization")
 	 * @return string|false The raw JSON response string, or false on error
 	 */
-	private function sendRequest($endpoint)
+	private function sendRequest(string $endpoint)
 	{
-		// Init trace ID
-		$this->traceId = '';
+		if (!function_exists('getURLContent')) require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+
+		$this->traceId = ''; // Init trace ID
 
 		// 1. Guard clause: If a configuration error was already detected, skip execution
 		if (!empty($this->error)) {
@@ -101,99 +99,77 @@ class QontoApi
 		dol_syslog(__METHOD__ . ": Sending GET request to " . $url, LOG_DEBUG);
 
 		// 3. Build the HTTP headers dynamically using credentials and staging token if Sandbox is active
-		$headers = array(
+		$headers = [
 			"Authorization: " . $this->slug . ":" . $this->apiKey,
 			"Accept: application/json",
 			"User-Agent: Dolibarr QontoSync"
-		);
+		];
 		if ($this->sandbox && !empty($this->sandboxToken)) {
 			$headers[] = "X-Qonto-Staging-Token: " . $this->sandboxToken;
 		}
 
-		// 4. Initialize the cURL session
-		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL, $url);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-		// Security
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-		
-		if (defined('CURLOPT_PROTOCOLS_STR')) {
-			curl_setopt($ch, CURLOPT_PROTOCOLS_STR, 'HTTPS');
-		} else {
-			curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
-		}
-
-		// Timeouts
-		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-
-		// 4.1 Capture trace ID in headers
-		$responseHeaders = array();
-		curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($ch, $headerLine) use (&$responseHeaders) {
-			$len = strlen($headerLine);
-			$parts = explode(':', $headerLine, 2);
-			if (count($parts) === 2) {
-				$key = strtolower(trim($parts[0]));
-				$value = trim($parts[1]);
-				$responseHeaders[$key] = $value;
+		// 4. Capture the response headers (Trace-ID) through a header callback
+		$responseHeaders = [];
+		$curlOptions = [
+			CURLOPT_HEADERFUNCTION => function ($ch, $headerLine) use (&$responseHeaders) {
+				$len = strlen($headerLine);
+				$parts = explode(':', $headerLine, 2);
+				if (count($parts) === 2) {
+					$responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+				}
+				return $len;
 			}
-			return $len;
-		});
-		
-		// 5. Execute the HTTP request
-		$response = curl_exec($ch);
+		];
 
-		// 6. Handle transport-level errors (e.g. DNS, connection timeout, server unreachable)
-		if ($response === false) {
-			$this->error = curl_error($ch);
+		// 5. Execute the HTTP request through the Dolibarr core function
+		//    GET, no redirection, HTTPS only, external URL only, SSL check forced, timeouts 10s/30s
+		$result = getURLContent($url, 'GET', '', 0, $headers, ['https'], 0, 1, 10, 30, $curlOptions);
+
+		// 6. Transport-level errors (DNS, timeout, SSRF/URL refused by the core...).
+		//    getURLContent() sets curl_error_no != 0 in those cases.
+		if (!empty($result['curl_error_no'])) {
+			$this->error = !empty($result['curl_error_msg']) ? $result['curl_error_msg'] : 'cURL error ' . $result['curl_error_no'];
 			dol_syslog(__METHOD__ . ": cURL error: " . $this->error, LOG_ERR);
-			curl_close($ch);
 			return false;
 		}
 
-		// 7. Retrieve the HTTP status code and close the cURL resource
-		$httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-		curl_close($ch);
+		$httpcode = (int) $result['http_code'];
+		$response = (string) $result['content'];
 
-		// 8. Handle API-level response status codes
+		// 7. Handle API-level response status codes
 		if ($httpcode == 200) {
-			// Capture trace ID in headers
 			if (!empty($responseHeaders['x-tyk-trace-id'])) {
 				$this->traceId = $responseHeaders['x-tyk-trace-id'];
 			}
 			dol_syslog(__METHOD__ . ": Request successful (200). Trace-ID: " . $this->traceId, LOG_DEBUG);
 			return $response;
-		} else {
-			// Try to extract the Trace-ID from the HTTP header
-			if (!empty($responseHeaders['x-tyk-trace-id'])) {
-				$this->traceId = $responseHeaders['x-tyk-trace-id'];
-			} else {
-				// If absent from the header, look in the JSON body of the error
-				$data = json_decode($response, true);
-				if (is_array($data) && isset($data['trace_id'])) {
-					$this->traceId = $data['trace_id'];
-				}
-			}
-
-			// Format the HTTP code as a clean translation key pattern
-			$this->error = "ErrorHTTPCode" . $httpcode;
-
-			// If a Trace-ID has been intercepted, add it to the error message for the interface
-			if (!empty($this->traceId)) {
-				$this->error .= " (Trace-ID: " . $this->traceId . ")";
-			}
-			
-			// Log in Dolibarr (SYSLOG)
-			dol_syslog(__METHOD__ . ": API Error HTTP " . $httpcode . " on URL " . $url, LOG_ERR);
-			dol_syslog(__METHOD__ . ": Trace-ID: " . $this->traceId, LOG_ERR);
-			dol_syslog(__METHOD__ . ": API error response (truncated): " . substr($response, 0, 200), LOG_ERR);
-			
-			return false;
 		}
+
+		// Try to extract the Trace-ID from the HTTP header
+		if (!empty($responseHeaders['x-tyk-trace-id'])) {
+			$this->traceId = $responseHeaders['x-tyk-trace-id'];
+		} else {
+			// If absent from the header, look in the JSON body of the error
+			$data = json_decode($response, true);
+			if (is_array($data) && isset($data['trace_id'])) {
+				$this->traceId = $data['trace_id'];
+			}
+		}
+
+		// Format the HTTP code as a clean translation key pattern
+		$this->error = "ErrorHTTPCode" . $httpcode;
+
+		// If a Trace-ID has been intercepted, add it to the error message for the interface
+		if (!empty($this->traceId)) {
+			$this->error .= " (Trace-ID: " . $this->traceId . ")";
+		}
+
+		// Log in Dolibarr (SYSLOG)
+		dol_syslog(__METHOD__ . ": API Error HTTP " . $httpcode . " on URL " . $url, LOG_ERR);
+		dol_syslog(__METHOD__ . ": Trace-ID: " . $this->traceId, LOG_ERR);
+		dol_syslog(__METHOD__ . ": API error response (truncated): " . substr($response, 0, 200), LOG_ERR);
+
+		return false;
 	}
 
 	/**
@@ -212,7 +188,7 @@ class QontoApi
 		$base_endpoint = "/v2/transactions";
 		$base_endpoint .= "?" . http_build_query($parameters);
 
-		$all_transactions = array();
+		$all_transactions = [];
 		$current_page = 1;
 
 		do {
@@ -249,7 +225,7 @@ class QontoApi
 	 * @param string $transaction_id ID of the transaction
 	 * @return array|false Array of the transaction data or false on error
 	 */
-	public function getTransaction($transaction_id)
+	public function getTransaction(string $transaction_id)
 	{
 		$endpoint = "/v2/transactions/" . urlencode(trim($transaction_id));
 		
@@ -274,7 +250,7 @@ class QontoApi
 	 *
 	 * @return bool True if connection succeeded, false otherwise
 	 */
-	public function testConnection()
+	public function testConnection(): bool
 	{
 		$response = $this->sendRequest("/v2/organization");
 		dol_syslog(__METHOD__ . ": Testing the Qonto connection.", LOG_DEBUG);
@@ -288,16 +264,16 @@ class QontoApi
 	 * @param int    $year Year
 	 * @return array|false Array of statements or false on error
 	 */
-	public function getStatements($iban, $year)
+	public function getStatements(string $iban, int $year)
 	{
-		$all_statements = array();
+		$all_statements = [];
 		$current_page = 1;
 
 		// Clean the IBAN by removing spaces
 		$clean_iban = str_replace(' ', '', $iban);
 
-		$period_from = "01-" . (int)$year;
-		$period_to = "12-" . (int)$year;
+		$period_from	= "01-" . (int) $year;
+		$period_to		= "12-" . (int) $year;
 
 		$base_endpoint = "/v2/statements?per_page=100&ibans[]=" . urlencode($clean_iban) . "&period_from=" . $period_from . "&period_to=" . $period_to;
 
@@ -317,7 +293,7 @@ class QontoApi
 
 			// Check if there is a next page according to Qonto API meta object
 			if (isset($data['meta']) && !empty($data['meta']['next_page'])) {
-				$current_page = (int)$data['meta']['next_page'];
+				$current_page = (int) $data['meta']['next_page'];
 			} else {
 				$current_page = null;
 			}
@@ -335,7 +311,7 @@ class QontoApi
 	 * @param string $statement_id ID of the statement
 	 * @return array|false Array of the statement data or false on error
 	 */
-	public function getStatementById($statement_id)
+	public function getStatementById(string $statement_id)
 	{
 		$endpoint = "/v2/statements/" . urlencode(trim($statement_id));
 		$response = $this->sendRequest($endpoint);
@@ -434,7 +410,7 @@ class QontoApi
 	 * @param string $attachment_id UUID of the attachment
 	 * @return array|false Attachment array or false on error
 	 */
-	public function getAttachment($attachment_id)
+	public function getAttachment(string $attachment_id)
     {
         if (empty($attachment_id)) {
             return false;
