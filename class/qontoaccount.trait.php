@@ -24,6 +24,17 @@ trait QontoAccountTrait
     /** @var Account|null */
     protected $account;
 
+    /**
+     * Initialize $this->account from a Dolibarr Account instance or bank account ID.
+     *
+     * Resets $this->account to null before loading. When an ID is provided, loads the
+     * record via Account::fetch(). When an existing Account instance is provided,
+     * validates only that id > 0; call isAccountAllowed() afterward to enforce
+     * entity scope.
+     *
+     * @param  Account|int|null $accountOrId Dolibarr Account object or llx_bank_account rowid
+     * @return bool True if a valid Account was loaded into $this->account, false otherwise
+     */
     protected function initAccount($accountOrId): bool
     {
         $this->account = null;
@@ -49,12 +60,24 @@ trait QontoAccountTrait
         return false;
     }
 
+    /**
+     * Check whether the loaded bank account belongs to an allowed entity.
+     *
+     * Clears $this->account to null if no valid account is loaded or if access is denied.
+     *
+     * @return bool True if $this->account is valid and within getEntity('bank_account'), false otherwise
+     */
     protected function isAccountAllowed(): bool
     {
         if (empty($this->account) || $this->account->id <= 0) {
             return false;
         }
 
-        return in_array((string) (int) $this->account->entity, explode(',', getEntity('bank_account')), true);
+        if (!in_array((string) (int) $this->account->entity, explode(',', getEntity('bank_account')), true)) {
+            $this->account = null;
+            return false;
+        }
+
+        return true;
     }
 }
