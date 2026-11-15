@@ -16,8 +16,9 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
  */
 class QontoApi
 {
-	// Set default URL for Qonto API
+	/** @var string */
 	const BASE_URL_PROD = "https://thirdparty.qonto.com";
+	/** @var string */
 	const BASE_URL_SANDBOX = "https://thirdparty-sandbox.staging.qonto.co";
 
 	/** @var string */
@@ -36,11 +37,11 @@ class QontoApi
 	private $baseUrl;
 
 	/**
-	 * QontoApi constructor.
+	 * QontoApi constructor (falls back to Dolibarr module constants when empty/null).
 	 *
 	 * @param string        $apiKey       API key
 	 * @param string        $slug         Organization slug
-	 * @param bool|null		$sandbox      Sandbox mode
+	 * @param bool|int|null $sandbox      Sandbox mode
 	 * @param string        $sandboxToken Sandbox token
 	 */
 	public function __construct(string $apiKey = '', string $slug = '', $sandbox = null, string $sandboxToken = '')
@@ -77,10 +78,10 @@ class QontoApi
 	}
 
 	/**
-	 * Send a GET request to the Qonto API.
+	 * Send an authenticated GET request to the Qonto API via getURLContent().
 	 *
-	 * @param string $endpoint The API endpoint path (e.g. "/v2/organization")
-	 * @return string|false The raw JSON response string, or false on error
+	 * @param string        $endpoint API endpoint path (e.g. "/v2/organization")
+	 * @return string|false           Raw JSON response string, or false on error
 	 */
 	private function sendRequest(string $endpoint)
 	{
@@ -173,10 +174,10 @@ class QontoApi
 	}
 
 	/**
-	 * Get transactions from Qonto API
+	 * Get transactions from Qonto API (auto-paginated).
 	 *
-	 * @param array $parameters Query parameters (iban, settled_at_from, settled_at_to, status, sort_by, etc.)
-	 * @return array|false Array of transactions or false on error
+	 * @param array        $parameters Query parameters (iban, settled_at_from, settled_at_to, status, sort_by, etc.)
+	 * @return array|false             Array of transactions, or false on error
 	 */
 	public function getTransactions(array $parameters = [])
 	{
@@ -220,10 +221,10 @@ class QontoApi
 	}
 	
 	/**
-	 * Get a single transaction from Qonto API by its ID
+	 * Get a single transaction from Qonto API by its ID.
 	 *
-	 * @param string $transaction_id ID of the transaction
-	 * @return array|false Array of the transaction data or false on error
+	 * @param string       $transaction_id ID of the transaction
+	 * @return array|false                 Transaction data array, or false on error
 	 */
 	public function getTransaction(string $transaction_id)
 	{
@@ -246,7 +247,7 @@ class QontoApi
 	}
 
 	/**
-	 * Test the connection to the Qonto API without retrieving or processing the list of accounts.
+	 * Test the connection to the Qonto API via /v2/organization.
 	 *
 	 * @return bool True if connection succeeded, false otherwise
 	 */
@@ -258,11 +259,11 @@ class QontoApi
 	}
 
 	/**
-	 * Get statements list from Qonto API filtered by IBAN and Year
+	 * Get statements list from Qonto API filtered by IBAN and year (auto-paginated).
 	 *
-	 * @param string $iban IBAN of the bank account
-	 * @param int    $year Year
-	 * @return array|false Array of statements or false on error
+	 * @param string       $iban IBAN of the bank account
+	 * @param int          $year Year
+	 * @return array|false       Array of statements, or false on error
 	 */
 	public function getStatements(string $iban, int $year)
 	{
@@ -306,10 +307,10 @@ class QontoApi
 	}
 
 	/**
-	 * Retrieve a specific statement from Qonto API by its ID
+	 * Retrieve a specific statement from Qonto API by its ID.
 	 *
-	 * @param string $statement_id ID of the statement
-	 * @return array|false Array of the statement data or false on error
+	 * @param string       $statement_id ID of the statement
+	 * @return array|false               Statement data array, or false on error
 	 */
 	public function getStatementById(string $statement_id)
 	{
@@ -330,12 +331,9 @@ class QontoApi
 	}
 
 	/**
-	 * Get e-invoicing settings from Qonto API
+	 * Get e-invoicing settings from Qonto API (not compatible with sandbox).
 	 *
-	 * "sending_status": "enabled", "disabled"
-	 * "receiving_status": "enabled", "disabled", "pending_creation", "pending_deletion"
-	 *
-	 * @return array|false Array containing sending_status and receiving_status, or false on error
+	 * @return array|false Settings array (sending_status, receiving_status), or false on error
 	 */
 	public function getEInvoicingSettings()
 	{
@@ -363,10 +361,10 @@ class QontoApi
 	}
 
 	/**
-	 * Get supplier invoices list from Qonto API
+	 * Get supplier invoices list from Qonto API (auto-paginated).
 	 *
-	 * @param array $parameters Query parameters (filter[status], page, per_page, etc.)
-	 * @return array|false Array with supplier invoices or false on error
+	 * @param array        $parameters Query parameters (filter[status], per_page, etc.)
+	 * @return array|false             Array of supplier invoices, or false on error
 	 */
 	public function getSupplierInvoices(array $parameters = [])
 	{
@@ -405,10 +403,10 @@ class QontoApi
 	}
 
 	/**
-	 * Retrieve an attachment and its temporary download URL
+	 * Retrieve an attachment and its temporary download URL.
 	 *
-	 * @param string $attachment_id UUID of the attachment
-	 * @return array|false Attachment array or false on error
+	 * @param string       $attachment_id UUID of the attachment
+	 * @return array|false                Attachment data array, or false on error
 	 */
 	public function getAttachment(string $attachment_id)
     {
