@@ -1031,6 +1031,7 @@ class QontoUpdater
                 break;
 			
 			default:
+				$error++;
 				break;
 		}
 		
