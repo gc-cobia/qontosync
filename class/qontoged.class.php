@@ -11,6 +11,9 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     exit('Access Forbidden');
 }
 
+if (!trait_exists('QontoAccountTrait')) dol_include_once('/qontosync/class/qontoaccount.trait.php');
+
+
 /**
  * Class QontoGed
  *
@@ -19,12 +22,12 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
  */
 class QontoGed
 {
+	use QontoAccountTrait;
+
     /** @var DoliDB|null */
     private $db;
-
     /** @var string */
     public $error = '';
-
     /** @var array */
     public $errors = [];
 
@@ -33,9 +36,10 @@ class QontoGed
      *
      * @param DoliDB|null $db Database handler
      */
-    public function __construct($db = null)
+    public function __construct(DoliDB $db, $accountOrId = null)
     {
         $this->db = $db;
+		if ($accountOrId !== null) $this->initAccount($accountOrId);
     }
 
     /**
@@ -160,30 +164,33 @@ class QontoGed
      * @param QontoApi|null $api     Instantiated Qonto API object
      * @return array                 Array with success, error, and skipped counts
      */
-    public function syncStatementsGED($account, $year, $api = null)
+    public function syncStatementsGED($year, $api = null): array
     {
         global $conf;
 
-        $result = array(
+		if (!$this->isAccountAllowed()) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
+			return [];
+		}
+
+        $result = [
             'success_count'  => 0,
             'error_count'    => 0,
             'already_exists' => 0,
             'api_error'      => false,
-            'valid_refs'     => array()
-        );
+            'valid_refs'     => []
+        ];
 
         if ($api === null) {
-            if (!class_exists('QontoApi')) {
-                dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-            }
+            if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
             $api = new QontoApi();
         }
 
         // 1. Retrieving the list of statements from the Qonto API
-        $qonto_statements_raw = $api->getStatements($account->iban, $year);
+        $qonto_statements_raw = $api->getStatements($this->account->iban, $year);
 
         if ($qonto_statements_raw === false) {
-            dol_syslog(__METHOD__ . ': Failed to retrieve statements from Qonto API for IBAN ' . $account->iban . (!empty($api->error) ? ' (' . $api->error . ')' : ''), LOG_ERR);
+            dol_syslog(__METHOD__ . ': Failed to retrieve statements from Qonto API for IBAN ' . $this->account->iban . (!empty($api->error) ? ' (' . $api->error . ')' : ''), LOG_ERR);
             $result['api_error'] = true;
             return $result;
         }
@@ -218,7 +225,7 @@ class QontoGed
                 $clean_ref = dol_sanitizeFileName($raw_ref);
                 $ref_releve = substr($clean_ref, 0, 50);
 
-                $dir_output = $conf->bank->dir_output . '/' . $account->id . '/statement/' . $ref_releve;
+                $dir_output = $conf->bank->dir_output . '/' . $this->account->id . '/statement/' . $ref_releve;
                 if (!file_exists($dir_output)) {
                     dol_mkdir($dir_output);
                 }

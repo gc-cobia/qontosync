@@ -11,6 +11,8 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     exit('Access Forbidden');
 }
 
+if (!trait_exists('QontoAccountTrait')) dol_include_once('/qontosync/class/qontoaccount.trait.php');
+
 /**
  * SECURITY WARNING - SQL INJECTIONS
  * As this module relies on standard Dolibarr $db abstraction (no prepared statements),
@@ -22,57 +24,22 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 
 class QontoRepository
 {
-	public $db;
-    private $multicurrency_enabled;
+   	use QontoAccountTrait;
 
-	public function __construct($db)
-	{
-        global $conf;
-
-		$this->db = $db;
-		$this->multicurrency_enabled = isModEnabled('multicurrency');
-	}
+    /** @var DoliDB */
+    private $db;
 
     /**
-     * Verify that the bank account is accessible within the current user's entity scope
-     * (Multi-Company Security)
+     * Constructor
      *
-     * @param int $bank_id Bank account ID to be verified
-     * @return bool True if the account is authorized, False otherwise.
+     * @param DoliDB|null $db Database handler
      */
-    public function isAccountAllowed($bank_id)
-    {
-        global $conf;
+	public function __construct(DoliDB $db, $accountOrId = null)
+	{
+		$this->db = $db;
+		if ($accountOrId !== null) $this->initAccount($accountOrId);
+	}
 
-        if (empty($bank_id) || $bank_id <= 0) {
-            return false;
-        }
-
-        $sql = "SELECT entity FROM " . MAIN_DB_PREFIX . "bank_account WHERE rowid = " . (int) $bank_id;
-        $resql = $this->db->query($sql);
-
-        if (!$resql || $this->db->num_rows($resql) == 0) {
-            dol_syslog(__METHOD__ . ": Bank account not found: " . $bank_id, LOG_ERR);
-            return false;
-        }
-
-        $obj = $this->db->fetch_object($resql);
-        $this->db->free($resql);
-
-        $account_entity = (int) $obj->entity;
-
-        if ($account_entity === (int) $conf->entity) {
-            return true;
-        }
-
-        if (function_exists('getEntity')) {
-            $allowed_entities = explode(',', getEntity('bank_account'));
-            return in_array((string) $account_entity, $allowed_entities);
-        }
-
-        return false;
-    }
-	
 	/**
 	 * Retrieve unpaid documents (Customers/Suppliers invoices/credit notes, VAT)
 	 * Array will not return the total amount but the remain amount to pay
@@ -80,22 +47,22 @@ class QontoRepository
 	 * @param string $type Document type ('all', 'cinv', 'sinv', 'vat')
 	 * @return array Multidimensional array with unpaid documents
 	 */
-	public function getUnpaidDocuments($type = 'all')
+	public function getUnpaidDocuments($type = 'all'): array
 	{
         global $conf;
 
-		$documents = array(
-            'c_invoices' => array(),
-            's_invoices' => array(),
-            'vat'        => array(),
-            'social'     => array(),
-            'salary'     => array(),
-            'expense'    => array()
-        );
+		$documents = [
+            'c_invoices' => [],
+            's_invoices' => [],
+            'vat'        => [],
+            'social'     => [],
+            'salary'     => [],
+            'expense'    => []
+        ];
 		
 		// Dynamic boundary recovery
-		$max_months = getDolGlobalInt('QONTOSYNC_MAX_MONTHS');
-		if (empty($max_months) || $max_months <= 0) {
+		$max_months = getDolGlobalInt('QONTOSYNC_MAX_MONTHS', 24);
+		if ($max_months <= 0) {
 		    $max_months = 24; // Safety value (fallback)
 		}
 		
@@ -107,7 +74,7 @@ class QontoRepository
 			$sql_c_inv = "SELECT f.rowid, f.ref, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
 
             // If multicurrency is enabled
-            if ($this->multicurrency_enabled) {
+            if (isModEnabled('multicurrency')) {
                 $sql_c_inv .= ", f.multicurrency_code, f.multicurrency_tx, f.multicurrency_total_ttc, ";
                 $sql_c_inv .= "(SELECT SUM(multicurrency_amount) FROM " . MAIN_DB_PREFIX . "paiement_facture WHERE fk_facture = f.rowid) as already_paid_mc ";
             }
@@ -133,11 +100,11 @@ class QontoRepository
 					$remain = $fact->getRemainToPay();						
 					if ($remain != 0) {
                         // If multicurrency is enabled
-                        $mc_code = !empty($this->multicurrency_enabled) ? $obj_c_inv->multicurrency_code : '';
-                        $mc_tx = (!empty($this->multicurrency_enabled) && $obj_c_inv->multicurrency_tx > 0) ? (float)$obj_c_inv->multicurrency_tx : 1;
+                        $mc_code = (isModEnabled('multicurrency')) ? $obj_c_inv->multicurrency_code : '';
+                        $mc_tx = ((isModEnabled('multicurrency')) && $obj_c_inv->multicurrency_tx > 0) ? (float) $obj_c_inv->multicurrency_tx : 1;
                         if ($mc_code && $mc_code != $conf->currency) {
-                            $mc_total = (float)$obj_c_inv->multicurrency_total_ttc;
-                            $mc_paid = (float)$obj_c_inv->already_paid_mc;
+                            $mc_total = (float) $obj_c_inv->multicurrency_total_ttc;
+                            $mc_paid = (float) $obj_c_inv->already_paid_mc;
                             $mc_remain = $mc_total - $mc_paid;
                         } else {
                             $mc_remain = $remain;
@@ -152,7 +119,7 @@ class QontoRepository
                             'mc_tx'         => $mc_tx,
                             'datev'         => $fact->date,
                             'thirdparty'    => $obj_c_inv->thirdparty_name,
-                            'inv_type'      => (int)$obj_c_inv->type
+                            'inv_type'      => (int) $obj_c_inv->type
 						);
 					}
 				}
@@ -165,7 +132,7 @@ class QontoRepository
 			$sql_s_inv = "SELECT f.rowid, f.ref, f.ref_supplier, f.total_ttc, f.type, f.datef, s.nom as thirdparty_name ";
             
             // If multicurrency is enabled
-            if ($this->multicurrency_enabled) {
+            if (isModEnabled('multicurrency')) {
                 $sql_s_inv .= ", f.multicurrency_code, f.multicurrency_tx, f.multicurrency_total_ttc, ";
                 $sql_s_inv .= "(SELECT SUM(multicurrency_amount) FROM " . MAIN_DB_PREFIX . "paiementfourn_facturefourn WHERE fk_facturefourn = f.rowid) as already_paid_mc ";
             }
@@ -190,11 +157,11 @@ class QontoRepository
 					$remain = $fact_fourn->getRemainToPay();
 					if ($remain != 0) {
                         // If multicurrency is enabled
-                        $mc_code = !empty($this->multicurrency_enabled) ? $obj_s_inv->multicurrency_code : '';
-                        $mc_tx = (!empty($this->multicurrency_enabled) && $obj_s_inv->multicurrency_tx > 0) ? (float)$obj_s_inv->multicurrency_tx : 1;
+                        $mc_code = (isModEnabled('multicurrency')) ? $obj_s_inv->multicurrency_code : '';
+                        $mc_tx = ((isModEnabled('multicurrency')) && $obj_s_inv->multicurrency_tx > 0) ? (float) $obj_s_inv->multicurrency_tx : 1;
                         if ($mc_code && $mc_code != $conf->currency) {
-                            $mc_total = (float)$obj_s_inv->multicurrency_total_ttc;
-                            $mc_paid = (float)$obj_s_inv->already_paid_mc;
+                            $mc_total = (float) $obj_s_inv->multicurrency_total_ttc;
+                            $mc_paid = (float) $obj_s_inv->already_paid_mc;
                             $mc_remain = $mc_total - $mc_paid;
                         } else {
                             $mc_remain = $remain;
@@ -210,7 +177,7 @@ class QontoRepository
 							'datev'        => $fact_fourn->date,
 							'thirdparty'   => $obj_s_inv->thirdparty_name,
 							'ref_supplier' => $obj_s_inv->ref_supplier,
-							'inv_type'     => (int)$obj_s_inv->type
+							'inv_type'     => (int) $obj_s_inv->type
 						);
 					}
 				}
@@ -228,7 +195,7 @@ class QontoRepository
 					$documents['vat'][] = (object) array(
 						'rowid'    => $obj_vat->rowid,
 						'label'    => $obj_vat->label ? $obj_vat->label : 'VAT',
-						'amount'   => (float)$obj_vat->amount,
+						'amount'   => (float) $obj_vat->amount,
 						'datev'    => $this->db->jdate($obj_vat->datev),
 						'inv_type' => 0
 					);
@@ -246,7 +213,7 @@ class QontoRepository
                     $documents['social'][] = (object) array(
                         'rowid' => $obj_soc->rowid,
                         'label' => $obj_soc->label,
-                        'amount' => (float)$obj_soc->amount,
+                        'amount' => (float) $obj_soc->amount,
                         'datev' => $this->db->jdate($obj_soc->date_ech),
                         'inv_type' => 0);
                 }
@@ -285,7 +252,7 @@ class QontoRepository
                     $documents['salary'][] = (object) array(
                         'rowid' => $obj_sal->rowid, 
                         'label' => $display_label, 
-                        'amount' => (float)$obj_sal->amount, 
+                        'amount' => (float) $obj_sal->amount, 
                         'datev' => $this->db->jdate($obj_sal->dateep), 
                         'inv_type' => 0
                     );
@@ -303,7 +270,7 @@ class QontoRepository
             $resql_exp = $this->db->query($sql_exp);
             if ($resql_exp) {
                 while ($obj_exp = $this->db->fetch_object($resql_exp)) {
-                    $documents['expense'][] = (object) array('rowid' => $obj_exp->rowid, 'label' => $obj_exp->label, 'amount' => (float)$obj_exp->amount, 'datev' => $this->db->jdate($obj_exp->date_debut), 'inv_type' => 0);
+                    $documents['expense'][] = (object) array('rowid' => $obj_exp->rowid, 'label' => $obj_exp->label, 'amount' => (float) $obj_exp->amount, 'datev' => $this->db->jdate($obj_exp->date_debut), 'inv_type' => 0);
                 }
                 $this->db->free($resql_exp);
             }
@@ -315,22 +282,21 @@ class QontoRepository
 	/**
      * Retrieve unlinked bank lines for a specific bank account
      *
-     * @param int $bank_id Bank account id
      * @return array Array of unlinked bank lines objects
      */
-    public function getUnlinkedBankLines($bank_id)
+    public function getUnlinkedBankLines(): array
     {
-        if (empty($bank_id)) {
-			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
-            return array();
-        }
+		if (!$this->isAccountAllowed()) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
+			return [];
+		}
 
-        $unlinked_bank_lines = array();
+        $unlinked_bank_lines = [];
 
         $sql_bank = "SELECT b.rowid, b.amount, b.label, b.datev ";
         $sql_bank .= "FROM " . MAIN_DB_PREFIX . "bank as b ";
         $sql_bank .= "LEFT JOIN " . MAIN_DB_PREFIX . "bank_extrafields as ef ON ef.fk_object = b.rowid ";
-        $sql_bank .= "WHERE b.fk_account = " . (int)$bank_id . " ";
+        $sql_bank .= "WHERE b.fk_account = " . (int) $this->account->id . " ";
         $sql_bank .= "AND (ef.qonto_id IS NULL OR ef.qonto_id = '')";
         
         $resql_bank = $this->db->query($sql_bank);
@@ -347,21 +313,20 @@ class QontoRepository
 	/**
      * Fetch linked Qonto IDs from the database for a specific bank account.
      *
-     * @param int $bank_id
      * @param string|null $qonto_id
      * @return array Associative array [qonto_id => fk_object]
      */
-    public function getLinkedQontoIds($bank_id, $qonto_id = null)
+    public function getLinkedQontoIds(string $qonto_id = null): array
     {
-        if (empty($bank_id)) {
-            dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
-            return array();
+        if (!$this->isAccountAllowed()) {
+            dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
+            return [];
         }
 
         $sql = "SELECT ef.qonto_id, ef.fk_object ";
         $sql .= "FROM " . MAIN_DB_PREFIX . "bank_extrafields as ef ";
         $sql .= "JOIN " . MAIN_DB_PREFIX . "bank as b ON ef.fk_object = b.rowid ";
-        $sql .= "WHERE b.fk_account = " . (int) $bank_id . " ";
+        $sql .= "WHERE b.fk_account = " . (int) $this->account->id . " ";
         
         if ($qonto_id !== null) {
             $sql .= "AND ef.qonto_id = '" . $this->db->escape($qonto_id) . "'";
@@ -370,7 +335,7 @@ class QontoRepository
         }
 
         $resql = $this->db->query($sql);
-        $results = array();
+        $results = [];
         
         if ($resql) {
             while ($obj = $this->db->fetch_object($resql)) {
@@ -389,20 +354,19 @@ class QontoRepository
     /**
      * Retrieve details of documents linked to a bank entry
      *
-     * @param int $bank_id Bank account id
      * @return array Array of linked documents details
      */
-    public function getLinkedDetails($bank_id)
+    public function getLinkedDetails(int $bank_line_id): array
     {
-        if (empty($bank_id)) {
-            dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
-            return array();
-        }
+		if (!$this->isAccountAllowed()) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
+			return [];
+		}
 
-        $details = array();
+        $details = [];
         
         // Searches for payments associated with this bank line
-        $sql = "SELECT url_id, type FROM " . MAIN_DB_PREFIX . "bank_url WHERE fk_bank = " . (int)$bank_id;
+        $sql = "SELECT url_id, type FROM " . MAIN_DB_PREFIX . "bank_url WHERE fk_bank = " . (int) $bank_line_id;
         $res = $this->db->query($sql);
         
         if ($res) {
@@ -494,7 +458,7 @@ class QontoRepository
         // Looking for Miscellaneous Payments (Direct link via fk_bank)
         $sql_var = "SELECT rowid as payment_id, label as ref, amount, 'various' as doc_type 
                     FROM " . MAIN_DB_PREFIX . "payment_various 
-                    WHERE fk_bank = " . (int)$bank_id;
+                    WHERE fk_bank = " . (int) $bank_line_id;
         $res_var = $this->db->query($sql_var);
         
         if ($res_var) {
@@ -510,23 +474,22 @@ class QontoRepository
     /**
 	 * Retrieve Dolibarr opening and closing balances for each month of a given year
 	 *
-	 * @param int $bank_id Bank account id
 	 * @param int $year Year to analyze
 	 * @return array Array of months (1 to 12) with opening and closing balances
 	 */
-    public function getMonthlyBalances($bank_id, $year)
+    public function getMonthlyBalances(int $year): array
     {
-        if (empty($bank_id) || empty($year)) {
+        if (empty($year)) {
             dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
             return array();
         }
-       
-        // Load the native Dolibarr Account class
-        if (!class_exists('Account')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/account.class.php';
-        $account = new Account($this->db);
-        $account->fetch($bank_id);
 
-        $balances = array();
+		if (!$this->isAccountAllowed()) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
+			return [];
+		}
+
+        $balances = [];
 
         for ($m = 1; $m <= 12; $m++) {
             // Defining the month's boundaries
@@ -535,14 +498,14 @@ class QontoRepository
 
              // 1. OPENING balance for the month (Balance as of the day before the 1st of the month)
             $veille_start = strtotime(date("Y-m-d 23:59:59", strtotime("-1 day", strtotime($filter_start_month))));
-            $opening = $account->solde(1, $veille_start, 'datev');
+            $opening = $this->account->solde(1, $veille_start, 'datev');
 
             // 2. Month-end CLOSING balance (Balance as of the last day of the month)
-            $closing = $account->solde(1, $filter_end_month, 'datev');
+            $closing = $this->account->solde(1, $filter_end_month, 'datev');
 
             $balances[$m] = array(
-                'opening' => (float)$opening,
-                'closing' => (float)$closing
+                'opening' => (float) $opening,
+                'closing' => (float) $closing
             );
         }
 
@@ -556,7 +519,7 @@ class QontoRepository
      * @param string $type   'cinv' (customer) or 'sinv' (supplier)
      * @return float         Total amount paid in foreign currency
      */
-    public function getMulticurrencyPaidAmount($doc_id, $type = 'cinv')
+    public function getMulticurrencyPaidAmount(int $doc_id, string $type = 'cinv')
     {
         $table = ($type === 'cinv') ? 'paiement_facture' : 'paiementfourn_facturefourn';
         $field = ($type === 'cinv') ? 'fk_facture' : 'fk_facturefourn';
@@ -568,7 +531,7 @@ class QontoRepository
         $resql = $this->db->query($sql);
         
         if ($resql && $obj = $this->db->fetch_object($resql)) {
-            $amount = (float)$obj->amount_paid_devise;
+            $amount = (float) $obj->amount_paid_devise;
             $this->db->free($resql);
             return $amount;
         }
@@ -626,7 +589,6 @@ class QontoRepository
                 $cleanSiren = dol_substr(preg_replace('/\D/', '', (string) $obj->siren), 0, 9);
                 $matches[$cleanRef . '|' . $cleanSiren] = (int) $obj->rowid;
             }
-            
            $this->db->free($resql);
         }
 
@@ -677,11 +639,9 @@ class QontoRepository
             while ($obj = $this->db->fetch_object($resql)) {
                 $matches[$obj->ref_ext] = (int) $obj->rowid;
             }
-
             $this->db->free($resql);
         }
 
         return $matches;
     }
-
 }

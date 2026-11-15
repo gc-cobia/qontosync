@@ -91,10 +91,10 @@ if (!$isLoaded) {
 
 if (class_exists($className)) {
     try {
-        $instance = new $className($db);
+        $instance = new $className($db, is_array($data) ? $data : []);
 
         if (is_callable([$instance, $methodName]) && strpos($methodName, '_') !== 0) {
-            $reponse = $instance->$methodName(is_array($data) ? $data : []);
+            $reponse = $instance->$methodName();
         } else {
             $reponse = ['http_code' => 404, 'error' => "ACTION_NOT_FOUND"];
         }

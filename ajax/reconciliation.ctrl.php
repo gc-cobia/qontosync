@@ -5,81 +5,76 @@
  * @author     Gaëtan COURTOIS
  * @license    GPLv3
  */
+
+if (!trait_exists('QontoAccountTrait')) dol_include_once('/qontosync/class/qontoaccount.trait.php');
  
 /**
  * Controller for bank reconciliation AJAX actions.
  */
-class ReconciliationController {
+class ReconciliationController
+{
+    use QontoAccountTrait;
     
     /** @var DoliDB */
     private $db;
+    /** @var array */
+    private $data;
+    /** @var array|null */
+    private $accountError = null;
     
     /**
      * ReconciliationController constructor.
      * 
      * @param DoliDB $db Database handler
      */
-    public function __construct($db) {
+    public function __construct(DoliDB $db, array $data = [])
+    {
         $this->db = $db;
-    }
+        $this->data = $data;
 
-    /**
-     * Multi-company security segregation (Bank account entity verification)
-     * 
-     * @param int $bank_rowid Bank account ID
-     * @return bool True if the account belongs to the current company, false otherwise
-     */
-    private function checkAccountPermission($bank_rowid) {
-        if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
-        $qontoRepo = new QontoRepository($this->db);
+        $bank_rowid = (int) ($this->data['bank_rowid'] ?? 0);
 
-       return $qontoRepo->isAccountAllowed($bank_rowid);
+        if ($bank_rowid <= 0) {
+            $this->accountError = ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        } elseif (!$this->initAccount($bank_rowid)) {
+            $this->accountError = ['http_code' => 400, 'error' => 'BANK_ACCOUNT_NOT_FOUND'];
+        } elseif (!$this->isAccountAllowed()) {
+            $this->accountError = ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
     }
     
     /**
      * Get transactions for a specific month and year
      * 
-     * @param array $data Array containing month, year, and bank_rowid
      * @return array Array containing http_code and transactions or error code
      */
-    public function getTransactions(array $data) {
+    public function getTransactions(): array
+    {
         global $user, $conf, $langs;
 
         if (!$user->hasRight('qontosync', 'reconciliation', 'read')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        $month = (int) ($data['month'] ?? 0);
-        $year = (int) ($data['year'] ?? 0);
-        $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
-
-        if ($bank_rowid <= 0) {
-            return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        if ($this->accountError !== null) {
+            return $this->accountError;
         }
 
-        if (!$this->checkAccountPermission($bank_rowid)) {
-            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
-        }
+        $month = (int) ($this->data['month'] ?? 0);
+        $year = (int) ($this->data['year'] ?? 0);
 
         if ($month <= 0 || $month > 12 || $year <= 0 || $year > (int) date('Y')) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
-        if (!class_exists('Account')) require_once DOL_DOCUMENT_ROOT .'/compta/bank/class/account.class.php';
-        $account = new Account($this->db);
-
-        if ($account->fetch($bank_rowid) <= 0) {
-            return ['http_code' => 400, 'error' => 'BANK_ACCOUNT_NOT_FOUND'];
-        }
-
         $dateStart = sprintf("%04d-%02d-01", $year, $month);
         $dateEnd = date("Y-m-t", strtotime($dateStart));
 
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
+        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
         $api = new QontoApi();
 
         $transactions = $api->getTransactions([
-            'iban' => $account->iban,
+            'iban' => $this->account->iban,
             'settled_at_from' => $dateStart . "T00:00:00.000Z",
             'settled_at_to' => $dateEnd . "T23:59:59.999Z"
         ]);
@@ -93,10 +88,10 @@ class ReconciliationController {
         }
 
         // Load documents fetching Qonto transactions
-        if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
-        $qontoMatching = new QontoMatching($this->db);
+        if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
+        $qontoMatching = new QontoMatching($this->db, $this->account);
 
-        $transactions = $qontoMatching->fetchTransactions($transactions, $bank_rowid);
+        $transactions = $qontoMatching->fetchTransactions($transactions);
 
         $formatted_transactions = [];
 
@@ -240,44 +235,40 @@ class ReconciliationController {
 
         return [
             'http_code' => 200,
-            'bank_rowid' => (int) $bank_rowid,
-            'hide_linked' => (bool) getDolGlobalString('QONTOSYNC_HIDE_LINKED'),
-            'transactions' => $formatted_transactions
+            'bank_rowid' => (int) $this->account->id,
+            'hide_linked' => (bool) getDolGlobalBool('QONTOSYNC_HIDE_LINKED'),
+            'transactions' => (array) $formatted_transactions
         ];
     }
 
     /**
      * Link transactions in batch mode.
      * 
-     * @param array $data Array containing bank_rowid and matches (array of target documents for each Qonto transaction)
      * @return array Associative array with http_code and result counts
      */
-    public function batchLink(array $data) {
+    public function batchLink(): array
+    {
         global $user;
 
         if (!$user->hasRight('qontosync', 'reconciliation', 'link')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
-        $matches = $data['matches'] ?? [];
-
-        if ($bank_rowid <= 0) {
-            return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        if ($this->accountError !== null) {
+            return $this->accountError;
         }
 
-        if (!$this->checkAccountPermission($bank_rowid)) {
-            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
-        }
+        $matches = $this->data['matches'] ?? [];
 
         if (empty($matches) || !is_array($matches)) {
             return ['http_code' => 400, 'error' => 'NO_TRANSACTION_TO_LINK'];
         }
 
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
-        if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
+        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
         $api = new QontoApi();
-        $qontoUpdater = new QontoUpdater($this->db);
+
+        if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php', 'QontoUpdater');
+        $qontoUpdater = new QontoUpdater($this->db, $this->account);
         
         $success_count = 0;
         $error_count = 0;
@@ -301,7 +292,7 @@ class ReconciliationController {
                 
                 $amounts_array = [$doc_id => $amount];
 
-                $res = $qontoUpdater->update($type, $amounts_array, $selected_trx, $bank_rowid);
+                $res = $qontoUpdater->update($type, $amounts_array, $selected_trx);
                 if ($res > 0) $success_count++;
                 else $error_count++;
                 
@@ -312,9 +303,9 @@ class ReconciliationController {
 
         return [
             'http_code' => 200,
-            'bank_rowid' => $bank_rowid,
-            'success_count' => $success_count,
-            'error_count' => $error_count
+            'bank_rowid' => (int) $this->account->id,
+            'success_count' => (int) $success_count,
+            'error_count' => (int) $error_count
         ];
     }
 
@@ -324,30 +315,26 @@ class ReconciliationController {
      * @param array $data Array containing bank_rowid and bank_line_id
      * @return array Associative array with http_code for result
      */
-    public function unlinkTransaction(array $data) {
+    public function unlinkTransaction(): array
+    {
         global $user;
 
         if (!$user->hasRight('qontosync', 'reconciliation', 'unlink')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
-        $bank_line_id = (int) ($data['bank_line_id'] ?? 0);
-
-        if ($bank_rowid <= 0) {
-            return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        if ($this->accountError !== null) {
+            return $this->accountError;
         }
 
-        if (!$this->checkAccountPermission($bank_rowid)) {
-            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
-        }
+        $bank_line_id = (int) ($this->data['bank_line_id'] ?? 0);
 
         if ($bank_line_id <= 0) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
         if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
-        $updater = new QontoUpdater($this->db);
+        $updater = new QontoUpdater($this->db, $this->account);
 
         $res = $updater->unlinkTransaction($bank_line_id);
         if ($res <= 0) {
@@ -356,7 +343,7 @@ class ReconciliationController {
 
         return [
             'http_code' => 200,
-            'bank_rowid' => $bank_rowid
+            'bank_rowid' => $this->account->id
         ];
     }
 
@@ -366,29 +353,25 @@ class ReconciliationController {
      * @param array $data Array containing bank_rowid and qonto_id
      * @return array Associative array with http_code and linked data array for result
      */
-    public function getAdvancedInfo(array $data) {
+    public function getAdvancedInfo(): array
+    {
         global $user, $conf, $langs;
 
         if (!$user->hasRight('qontosync', 'reconciliation', 'read')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
-        $qonto_id = ($data['qonto_id'] ?? '');
-
-        if ($bank_rowid <= 0) {
-            return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        if ($this->accountError !== null) {
+            return $this->accountError;
         }
 
-        if (!$this->checkAccountPermission($bank_rowid)) {
-            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
-        }
+        $qonto_id = ($this->data['qonto_id'] ?? '');
 
         if (empty($qonto_id)) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
+        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
         $api = new QontoApi();
 
         $raw_trx = $api->getTransaction($qonto_id);
@@ -403,14 +386,14 @@ class ReconciliationController {
             $processed_trx['amount'] = -$processed_trx['amount'];
         }
 
-        if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
-        $qontoRepo = new QontoRepository($this->db);
+        if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php', 'QontoRepository');
+        $qontoRepo = new QontoRepository($this->db, $this->account);
 
-        if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
-        $qontoMatching = new QontoMatching($this->db);
+        if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
+        $qontoMatching = new QontoMatching($this->db, $this->account);
 
         // Verify if the transaction is linked with a bank entry
-        $linked = $qontoMatching->isLinked($qonto_id, $bank_rowid, false);
+        $linked = $qontoMatching->isLinked($qonto_id, false);
 
         // Payment type label determination
         $op_type = isset($processed_trx['operation_type']) ? $processed_trx['operation_type'] : '';
@@ -636,24 +619,20 @@ class ReconciliationController {
      * @param array $data Array containing bank_rowid, qonto_id, link_doc, and amounts
      * @return array Associative array with http_code for result or error
      */
-    public function batchLinkAdvanced(array $data) {
+    public function batchLinkAdvanced(): array
+    {
         global $user;
 
         if (!$user->hasRight('qontosync', 'reconciliation', 'link')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
-        $qonto_id = ($data['qonto_id'] ?? '');
-        $link_docs = $data['link_doc'] ?? [];
-
-        if ($bank_rowid <= 0) {
-            return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        if ($this->accountError !== null) {
+            return $this->accountError;
         }
 
-        if (!$this->checkAccountPermission($bank_rowid)) {
-            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
-        }
+        $qonto_id = ($this->data['qonto_id'] ?? '');
+        $link_docs = $this->data['link_doc'] ?? [];
 
         if (empty($qonto_id) || empty($link_docs) || !is_array($link_docs)) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
@@ -663,7 +642,7 @@ class ReconciliationController {
         $api = new QontoApi();
 
         if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
-        $qontoUpdater = new QontoUpdater($this->db);
+        $qontoUpdater = new QontoUpdater($this->db, $this->account);
     
         $selected_trx = $api->getTransaction($qonto_id);
 
@@ -694,7 +673,7 @@ class ReconciliationController {
                 return ['http_code' => 400, 'error' => 'ERROR_MIXED_DOCUMENT_TYPES'];
             }
         
-            $imputed_amount = (float) price2num($data['amounts'][$current_type . '_' . $doc_id] ?? 0);
+            $imputed_amount = (float) price2num($this->data['amounts'][$current_type . '_' . $doc_id] ?? 0);
         
             // Retrieves the entered gross amount (Invoice = Positive, Credit Note = Negative)
             if ($imputed_amount != 0) {
@@ -717,14 +696,14 @@ class ReconciliationController {
             return ['http_code' => 400, 'error' => 'ERROR_IMPUTED_AMOUNT_EXCEEDS'];
         }
 
-        $res = $qontoUpdater->update($doc_type, $amounts_array, $selected_trx, $bank_rowid);
+        $res = $qontoUpdater->update($doc_type, $amounts_array, $selected_trx);
         if ($res <= 0) {
             return ['http_code' => 500, 'error' => 'FAILED_TO_LINK_TRANSACTION'];
         }
 
         return [
             'http_code' => 200,
-            'bank_rowid' => $bank_rowid,
+            'bank_rowid' => (int) $this->account->id
         ];
     }
 
@@ -734,26 +713,21 @@ class ReconciliationController {
      * @param array $data Array containing bank_rowid, qonto_id, accountancy_code, and optional attached_file
      * @return array Associative array with http_code for result or error
      */
-    public function createVariousPayment(array $data) {
+    public function createVariousPayment(): array
+    {
         global $user, $langs;
 
-        // Security check
         if (!$user->hasRight('qontosync', 'reconciliation', 'create_various')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
-        $qonto_id = ($data['qonto_id'] ?? '');
-        $accountancy_code = ($data['accountancy_code'] ?? '');
-        $attached_file = $data['attached_file'] ?? null;
-
-        if ($bank_rowid <= 0) {
-            return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        if ($this->accountError !== null) {
+            return $this->accountError;
         }
 
-        if (!$this->checkAccountPermission($bank_rowid)) {
-            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
-        }
+        $qonto_id = ($this->data['qonto_id'] ?? '');
+        $accountancy_code = ($this->data['accountancy_code'] ?? '');
+        $attached_file = $this->data['attached_file'] ?? null;
 
         if (empty($qonto_id)) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
@@ -773,10 +747,10 @@ class ReconciliationController {
         }
 
         if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
-        $qontoUpdater = new QontoUpdater($this->db);
+        $qontoUpdater = new QontoUpdater($this->db, $this->account);
 
         // Step 1: Create the various payment
-        $payment_id = $qontoUpdater->createVariousPayment($qonto_id, $bank_rowid, $accountancy_code);
+        $payment_id = $qontoUpdater->createVariousPayment($qonto_id, $accountancy_code);
         if ($payment_id <= 0) {
             return ['http_code' => 400, 'error' => 'FAILED_TO_CREATE_PAYMENT'];
         }
@@ -793,7 +767,7 @@ class ReconciliationController {
 
         return [
             'http_code' => 200,
-            'bank_rowid' => $bank_rowid,
+            'bank_rowid' => (int) $this->account->id
         ];
     }
 }

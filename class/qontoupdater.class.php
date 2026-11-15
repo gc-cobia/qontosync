@@ -11,6 +11,8 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     exit('Access Forbidden');
 }
 
+if (!trait_exists('QontoAccountTrait')) dol_include_once('/qontosync/class/qontoaccount.trait.php');
+
 /**
  * SECURITY WARNING - SQL INJECTIONS
  * As this module relies on standard Dolibarr $db abstraction (no prepared statements),
@@ -22,15 +24,23 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 
 class QontoUpdater
 {
-    private $db;
-	public $error = '';
-	public $errors = array();
-	private $multicurrency_enabled;
+	use QontoAccountTrait;
 
-    public function __construct($db) {
-		global $conf;
+    /** @var DoliDB */
+    private $db;
+	/** @var string */
+	public $error = '';
+	/** @var array */
+	public $errors = array();
+
+    /**
+     * Constructor
+     *
+     * @param DoliDB|null $db Database handler
+     */
+    public function __construct(DoliDB $db, $accountOrId = null) {
 		$this->db = $db;
-		$this->multicurrency_enabled = isModEnabled('multicurrency');
+		if ($accountOrId !== null) $this->initAccount($accountOrId);
     }
 
 	/**
@@ -43,29 +53,25 @@ class QontoUpdater
 	 */
 	private function linkTransaction($bank_line_id, $qonto_id, $ref_releve)
 	{
-		global $conf, $user;
+		global $user;
 
 		if (empty($bank_line_id) || empty($qonto_id) || empty($ref_releve)) {
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return -1;
 		}
 		
-		// Lazy load AccountLine class if needed
 		if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
-		
 		$bank = new AccountLine($this->db);
+
 		$res = $bank->fetch($bank_line_id);
-		
-		// Verify if the bank line exists
 		if ($res <= 0) {
 			dol_syslog(__METHOD__ . ": bank line " . $bank_line_id . " doesn't exist", LOG_ERR);
 			return -1;
 		}
 		
-		// Lazy load ExtraFields class
 		if (!class_exists('ExtraFields')) require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';	
-
 		$extrafields = new ExtraFields($this->db);
+		
 		$extrafields->fetch_name_optionals_label($bank->table_element);
 		$bank->fetch_optionals();
 		
@@ -103,46 +109,38 @@ class QontoUpdater
 	 * @param int $bank_line_id
 	 * @return int 1 on success, -1 on error
 	 */
-	public function unlinkTransaction($bank_line_id)
+	public function unlinkTransaction($bank_line_id): int
 	{
-		global $conf, $user;
+		global $user;
 
 		if (empty($bank_line_id)) {
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return -1;
 		}
 		
-		// Lazy load AccountLine class if needed
 		if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
-		
 		$bank = new AccountLine($this->db);
+
 		$res = $bank->fetch($bank_line_id);
-		
-		// Verify if the bank line exists
 		if ($res <= 0) {
-			dol_syslog(__METHOD__ . ": bank line " . $bank_line_id . " doesn't exist", LOG_ERR);
+			dol_syslog(__METHOD__ . ": Bank line " . $bank_line_id . " doesn't exist", LOG_ERR);
 			return -1;
 		}
 
 		// Multi-tenant Security (Anti-IDOR)
-		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
-		$qontoRepo = new QontoRepository($this->db);
-
-		if (!$qontoRepo->isAccountAllowed($bank->fk_account)) {
+		if (!$this->isAccountAllowed() || ((int) $bank->fk_account !== (int) $this->account->id)) {
 			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope: " . $bank->fk_account, LOG_ERR);
 			return -1;
 		}
 
-		// Init SQL transaction
 		$this->db->begin();
 
 		// Try to update the specific extrafieldm
 		// Direct SQL to force NULL and bypass Dolibarr's ORM empty string conversion which breaks UNIQUE constraint)
-		$sql = "UPDATE " . MAIN_DB_PREFIX . "bank_extrafields SET qonto_id = NULL WHERE fk_object = " . (int)$bank_line_id;
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "bank_extrafields SET qonto_id = NULL WHERE fk_object = " . (int) $bank_line_id;
 		$resql = $this->db->query($sql);
 		
 		if (!$resql) {
-			// Rollback SQL transaction
 			$this->db->rollback();
 			dol_syslog(__METHOD__ . ": Error updating the bank line extrafield: ".$bank->error, LOG_ERR);
 			return -1;
@@ -153,13 +151,11 @@ class QontoUpdater
 		$res = $bank->update_conciliation($user, null, 0);
 		
 		if ($res < 0) {
-			// Rollback SQL transaction
 			$this->db->rollback();
 			dol_syslog(__METHOD__ . ": Error updating the bank line statement: ".$bank->error, LOG_ERR);
 			return -1;
 		}
 	
-		// Commit SQL transaction
 		$this->db->commit();
 		dol_syslog(__METHOD__ . ": bank line " . $bank_line_id . " unlinked", LOG_INFO);
 		return 1;
@@ -169,16 +165,20 @@ class QontoUpdater
 	 * Create a Various Payment (Opération Diverse) and link it to a Qonto transaction
 	 *
 	 * @param string $qonto_id
-	 * @param int    $bank_rowid
 	 * @param string $accountancy_code
 	 * @return int Payment ID (> 0) on success, -1 on error
 	 */
-	public function createVariousPayment($qonto_id, $bank_rowid, $accountancy_code = '')
+	public function createVariousPayment($qonto_id, $accountancy_code = '')
 	{
-		global $conf, $user, $langs;
+		global $user;
 
-		if (empty($qonto_id) || empty($bank_rowid)) {
+		if (empty($qonto_id)) {
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
+			return -1;
+		}
+
+		if (!$this->isAccountAllowed()) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
 			return -1;
 		}
 
@@ -188,22 +188,8 @@ class QontoUpdater
 			return -1;
 		}
 
-		// Multi-tenant Security (Anti-IDOR)
-		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php', 'QontoRepository');
-		$qontoRepo = new QontoRepository($this->db);
-
-		if (!$qontoRepo->isAccountAllowed($bank_rowid)) {
-			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope: " . $bank_rowid, LOG_ERR);
-			return -1;
-		}
-
-		// Lazy load classes
 		if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-		if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
-		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/paymentvarious.class.php';
-
 		$api = new QontoApi();
-		$qontoMatching = new QontoMatching($this->db);
 
 		// Fetch transaction details
 		$qonto_trx = $api->getTransaction($qonto_id);
@@ -211,14 +197,19 @@ class QontoUpdater
 			dol_syslog(__METHOD__ . ": Cannot fetch Qonto transaction details for ID: " . $qonto_id, LOG_ERR);
 			return -1;
 		}
+		
+		if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
+		$qontoMatching = new QontoMatching($this->db);
 
 		// Prepare payment object
+		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/paymentvarious.class.php';
 		$payment = new PaymentVarious($this->db);
+		
 		$payment->datev = strtotime($qonto_trx['settled_at']);
 		$payment->datep = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
 		$payment->amount = abs($qonto_trx['amount']);
 		$payment->sens = (isset($qonto_trx['side']) && $qonto_trx['side'] === 'debit') ? 0 : 1;
-		$payment->fk_account = $bank_rowid;
+		$payment->fk_account = $this->account->id;
 		$payment->label = dol_substr(($qonto_trx['label'] . (!empty($qonto_trx['reference']) ? ' - ' . $qonto_trx['reference'] : '')), 0, 255);
 		$payment->num_payment = dol_substr((!empty($qonto_trx['reference']) ? $qonto_trx['reference'] : $qonto_id), 0, 50);
 
@@ -287,9 +278,8 @@ class QontoUpdater
 		}
 
 		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/paymentvarious.class.php';
-		if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/account.class.php';
-
 		$payment = new PaymentVarious($this->db);
+
 		$res = $payment->fetch($payment_id);
 		if ($res <= 0) {
 			dol_syslog(__METHOD__ . ": Cannot fetch various payment ID: " . $payment_id, LOG_ERR);
@@ -310,7 +300,9 @@ class QontoUpdater
 
 		// Delete the corresponding bank line if present
 		if ($fk_bank > 0) {
+			if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/account.class.php';
 			$accountline = new AccountLine($this->db);
+
 			if ($accountline->fetch($fk_bank) > 0) {
 				$del_line = $accountline->delete($user);
 				if ($del_line < 0) {
@@ -343,10 +335,9 @@ class QontoUpdater
 	 * @param string $type            Document type ('bank', 'cinv', 'sinv', 'vat')
 	 * @param array  $amounts_array   Array of document ID => imputed amount
 	 * @param mixed  $qonto_data      Qonto transaction data (array) OR Qonto transaction ID (string)
-	 * @param int    $bank_account_id Bank account ID
 	 * @return int 1 on success, -1 on error
 	 */
-	public function update($type, $amounts_array, $qonto_data, $bank_account_id = 0)
+	public function update($type, $amounts_array, $qonto_data)
 	{
 		global $conf, $user;
 		
@@ -355,12 +346,8 @@ class QontoUpdater
 			return -1;
 		}
 
-		// Multi-tenant Security (Anti-IDOR)
-		if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
-		$qontoRepo = new QontoRepository($this->db);
-
-		if (empty($bank_account_id) || !$qontoRepo->isAccountAllowed($bank_account_id)) {
-			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope: " . $bank_account_id, LOG_ERR);
+		if (!$this->isAccountAllowed()) {
+			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
 			return -1;
 		}
 
@@ -372,13 +359,13 @@ class QontoUpdater
         }
 		
 		// Resolve transaction data
-		$qonto_trx = array();
+		$qonto_trx = [];
 		if (is_array($qonto_data)) {
 			// Fast track: Array provided (ex: from update_batch)
 			$qonto_trx = $qonto_data;
 		} elseif (is_string($qonto_data)) {
 			// Smart track: ID provided, fetch from API (ex: for cron/trigger)
-			if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
+			if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
 			$api = new QontoApi();
 			$qonto_trx = $api->getTransaction($qonto_data);
 			
@@ -392,12 +379,12 @@ class QontoUpdater
 			
 		// Define local qonto currency amount
 		$qonto_local_amount = 0.0;
-		if (!empty($this->multicurrency_enabled)) {
-			$qonto_local_amount = isset($qonto_trx['local_amount']) ? (float)$qonto_trx['local_amount'] : 0.0;
+		if (isModEnabled('multicurrency')) {
+			$qonto_local_amount = isset($qonto_trx['local_amount']) ? (float) $qonto_trx['local_amount'] : 0.0;
 		}
 
 		// Calculate the real Qonto amount with its sign
-		$qonto_amount = isset($qonto_trx['amount']) ? (float)$qonto_trx['amount'] : 0.0;
+		$qonto_amount = isset($qonto_trx['amount']) ? (float) $qonto_trx['amount'] : 0.0;
 		if (empty($qonto_amount)) {
 			dol_syslog(__METHOD__ . ": Error: Qonto amount is zero or empty.", LOG_ERR);
 			return -1;
@@ -411,7 +398,7 @@ class QontoUpdater
 		$total_imputed = 0.0;
 		foreach ($amounts_array as $doc_id => $amount) {
 			// Keep the sign (+ for invoice, - for credit note)
-			$total_imputed += (float)$amount;
+			$total_imputed += (float) $amount;
 		}
 		
 		// Adapt sign to the document type
@@ -423,12 +410,11 @@ class QontoUpdater
 			return -1;
 		}
 
-        // Load QontoMatching class if not already loaded
-        if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
-        $qontoMatching = new QontoMatching($this->db);
+        if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
+        $qontoMatching = new QontoMatching($this->db, $this->account);
 		
 		// Check if Qonto ID already exists (REALTIME check, explicitly bypass cache)
-		if ($qontoMatching->isLinked($qonto_trx['id'], $bank_account_id, false) !== 0) {
+		if ($qontoMatching->isLinked($qonto_trx['id'], false) !== 0) {
 			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
 			return -1;
 		}
@@ -483,13 +469,19 @@ class QontoUpdater
 			$ref_releve = substr($clean_ref, 0, 50);
 		}
 
+        if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php', 'QontoRepository');
+        $qontoRepo = new QontoRepository($this->db, $this->account);
+
 		$autoclose = 1;
 		$payment_label_prefix = '';
 		
 		switch ($type) {
 			case 'bank':
-				// Security check: Bank module is enabled
-				if (!isModEnabled('banque')) { dol_syslog(__METHOD__ . ": Bank module is disabled.", LOG_ERR); $error++; break; }
+				if (!isModEnabled('banque')) {
+					dol_syslog(__METHOD__ . ": Bank module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
 				
 				// Accounting security: 1 Qonto transaction = 1 single Dolibarr bank line
 				if (count($amounts_array) > 1) {
@@ -509,8 +501,8 @@ class QontoUpdater
 				if ($line->fetch($doc_id) > 0) {
 
 					// Multi-Company Security (IDOR)
-					if ((int)$line->fk_account !== (int)$bank_account_id) {
-						dol_syslog(__METHOD__ . ": Security Alert - Bank line " . $doc_id . " does not belong to authorized bank account " . $bank_account_id, LOG_WARNING);
+					if ((int) $line->fk_account !== (int) $this->account->id) {
+						dol_syslog(__METHOD__ . ": Security Alert - Bank line " . $doc_id . " does not belong to authorized bank account " . $this->account->id, LOG_WARNING);
 						$error++;
 						break;
 					}
@@ -535,38 +527,38 @@ class QontoUpdater
 				break;
 
 			case 'cinv':
-				// Security check: Customer Invoice module is enabled
-				if (!isModEnabled('facture')) { dol_syslog(__METHOD__ . ": Customer Invoice module is disabled.", LOG_ERR); $error++; break; }
+				if (!isModEnabled('facture')) {
+					dol_syslog(__METHOD__ . ": Customer Invoice module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
 
-                // Declare payment and invoice classes
-				if (!class_exists('Paiement')) require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
 				if (!class_exists('Facture')) require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-				
-				// Initialize invoice
 				$invoice = new Facture($this->db);
 
-				// Initialize payment
+				if (!class_exists('Paiement')) require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
 				$payment = new Paiement($this->db);
+
                 $payment_type_str = 'payment';
 
-				$valid_amounts = array();
+				$valid_amounts = [];
 				
                 $first_socid = 0;
                 $payment_label_ref = '';
 
 				// Multi-currency pre-check
-				$valid_mc_amounts = array();
+				$valid_mc_amounts = [];
                 $mc_remain_all_docs = 0;
-                $mc_remain_by_doc = array();
+                $mc_remain_by_doc = [];
 				$eur_remaining = abs($qonto_amount);
 				$mc_remaining = abs($qonto_local_amount);
 				$doc_index = 0;
                 $total_docs = 0;
                 
-                if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+                if (isModEnabled('multicurrency') && $qonto_local_amount != 0) {
                     foreach ($amounts_array as $doc_id => $amount) {
                         if ($invoice->fetch($doc_id) > 0) {
-                            $tmp_total = (float)$invoice->multicurrency_total_ttc;
+                            $tmp_total = (float) $invoice->multicurrency_total_ttc;
                             $tmp_paid = $qontoRepo->getMulticurrencyPaidAmount($doc_id, 'cinv');
                             $tmp_rem = price2num($tmp_total - $tmp_paid, 'MT');
                             
@@ -606,7 +598,7 @@ class QontoUpdater
 						}
 
 						// Multi-Company Security (IDOR)
-						if ($invoice->entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$invoice->entity, explode(',', getEntity('facture'))))) {
+						if ($invoice->entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $invoice->entity, explode(',', getEntity('facture'))))) {
 							dol_syslog(__METHOD__ . ": Entity mismatch on customer invoice " . $doc_id, LOG_WARNING);
 							$error++; break;
 						}
@@ -624,13 +616,13 @@ class QontoUpdater
 						}
 
                         // Handle Credit Notes by applying a negative sign to the payment amount
-						$pay_amount = abs((float)$amount);
+						$pay_amount = abs((float) $amount);
 						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
 
 						$valid_amounts[$doc_id] = $pay_amount;
 
 						// Handle multicurrency different change
-						if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+						if (isModEnabled('multicurrency') && $qonto_local_amount != 0) {
 							if (
 								$invoice->multicurrency_code != $conf->currency && 
 								!empty($qonto_trx['local_currency']) && 
@@ -683,35 +675,35 @@ class QontoUpdater
 				break;
 				
 			case 'sinv':
-				// Security check: Supplier Invoice module is enabled
-				if (!isModEnabled('fournisseur')) { dol_syslog(__METHOD__ . ": Supplier Invoice module is disabled.", LOG_ERR); $error++; break; }
-				
-				// Declare payment and invoice classes
-				if (!class_exists('PaiementFourn')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
+				if (!isModEnabled('fournisseur')) {
+					dol_syslog(__METHOD__ . ": Supplier Invoice module is disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
+
 				if (!class_exists('FactureFournisseur')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
-				
-				// Initialize invoice
 				$invoice = new FactureFournisseur($this->db);
 
-				// Initialize payment
+				if (!class_exists('PaiementFourn')) require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
 				$payment = new PaiementFourn($this->db);
+
 				$payment_type_str = 'payment_supplier';
 
-				$valid_amounts = array();
+				$valid_amounts = [];
 
 				$first_socid = 0;
 				$payment_label_ref = '';
 
 				// Multi-currency pre-check
-				$valid_mc_amounts = array();
+				$valid_mc_amounts = [];
                 $mc_remain_all_docs = 0;
-                $mc_remain_by_doc = array();
+                $mc_remain_by_doc = [];
 				$eur_remaining = abs($qonto_amount);
 				$mc_remaining = abs($qonto_local_amount);
 				$doc_index = 0;
                 $total_docs = 0;
                 
-                if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+                if (isModEnabled('multicurrency') && $qonto_local_amount != 0) {
                     foreach ($amounts_array as $doc_id => $amount) {
                         if ($invoice->fetch($doc_id) > 0) {
                             $tmp_total = (float)$invoice->multicurrency_total_ttc;
@@ -754,7 +746,7 @@ class QontoUpdater
 						}
 
 						// Multi-Company Security (IDOR)
-						if ($invoice->entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$invoice->entity, explode(',', getEntity('facture_fourn'))))) {
+						if ($invoice->entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $invoice->entity, explode(',', getEntity('facture_fourn'))))) {
 							dol_syslog(__METHOD__ . ": Entity mismatch on supplier invoice " . $doc_id, LOG_WARNING);
 							$error++; break;
 						}
@@ -771,13 +763,13 @@ class QontoUpdater
 							$error++; break;
 						}
 
-						$pay_amount = abs((float)$amount);
+						$pay_amount = abs((float) $amount);
 						if ($invoice->type == 2 || $invoice->total_ttc < 0) $pay_amount = -$pay_amount;
 
 						$valid_amounts[$doc_id] = $pay_amount;
 
 						// Handle multicurrency different change
-						if (!empty($this->multicurrency_enabled) && $qonto_local_amount != 0) {
+						if (isModEnabled('multicurrency') && $qonto_local_amount != 0) {
 							if (
 								$invoice->multicurrency_code != $conf->currency && 
 								!empty($qonto_trx['local_currency']) && 
@@ -830,26 +822,28 @@ class QontoUpdater
 				break;
 			
 			case 'vat':
-				// Security check: Tax & Social module is enabled
-                if (!isModEnabled('tax')) { dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR); $error++; break; }
+                if (!isModEnabled('tax')) {
+					dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
 
-				// Declare payment and tax classes
-				if (!class_exists('PaymentVat')) require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/paymentvat.class.php';
 				if (!class_exists('Tva')) require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/tva.class.php';
-				
-				// Initialize payment
+                $vat = new Tva($this->db);
+
+				if (!class_exists('PaymentVat')) require_once DOL_DOCUMENT_ROOT.'/compta/tva/class/paymentvat.class.php';
 				$payment = new PaymentVat($this->db);
+
                 $payment_type_str = 'payment_vat';
                 $payment_label_prefix = '(VATPayment) ';
 
-                $valid_amounts = array();
+                $valid_amounts = [];
 
 				// Get the unique VAT element
                 reset($amounts_array);
                 $doc_id = key($amounts_array);
                 $amount = current($amounts_array);
 
-                $vat = new Tva($this->db);
                 if ($vat->fetch($doc_id) > 0) {
 
 					// Check if the vat is already marked as paid
@@ -862,15 +856,15 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($vat->entity) ? $vat->entity : null;
 					if ($doc_entity === null) {
-						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "tva WHERE rowid = " . (int)$doc_id);
+						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "tva WHERE rowid = " . (int) $doc_id);
 						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
 					}
-					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$doc_entity, explode(',', getEntity('tva'))))) {
+					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $doc_entity, explode(',', getEntity('tva'))))) {
 						dol_syslog(__METHOD__ . ": Entity mismatch on VAT " . $doc_id, LOG_WARNING);
 						$error++; break;
 					}
 
-                    $pay_amount = abs((float)$amount);
+                    $pay_amount = abs((float) $amount);
                     if ($vat->amount < 0) $pay_amount = -$pay_amount;
                     
                     $valid_amounts[$doc_id] = $pay_amount;
@@ -881,26 +875,28 @@ class QontoUpdater
 				break;
 			
 			case 'social':
-                // Security check: Tax & Social module is enabled
-                if (!isModEnabled('tax')) { dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR); $error++; break; }
+                if (!isModEnabled('tax')) {
+					dol_syslog(__METHOD__ . ": Tax/Social module disabled.", LOG_ERR);
+					$error++;
+					break; 
+				}
 
-                // Declare payment and social classes
-                if (!class_exists('PaymentSocialContribution')) require_once DOL_DOCUMENT_ROOT.'/compta/sociales/class/paymentsocialcontribution.class.php';
                 if (!class_exists('ChargeSociales')) require_once DOL_DOCUMENT_ROOT.'/compta/sociales/class/chargesociales.class.php';
+                $charge = new ChargeSociales($this->db);
 
-                // Initialize payment
+                if (!class_exists('PaymentSocialContribution')) require_once DOL_DOCUMENT_ROOT.'/compta/sociales/class/paymentsocialcontribution.class.php';
                 $payment = new PaymentSocialContribution($this->db);
+
                 $payment_type_str = 'payment_sc';
                 $payment_label_prefix = '(SocialPayment) ';
 
-                $valid_amounts = array();
+                $valid_amounts = [];
 
                 // Get the unique social element
                 reset($amounts_array);
                 $doc_id = key($amounts_array);
                 $amount = current($amounts_array);
 
-                $charge = new ChargeSociales($this->db);
                 if ($charge->fetch($doc_id) > 0) {
 
 					// Check if the social is already marked as paid
@@ -913,15 +909,15 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($charge->entity) ? $charge->entity : null;
 					if ($doc_entity === null) {
-						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "chargesociales WHERE rowid = " . (int)$doc_id);
+						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "chargesociales WHERE rowid = " . (int) $doc_id);
 						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
 					}
-					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$doc_entity, explode(',', getEntity('tax'))))) {
+					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $doc_entity, explode(',', getEntity('tax'))))) {
 						dol_syslog(__METHOD__ . ": Entity mismatch on Social Charge " . $doc_id, LOG_WARNING);
 						$error++; break;
 					}
 
-                    $valid_amounts[$doc_id] = abs((float)$amount);
+                    $valid_amounts[$doc_id] = abs((float) $amount);
                     $payment_label_ref = $charge->ref;
                 } else { 
                     $error++; 
@@ -929,26 +925,28 @@ class QontoUpdater
                 break;
 
 			case 'salary':
-                // Security check: Salaries module is enabled
-                if (!isModEnabled('salaries')) { dol_syslog(__METHOD__ . ": Salary module disabled.", LOG_ERR); $error++; break; }
+                if (!isModEnabled('salaries')) {
+					dol_syslog(__METHOD__ . ": Salary module disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
 
-                // Declare payment and salary classes
-                if (!class_exists('PaymentSalary')) require_once DOL_DOCUMENT_ROOT.'/salaries/class/paymentsalary.class.php';
                 if (!class_exists('Salary')) require_once DOL_DOCUMENT_ROOT.'/salaries/class/salary.class.php';
+                $salary = new Salary($this->db);
 
-                // Initialize payment
+                if (!class_exists('PaymentSalary')) require_once DOL_DOCUMENT_ROOT.'/salaries/class/paymentsalary.class.php';
                 $payment = new PaymentSalary($this->db);
+
                 $payment_type_str = 'payment_salary';
                 $payment_label_prefix = '(SalaryPayment) ';
 
-                $valid_amounts = array();
+                $valid_amounts = [];
 
                 // Get the unique salary element
                 reset($amounts_array);
                 $doc_id = key($amounts_array);
                 $amount = current($amounts_array);
 
-                $salary = new Salary($this->db);
                 if ($salary->fetch($doc_id) > 0) {
 
 					// Check if the salary is already marked as paid
@@ -961,15 +959,15 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($salary->entity) ? $salary->entity : null;
 					if ($doc_entity === null) {
-						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "salary WHERE rowid = " . (int)$doc_id);
+						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "salary WHERE rowid = " . (int) $doc_id);
 						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
 					}
-					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$doc_entity, explode(',', getEntity('salary'))))) {
+					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $doc_entity, explode(',', getEntity('salary'))))) {
 						dol_syslog(__METHOD__ . ": Entity mismatch on Salary " . $doc_id, LOG_WARNING);
 						$error++; break;
 					}
 
-                    $valid_amounts[$doc_id] = abs((float)$amount);
+                    $valid_amounts[$doc_id] = abs((float) $amount);
                     
                     // Create the reference text for the bank line
                     $start = dol_print_date($salary->datesp, 'day');
@@ -983,26 +981,28 @@ class QontoUpdater
                 break;
 
             case 'expense':
-                // Security check: Expense Report module is enabled
-                if (!isModEnabled('expensereport')) { dol_syslog(__METHOD__ . ": Expense Report module disabled.", LOG_ERR); $error++; break; }
+                if (!isModEnabled('expensereport')) {
+					dol_syslog(__METHOD__ . ": Expense Report module disabled.", LOG_ERR);
+					$error++;
+					break;
+				}
 
-                // Declare payment and expense report classes
-                if (!class_exists('PaymentExpenseReport')) require_once DOL_DOCUMENT_ROOT.'/expensereport/class/paymentexpensereport.class.php';
                 if (!class_exists('ExpenseReport')) require_once DOL_DOCUMENT_ROOT.'/expensereport/class/expensereport.class.php';
-                
-                // Initialize payment
+                $expense = new ExpenseReport($this->db);
+
+                if (!class_exists('PaymentExpenseReport')) require_once DOL_DOCUMENT_ROOT.'/expensereport/class/paymentexpensereport.class.php';
                 $payment = new PaymentExpenseReport($this->db);
+
                 $payment_type_str = 'payment_expensereport';
                 $payment_label_prefix = '(ExpensePayment) ';
                 
-                $valid_amounts = array();
+                $valid_amounts = [];
 
                 // Get the unique expense report element
                 reset($amounts_array);
                 $doc_id = key($amounts_array);
                 $amount = current($amounts_array);
 
-                $expense = new ExpenseReport($this->db);
                 if ($expense->fetch($doc_id) > 0) {
 
 					// Check if the expense is already marked as paid
@@ -1015,15 +1015,15 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($expense->entity) ? $expense->entity : null;
 					if ($doc_entity === null) {
-						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "expensereport WHERE rowid = " . (int)$doc_id);
+						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "expensereport WHERE rowid = " . (int) $doc_id);
 						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
 					}
-					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string)$doc_entity, explode(',', getEntity('expensereport'))))) {
+					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $doc_entity, explode(',', getEntity('expensereport'))))) {
 						dol_syslog(__METHOD__ . ": Entity mismatch on Expense Report " . $doc_id, LOG_WARNING);
 						$error++; break;
 					}
 
-                    $valid_amounts[$doc_id] = abs((float)$amount);
+                    $valid_amounts[$doc_id] = abs((float) $amount);
                     $payment_label_ref = $expense->ref;
                 } else { 
                     $error++; 
@@ -1040,8 +1040,8 @@ class QontoUpdater
             // Properties common to all payments
             
             // 1. Bank account assignment (according to the classes)
-            $payment->fk_account = $bank_account_id;
-            $payment->fk_bank = $bank_account_id;
+            $payment->fk_account = $this->account->id;
+            $payment->fk_bank = $this->account->id;
 
             // 2. Massive assignment of payment method to counter "OperNotDefined"
             $payment->paiementid = $mop;       // For Customer/Supplier Invoices
@@ -1075,7 +1075,7 @@ class QontoUpdater
                     $user,
                     $payment_type_str,
                     $payment_label_prefix . $payment_label_ref,
-                    $bank_account_id,
+                    $this->account->id,
                     $emitter_name,
                     $emitter_bank_name
                 );
@@ -1110,7 +1110,7 @@ class QontoUpdater
                             }
 
 							// Multi-currency, close document if paid (Force closure for exchange rate differences)
-							if (!empty($this->multicurrency_enabled) && !empty($valid_mc_amounts)) {
+							if (isModEnabled('multicurrency') && !empty($valid_mc_amounts)) {
                                 
                                 // Type (Customer or Supplier)
                                 $table_pf = ($type === 'cinv') ? 'paiement_facture' : 'paiementfourn_facturefourn';

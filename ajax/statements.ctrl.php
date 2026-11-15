@@ -6,34 +6,41 @@
  * @license    GPLv3
  */
 
+if (!trait_exists('QontoAccountTrait')) dol_include_once('/qontosync/class/qontoaccount.trait.php');
+
 /**
  * Controller for bank statements AJAX actions.
  */
-class StatementsController {
+class StatementsController
+{
+    use QontoAccountTrait;
 
     /** @var DoliDB */
     private $db;
+    /** @var array */
+    private $data;
+    /** @var array|null */
+    private $accountError = null;
 
     /**
      * StatementsController constructor.
      * 
      * @param DoliDB $db Database handler
      */
-    public function __construct($db) {
+    public function __construct(DoliDB $db, array $data = [])
+    {
         $this->db = $db;
-    }
+        $this->data = $data;
 
-    /**
-     * Multi-company security segregation (Bank account entity verification)
-     * 
-     * @param int $bank_rowid Bank account ID
-     * @return bool True if the account belongs to the current company, false otherwise
-     */
-    private function checkAccountPermission($bank_rowid) {
-        if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php');
-        $qontoRepo = new QontoRepository($this->db);
+        $bank_rowid = (int) ($this->data['bank_rowid'] ?? 0);
 
-        return $qontoRepo->isAccountAllowed($bank_rowid);
+        if ($bank_rowid <= 0) {
+            $this->accountError = ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        } elseif (!$this->initAccount($bank_rowid)) {
+            $this->accountError = ['http_code' => 400, 'error' => 'BANK_ACCOUNT_NOT_FOUND'];
+        } elseif (!$this->isAccountAllowed()) {
+            $this->accountError = ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+        }
     }
 
     /**
@@ -42,50 +49,36 @@ class StatementsController {
      * @param array $data Array containing year and bank_rowid
      * @return array Array containing http_code and statements or error code
      */
-    public function getStatements(array $data) {
+    public function getStatements(): array
+    {
         global $user;
 
         if (!$user->hasRight('qontosync', 'statements', 'read')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        $year = (int) ($data['year'] ?? 0);
-        $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
-
-        if ($bank_rowid <= 0) {
-            return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        if ($this->accountError !== null) {
+            return $this->accountError;
         }
 
-        if (!$this->checkAccountPermission($bank_rowid)) {
-            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
-        }
+        $year = (int) ($this->data['year'] ?? 0);
 
         if ($year <= 0 || $year > (int) date('Y')) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
-        if (!class_exists('Account')) require_once DOL_DOCUMENT_ROOT .'/compta/bank/class/account.class.php';
-        $account = new Account($this->db);
-
-        if ($account->fetch($bank_rowid) <= 0) {
-            return ['http_code' => 400, 'error' => 'BANK_ACCOUNT_NOT_FOUND'];
-        }
-
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
-        if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php');
-
+        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
         $api = new QontoApi();
-        $qontoMatching = new QontoMatching($this->db);
 
         $dateStart = sprintf("%04d-01-01", $year);
         $dateEnd   = sprintf("%04d-12-31", $year);
 
         $transactions = $api->getTransactions([
-            'iban' => $account->iban,
+            'iban' => $this->account->iban,
             'settled_at_from' => $dateStart . "T00:00:00.000Z",
             'settled_at_to' => $dateEnd . "T23:59:59.999Z"
         ]);
-        $qonto_statements_raw = $api->getStatements($account->iban, $year);
+        $qonto_statements_raw = $api->getStatements($this->account->iban, $year);
 
         if ($transactions === false) {
             return ['http_code' => 500, 'error' => 'ERROR_FETCHING_TRANSACTIONS'];
@@ -95,7 +88,10 @@ class StatementsController {
             return ['http_code' => 404, 'error' => 'NO_TRANSACTIONS_FOUND'];
         }
 
-        $months_data = $qontoMatching->matchStatements($account, $year, $transactions, $qonto_statements_raw);
+        if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
+        $qontoMatching = new QontoMatching($this->db, $this->account);
+
+        $months_data = $qontoMatching->matchStatements($year, $transactions, $qonto_statements_raw);
 
         $formatted_months = [];
 
@@ -125,9 +121,9 @@ class StatementsController {
 
         return [
             'http_code' => 200,
-            'bank_rowid' => (int) $bank_rowid,
+            'bank_rowid' => (int) $this->account->id,
             'year' => (int) $year,
-            'statements' => $formatted_months
+            'statements' => (array) $formatted_months
         ];
     }
 
@@ -137,42 +133,31 @@ class StatementsController {
      * @param array $data Array containing year and bank_rowid
      * @return array Associative array with http_code and sync result counts
      */
-    public function updateStatements(array $data) {
+    public function updateStatements(): array
+    {
         global $user;
 
         if (!$user->hasRight('qontosync', 'statements', 'import')) {
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        $year = (int) ($data['year'] ?? 0);
-        $bank_rowid = (int) ($data['bank_rowid'] ?? 0);
-
-        if ($bank_rowid <= 0) {
-            return ['http_code' => 400, 'error' => 'NO_BANK_SELECTED'];
+        if ($this->accountError !== null) {
+            return $this->accountError;
         }
 
-        if (!$this->checkAccountPermission($bank_rowid)) {
-            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
-        }
+        $year = (int) ($this->data['year'] ?? 0);
 
         if ($year <= 0 || $year > (int) date('Y')) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
-        if (!class_exists('Account')) require_once DOL_DOCUMENT_ROOT .'/compta/bank/class/account.class.php';
-        $account = new Account($this->db);
-
-        if ($account->fetch($bank_rowid) <= 0) {
-            return ['http_code' => 400, 'error' => 'BANK_ACCOUNT_NOT_FOUND'];
-        }
-
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
+        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
         $api = new QontoApi();
 
         if (!class_exists('QontoGed')) dol_include_once('/qontosync/class/qontoged.class.php', 'QontoGed');
-        $qontoGed = new QontoGed($this->db);
+        $qontoGed = new QontoGed($this->db, $this->account);
 
-        $sync_result = $qontoGed->syncStatementsGED($account, $year, $api);
+        $sync_result = $qontoGed->syncStatementsGED($year, $api);
 
         if (!empty($sync_result['api_error'])) {
             return ['http_code' => 500, 'error' => 'ERROR_FETCHING_STATEMENTS'];
@@ -180,7 +165,7 @@ class StatementsController {
 
         return [
             'http_code' => 200,
-            'bank_rowid' => (int) $bank_rowid,
+            'bank_rowid' => (int) $this->account->id,
             'year' => (int) $year,
             'success_count' => (int) $sync_result['success_count'],
             'error_count' => (int) $sync_result['error_count'],
