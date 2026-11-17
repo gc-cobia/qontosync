@@ -192,7 +192,7 @@ $(document).ready(function () {
             });
 
             if (data.error) {
-                showError(data.error);
+                showError(translateError(data.error));
             } else {
                 renderAdvancedModal(data, bankRowid);
             }
