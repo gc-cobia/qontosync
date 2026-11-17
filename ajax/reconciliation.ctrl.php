@@ -738,20 +738,23 @@ class ReconciliationController
         $qontoGed = null;
 
         if ($has_attachment) {
-            if (!class_exists('QontoGed')) dol_include_once('/qontosync/class/qontoged.class.php');
-            $qontoGed = new QontoGed($this->db);
+            if (!class_exists('QontoGed')) dol_include_once('/qontosync/class/qontoged.class.php', 'QontoGed');
+            $qontoGed = new QontoGed($this->db, $this->account);
 
             if ($qontoGed->validateAttachment($attached_file) <= 0) {
                 return ['http_code' => 400, 'error' => 'FAILED_TO_SAVE_ATTACHMENT'];
             }
         }
 
-        if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
+        if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php', 'QontoUpdater');
         $qontoUpdater = new QontoUpdater($this->db, $this->account);
 
-        // Step 1: Create the various payment
+        $this->db->begin();
+
+        // Step 1: Create the various payment (kept inside outer transaction for atomic rollback)
         $payment_id = $qontoUpdater->createVariousPayment($qonto_id, $accountancy_code);
         if ($payment_id <= 0) {
+            $this->db->rollback();
             return ['http_code' => 400, 'error' => 'FAILED_TO_CREATE_PAYMENT'];
         }
 
@@ -759,11 +762,12 @@ class ReconciliationController
         if ($has_attachment && $qontoGed !== null) {
             $saved = $qontoGed->saveVariousPaymentAttachment((int) $payment_id, $attached_file);
             if ($saved <= 0) {
-                // Cancel first operation if second operation fails
-                $qontoUpdater->cancelVariousPayment((int) $payment_id);
+                $this->db->rollback();
                 return ['http_code' => 400, 'error' => 'FAILED_TO_SAVE_ATTACHMENT'];
             }
         }
+
+        $this->db->commit();
 
         return [
             'http_code' => 200,

@@ -212,13 +212,13 @@ class QontoUpdater
 		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/paymentvarious.class.php';
 		$payment = new PaymentVarious($this->db);
 		
-		$payment->datev = strtotime($qonto_trx['settled_at']);
-		$payment->datep = isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
-		$payment->amount = abs($qonto_trx['amount']);
-		$payment->sens = (isset($qonto_trx['side']) && $qonto_trx['side'] === 'debit') ? 0 : 1;
-		$payment->fk_account = $this->account->id;
-		$payment->label = dol_substr(($qonto_trx['label'] . (!empty($qonto_trx['reference']) ? ' - ' . $qonto_trx['reference'] : '')), 0, 255);
-		$payment->num_payment = dol_substr((!empty($qonto_trx['reference']) ? $qonto_trx['reference'] : $qonto_id), 0, 50);
+		$payment->datev			= strtotime($qonto_trx['settled_at']);
+		$payment->datep			= isset($qonto_trx['emitted_at']) ? strtotime($qonto_trx['emitted_at']) : strtotime($qonto_trx['settled_at']);
+		$payment->amount		= abs($qonto_trx['amount']);
+		$payment->sens			= (isset($qonto_trx['side']) && $qonto_trx['side'] === 'debit') ? 0 : 1;
+		$payment->fk_account	= $this->account->id;
+		$payment->label			= dol_substr(($qonto_trx['label'] . (!empty($qonto_trx['reference']) ? ' - ' . $qonto_trx['reference'] : '')), 0, 255);
+		$payment->num_payment	= dol_substr((!empty($qonto_trx['reference']) ? $qonto_trx['reference'] : $qonto_id), 0, 50);
 
 		$mop = $qontoMatching->getPaymentModeId(
 			isset($qonto_trx['operation_type']) ? $qonto_trx['operation_type'] : '',
@@ -243,99 +243,32 @@ class QontoUpdater
 			$ref_releve = dol_substr($clean_ref, 0, 50);
 		}
 
-		// Init SQL transaction
 		$this->db->begin();
 
 		$res = $payment->create($user);
-
-		if ($res > 0) {
-			$payment->fetch($res);
-
-			$link_res = $this->linkTransaction($payment->fk_bank, $qonto_id, $ref_releve);
-			if ($link_res > 0) {
-				$this->db->commit();
-				dol_syslog(__METHOD__ . ": Various payment created and linked to Qonto ID: " . $qonto_id . " (ID: " . $payment->id . ")", LOG_INFO);
-				return (int) $payment->id;
-			} else {
-				$this->db->rollback();
-				dol_syslog(__METHOD__ . ": Error linking various payment to Qonto ID: " . $qonto_id, LOG_ERR);
-				return -1;
-			}
-		} else {
+		if ($res <= 0) {
 			$this->db->rollback();
 			dol_syslog(__METHOD__ . ": Error creating various payment: " . $payment->error, LOG_ERR);
 			return -1;
 		}
-	}
 
-	/**
-	 * Cancel and delete a previously created Various Payment and its associated bank line
-	 *
-	 * @param int $payment_id PaymentVarious ID
-	 * @return int 1 on success, -1 on error
-	 */
-	public function cancelVariousPayment($payment_id)
-	{
-		global $conf, $user;
-
-		$payment_id = (int) $payment_id;
-		if ($payment_id <= 0) {
-			dol_syslog(__METHOD__ . ": Invalid payment ID: " . $payment_id, LOG_ERR);
-			return -1;
+		// Fallback version < 24
+		if (empty($payment->fk_bank)) {
+			$payment->fetch($res);
 		}
 
-		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/paymentvarious.class.php';
-		$payment = new PaymentVarious($this->db);
-
-		$res = $payment->fetch($payment_id);
-		if ($res <= 0) {
-			dol_syslog(__METHOD__ . ": Cannot fetch various payment ID: " . $payment_id, LOG_ERR);
-			return -1;
-		}
-
-		$fk_bank = (int) $payment->fk_bank;
-
-		$this->db->begin();
-
-		// Delete the PaymentVarious record
-		$del_payment = $payment->delete($user);
-		if ($del_payment < 0) {
+		$link_res = $this->linkTransaction($payment->fk_bank, $qonto_id, $ref_releve);
+		if ($link_res <= 0) {
 			$this->db->rollback();
-			dol_syslog(__METHOD__ . ": Error deleting various payment ID " . $payment_id . ": " . $payment->error, LOG_ERR);
+			dol_syslog(__METHOD__ . ": Error linking various payment to Qonto ID: " . $qonto_id, LOG_ERR);
 			return -1;
-		}
-
-		// Delete the corresponding bank line if present
-		if ($fk_bank > 0) {
-			if (!class_exists('AccountLine')) require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/account.class.php';
-			$accountline = new AccountLine($this->db);
-
-			if ($accountline->fetch($fk_bank) > 0) {
-				$del_line = $accountline->delete($user);
-				if ($del_line < 0) {
-					$this->db->rollback();
-					dol_syslog(__METHOD__ . ": Error deleting bank line ID " . $fk_bank . ": " . $accountline->error, LOG_ERR);
-					return -1;
-				}
-			}
 		}
 
 		$this->db->commit();
-
-		// Clean up any generated GED directory for this payment
-		if (!function_exists('dol_sanitizeFileName') || !function_exists('dol_delete_dir_recursive')) {
-			require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
-		}
-		$bank_dir_output = !empty($conf->bank->dir_output) ? $conf->bank->dir_output : (DOL_DATA_ROOT . '/bank');
-		$upload_dir = $bank_dir_output . '/' . dol_sanitizeFileName((string) $payment_id);
-		if (is_dir($upload_dir)) {
-			dol_delete_dir_recursive($upload_dir);
-		}
-
-		dol_syslog(__METHOD__ . ": Various payment and bank line cancelled successfully for ID: " . $payment_id, LOG_INFO);
-		return 1;
+		dol_syslog(__METHOD__ . ": Various payment created and linked to Qonto ID: " . $qonto_id . " (ID: " . $payment->id . ")", LOG_INFO);
+		return (int) $payment->id;
 	}
-	
+
     /**
 	 * Unified method: Update selected entries with the Qonto transaction (Single or Multiple)
 	 *
