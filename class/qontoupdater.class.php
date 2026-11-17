@@ -28,6 +28,8 @@ class QontoUpdater
 
     /** @var DoliDB */
     private $db;
+	/** @var QontoApi|null */
+	private $api;
 	/** @var string */
 	public $error = '';
 	/** @var array */
@@ -36,10 +38,13 @@ class QontoUpdater
     /**
      * Constructor
      *
-     * @param DoliDB|null $db Database handler
+     * @param DoliDB             $db          Database handler
+     * @param Account|int|null   $accountOrId Account object or ID
+     * @param QontoApi|null      $api         QontoApi handler
      */
-    public function __construct(DoliDB $db, $accountOrId = null) {
-		$this->db = $db;
+    public function __construct(DoliDB $db, $accountOrId = null, ?QontoApi $api = null) {
+		$this->db	= $db;
+		$this->api	= $api;
 		if ($accountOrId !== null) $this->initAccount($accountOrId);
     }
 
@@ -188,11 +193,13 @@ class QontoUpdater
 			return -1;
 		}
 
-		if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-		$api = new QontoApi();
+		if ($this->api === null) {
+			if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
+			$this->api = new QontoApi();
+		}
 
 		// Fetch transaction details
-		$qonto_trx = $api->getTransaction($qonto_id);
+		$qonto_trx = $this->api->getTransaction($qonto_id);
 		if (empty($qonto_trx)) {
 			dol_syslog(__METHOD__ . ": Cannot fetch Qonto transaction details for ID: " . $qonto_id, LOG_ERR);
 			return -1;
@@ -365,9 +372,12 @@ class QontoUpdater
 			$qonto_trx = $qonto_data;
 		} elseif (is_string($qonto_data)) {
 			// Smart track: ID provided, fetch from API (ex: for cron/trigger)
-			if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-			$api = new QontoApi();
-			$qonto_trx = $api->getTransaction($qonto_data);
+			if ($this->api === null) {
+				if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
+				$this->api = new QontoApi();
+			}
+			
+			$qonto_trx = $this->api->getTransaction($qonto_data);
 			
 			if (empty($qonto_trx)) {
 				dol_syslog(__METHOD__ . ": Cannot fetch Qonto transaction details for ID: " . $qonto_data, LOG_ERR);

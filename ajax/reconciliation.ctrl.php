@@ -268,7 +268,7 @@ class ReconciliationController
         $api = new QontoApi();
 
         if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php', 'QontoUpdater');
-        $qontoUpdater = new QontoUpdater($this->db, $this->account);
+        $qontoUpdater = new QontoUpdater($this->db, $this->account, $api);
         
         $success_count = 0;
         $error_count = 0;
