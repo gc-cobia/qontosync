@@ -316,7 +316,7 @@ class QontoRepository
      * @param string|null $qonto_id
      * @return array Associative array [qonto_id => fk_object]
      */
-    public function getLinkedQontoIds(string $qonto_id = null): array
+    public function getLinkedQontoIds(?string $qonto_id = null): array
     {
         if (!$this->isAccountAllowed()) {
             dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
