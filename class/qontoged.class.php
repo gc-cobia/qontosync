@@ -159,19 +159,13 @@ class QontoGed
     /**
      * Download missing statements from Qonto to Dolibarr GED
      *
-     * @param Account       $account Bank account object
      * @param int           $year    Year to analyze
      * @param QontoApi|null $api     Instantiated Qonto API object
-     * @return array                 Array with success, error, and skipped counts
+     * @return array                 Array with success, error, skipped counts and api_error flag
      */
     public function syncStatementsGED($year, $api = null): array
     {
         global $conf;
-
-		if (!$this->isAccountAllowed()) {
-			dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
-			return [];
-		}
 
         $result = [
             'success_count'  => 0,
@@ -180,6 +174,12 @@ class QontoGed
             'api_error'      => false,
             'valid_refs'     => []
         ];
+
+        if (!$this->isAccountAllowed()) {
+            dol_syslog(__METHOD__ . ": Bank account NOT allowed for current entity scope", LOG_ERR);
+            $result['api_error'] = true;
+            return $result;
+        }
 
         if ($api === null) {
             if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
