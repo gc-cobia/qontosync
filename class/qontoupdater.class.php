@@ -173,7 +173,7 @@ class QontoUpdater
 	 * @param string $accountancy_code
 	 * @return int Payment ID (> 0) on success, -1 on error
 	 */
-	public function createVariousPayment($qonto_id, $accountancy_code = '')
+	public function createVariousPayment(string $qonto_id, string $accountancy_code = '')
 	{
 		global $user;
 
@@ -197,7 +197,7 @@ class QontoUpdater
 		$qontoMatching = new QontoMatching($this->db, $this->account);
 
 		if ($qontoMatching->isLinked($qonto_id, false) !== 0) {
-			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
+			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_id.") already linked.", LOG_WARNING);
 			return -1;
 		}
 
