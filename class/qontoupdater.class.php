@@ -192,6 +192,14 @@ class QontoUpdater
 			dol_syslog(__METHOD__ . ": Accountancy code is empty", LOG_ERR);
 			return -1;
 		}
+		
+		if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
+		$qontoMatching = new QontoMatching($this->db, $this->account);
+
+		if ($qontoMatching->isLinked($qonto_id, false) !== 0) {
+			dol_syslog(__METHOD__ . ": Transaction ID (".$qonto_trx['id'].") already linked.", LOG_WARNING);
+			return -1;
+		}
 
 		if ($this->api === null) {
 			if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
@@ -204,9 +212,6 @@ class QontoUpdater
 			dol_syslog(__METHOD__ . ": Cannot fetch Qonto transaction details for ID: " . $qonto_id, LOG_ERR);
 			return -1;
 		}
-		
-		if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
-		$qontoMatching = new QontoMatching($this->db);
 
 		// Prepare payment object
 		if (!class_exists('PaymentVarious')) require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/paymentvarious.class.php';
