@@ -83,6 +83,7 @@ QontoSyncAllReconciled=Toutes les transactions de cette période sont déjà rap
 
 # Actions & Results
 InvalidToken=Jeton de sécurité invalide
+SessionExpired=Session expirée ou permission refusée
 TransactionSuccessfullyLinked=Transaction liée avec succès
 VariousPaymentCreatedSuccessfully=Paiement divers créé avec succès
 TransactionSuccessfullyUnlinked=Transaction déliée avec succès
@@ -162,3 +163,6 @@ QontoEInvoicingStatusMatched=Existe en base
 QontoEInvoicingStatusMatchedTooltip=Facture existante en base sans UUID Qonto
 QontoEInvoicingStatusNotImported=Non importée
 QontoEInvoicingImportedPrivateNote=Importé depuis Qonto (Facture électronique)
+QontoEInvoicingSearching=Récupération des factures fournisseurs Qonto en cours...
+ErrorFetchingSupplierInvoices=Erreur lors de la récupération des factures fournisseurs depuis Qonto
+NoSupplierInvoicesFound=Aucune facture fournisseur trouvée sur Qonto.

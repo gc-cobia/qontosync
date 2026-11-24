@@ -46,6 +46,9 @@ QontoSyncAllReconciled=Alle Transaktionen für diesen Zeitraum sind bereits abge
 
 # Actions & Results
 InvalidToken=Ungültiges Sicherheits-Token
+SessionExpired=Sitzung abgelaufen oder Berechtigung verweigert
+PermissionDenied=Berechtigung verweigert
+InvalidParameters=Ungültige Parameter
 TransactionSuccessfullyLinked=Transaktion erfolgreich verknüpft
 FailedToLinkTransaction=Fehler beim Verknüpfen der Transaktion
 TransactionNotFound=Transaktion nicht gefunden
@@ -91,3 +94,29 @@ ConfirmNewVariousPaymentQuestion=Sind Sie sicher, dass Sie für diese Transaktio
 UnlinkTransaction=Transaktion entkoppeln
 ConfirmUnlinkTransaction=Sind Sie sicher, dass Sie die Verknüpfung dieser Qonto-Transaktion mit der Bankbuchung in Dolibarr aufheben möchten?
 TransactionSuccessfullyUnlinked=Verknüpfung der Transaktion erfolgreich aufgehoben.
+
+# Supplier E-Invoicing Import
+QontoEInvoicingNotEnabled=Die elektronische Rechnungsstellung ist in der QontoSync-Konfiguration nicht aktiviert.
+QontoEInvoicingModuleRequired=Das Community-Modul EInvoicing muss installiert und aktiviert sein, um Lieferantenrechnungen zu importieren.
+QontoEInvoicingNoAttachment=Kein Anhang (Factur-X / XML) für diese Qonto-Rechnung gefunden.
+QontoEInvoicingUnsupportedProtocol=E-Rechnungsprotokoll wird von EInvoicing nicht unterstützt (%s).
+QontoEInvoicingUnknownFormat=Unbekanntes Dateiformat (das Dokument muss eine Factur-X-PDF- oder eine CII-XML-Datei sein).
+QontoEInvoicingPdfNotFacturX=Die von Qonto abgerufene PDF-Datei ist ein Standard-PDF und enthält kein eingebettetes Factur-X-XML.
+QontoEInvoicingImportError=Fehler beim Importieren der Lieferantenrechnung über EInvoicing.
+QontoEInvoicingInvoiceNotFound=Qonto-Rechnung nicht gefunden.
+QontoEInvoicingInvoiceImported=Lieferantenrechnung erfolgreich in Dolibarr importiert (#%s).
+QontoEInvoicingInvoiceLinked=Lieferantenrechnung (#%s) erfolgreich mit Qonto verknüpft.
+QontoEInvoicingLinkError=Fehler beim Verknüpfen der Lieferantenrechnung mit Qonto.
+QontoEInvoicingWarningLinkFailed=Warnung: Rechnung #%s wurde erstellt, aber ihre Qonto-UUID (%s) konnte nicht gespeichert werden.
+QontoEInvoicingWarningAutoValidateFailed=Warnung: Automatische Validierung der Rechnung %s fehlgeschlagen (%s).
+QontoEInvoicingBatchCompleted=Synchronisation abgeschlossen: %s Rechnung(en) erfolgreich verarbeitet, %s fehlgeschlagen.
+QontoEInvoicingImportAll=Alle synchronisieren
+QontoEInvoicingLinkVerb=Verknüpfen
+QontoEInvoicingStatusImported=Importiert
+QontoEInvoicingStatusMatched=In DB vorhanden
+QontoEInvoicingStatusMatchedTooltip=Vorhandene Rechnung in der Datenbank ohne Qonto-UUID
+QontoEInvoicingStatusNotImported=Nicht importiert
+QontoEInvoicingImportedPrivateNote=Aus Qonto importiert (Elektronische Rechnung)
+QontoEInvoicingSearching=Qonto-Lieferantenrechnungen werden abgerufen...
+ErrorFetchingSupplierInvoices=Fehler beim Abrufen der Lieferantenrechnungen von Qonto
+NoSupplierInvoicesFound=Keine Lieferantenrechnungen auf Qonto gefunden.

@@ -62,6 +62,7 @@ QontoSyncAllReconciled=All transactions for this period are already reconciled.
 
 # Actions & Results
 InvalidToken=Invalid security token
+SessionExpired=Session expired or permission denied
 TransactionSuccessfullyLinked=Transaction successfully linked
 VariousPaymentCreatedSuccessfully=Various payment created successfully
 TransactionSuccessfullyUnlinked=Transaction successfully unlinked
@@ -141,3 +142,6 @@ QontoEInvoicingStatusMatched=Exists in DB
 QontoEInvoicingStatusMatchedTooltip=Existing invoice in database without Qonto UUID
 QontoEInvoicingStatusNotImported=Not imported
 QontoEInvoicingImportedPrivateNote=Imported from Qonto (Electronic invoice)
+QontoEInvoicingSearching=Fetching Qonto supplier invoices...
+ErrorFetchingSupplierInvoices=Error fetching supplier invoices from Qonto
+NoSupplierInvoicesFound=No supplier invoices found on Qonto.

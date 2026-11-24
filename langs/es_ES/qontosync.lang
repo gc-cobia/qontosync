@@ -48,6 +48,9 @@ QontoSyncAllReconciled=Todas las transacciones de este período ya están concil
 
 # Actions & Results
 InvalidToken=Token de seguridad no válido
+SessionExpired=Sesión caducada o permiso denegado
+PermissionDenied=Permiso denegado
+InvalidParameters=Parámetros no válidos
 TransactionSuccessfullyLinked=Transacción vinculada con éxito
 FailedToLinkTransaction=Error al vincular la transacción
 TransactionNotFound=Transacción no encontrada
@@ -93,3 +96,29 @@ ConfirmNewVariousPaymentQuestion=¿Está seguro de que desea crear un nuevo pago
 UnlinkTransaction=Desvincular transacción
 ConfirmUnlinkTransaction=¿Está seguro de que desea desvincular esta transacción de Qonto de su asiento bancario en Dolibarr?
 TransactionSuccessfullyUnlinked=Transacción desvinculada con éxito.
+
+# Supplier E-Invoicing Import
+QontoEInvoicingNotEnabled=La facturación electrónica no está activada en la configuración de QontoSync.
+QontoEInvoicingModuleRequired=El módulo comunitario EInvoicing debe estar instalado y activado para importar facturas de proveedores.
+QontoEInvoicingNoAttachment=No se encontró ningún archivo adjunto (Factur-X / XML) en esta factura de Qonto.
+QontoEInvoicingUnsupportedProtocol=Protocolo de facturación electrónica no compatible con EInvoicing (%s).
+QontoEInvoicingUnknownFormat=Formato de archivo no reconocido (el documento debe ser un PDF Factur-X o un archivo XML CII).
+QontoEInvoicingPdfNotFacturX=El archivo PDF recuperado de Qonto es un PDF estándar y no contiene XML Factur-X incrustado.
+QontoEInvoicingImportError=Error al importar la factura de proveedor mediante EInvoicing.
+QontoEInvoicingInvoiceNotFound=Factura de Qonto no encontrada.
+QontoEInvoicingInvoiceImported=Factura de proveedor importada con éxito en Dolibarr (#%s).
+QontoEInvoicingInvoiceLinked=Factura de proveedor (#%s) vinculada con éxito a Qonto.
+QontoEInvoicingLinkError=Error al vincular la factura de proveedor con Qonto.
+QontoEInvoicingWarningLinkFailed=Advertencia: la factura #%s se creó pero su UUID de Qonto (%s) no se pudo guardar.
+QontoEInvoicingWarningAutoValidateFailed=Advertencia: falló la validación automática de la factura %s (%s).
+QontoEInvoicingBatchCompleted=Sincronización completada: %s factura(s) procesada(s) con éxito, %s fallida(s).
+QontoEInvoicingImportAll=Sincronizar todo
+QontoEInvoicingLinkVerb=Vincular
+QontoEInvoicingStatusImported=Importada
+QontoEInvoicingStatusMatched=Existe en BD
+QontoEInvoicingStatusMatchedTooltip=Factura existente en la base de datos sin UUID de Qonto
+QontoEInvoicingStatusNotImported=No importada
+QontoEInvoicingImportedPrivateNote=Importado desde Qonto (Factura electrónica)
+QontoEInvoicingSearching=Obteniendo facturas de proveedores de Qonto...
+ErrorFetchingSupplierInvoices=Error al obtener las facturas de proveedores desde Qonto
+NoSupplierInvoicesFound=No se encontraron facturas de proveedores en Qonto.
