@@ -47,6 +47,49 @@ class ReconciliationController
             $this->accountError = ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
     }
+
+    /**
+     * Generate a stateless HMAC-SHA256 signature binding a Qonto transaction ID
+     * to the current Dolibarr entity and authorized bank account.
+     *
+     * @param  string $qontoId Qonto transaction ID
+     * @return string          Hexadecimal HMAC signature, or empty string if context is invalid
+     */
+    private function signTransaction(string $qontoId): string
+    {
+        global $conf;
+
+        $instanceId = !empty($conf->file->instance_unique_id) ? (string) $conf->file->instance_unique_id : '';
+        $qontoId = trim($qontoId);
+
+        if ($instanceId === '' || $qontoId === '' || empty($this->account) || $this->account->id <= 0) {
+            return '';
+        }
+
+        return hash_hmac(
+            'sha256',
+            ((int) $conf->entity) . '|' . ((int) $this->account->id) . '|' . $qontoId,
+            'qontosync:trx:' . $instanceId
+        );
+    }
+
+    /**
+     * Verify a transaction HMAC signature in constant time.
+     *
+     * @param  string $qontoId Qonto transaction ID
+     * @param  string $sig     Client-supplied HMAC signature
+     * @return bool            True if valid, false otherwise
+     */
+    private function verifyTransactionSignature(string $qontoId, string $sig): bool
+    {
+        $qontoId = trim($qontoId);
+        if ($qontoId === '' || $sig === '') {
+            return false;
+        }
+
+        $expected = $this->signTransaction($qontoId);
+        return $expected !== '' && hash_equals($expected, $sig);
+    }
     
     /**
      * Get transactions for a specific month and year
@@ -107,6 +150,7 @@ class ReconciliationController
 
             $trx_item = [
                 'id' => $q_id,
+                'sig' => $this->signTransaction((string) $q_id),
                 'label' => $t['label'],
                 'reference' => !empty($t['reference']) ? $t['reference'] : '',
                 'settled_at' => $t['settled_at'],
@@ -269,6 +313,19 @@ class ReconciliationController
             return ['http_code' => 400, 'error' => 'NO_TRANSACTION_TO_LINK'];
         }
 
+        // Verify all HMAC transaction signatures before fetching from Qonto API
+        foreach ($matches as $qonto_id => $match) {
+            if (empty($match) || !is_array($match)) {
+                continue;
+            }
+            $clean_qonto_id = trim((string) sanitizeVal((string) $qonto_id, 'alphanohtml'));
+            $sig = (isset($match['sig']) && is_string($match['sig'])) ? $match['sig'] : '';
+            if (!$this->verifyTransactionSignature($clean_qonto_id, $sig)) {
+                dol_syslog(__METHOD__ . ": Invalid HMAC signature for Qonto transaction " . $clean_qonto_id . " on bank account " . $this->account->id, LOG_WARNING);
+                return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
+            }
+        }
+
         if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
         $api = new QontoApi();
 
@@ -279,11 +336,13 @@ class ReconciliationController
         $error_count = 0;
 
         foreach ($matches as $qonto_id => $match) {
-            $qonto_id = sanitizeVal($qonto_id, 'alphanohtml');
-            $type = sanitizeVal($match['type'], 'alpha');
-            $doc_id = (int) $match['doc_id'];
+            if (empty($match) || !is_array($match)) {
+                continue;
+            }
 
-            if (empty($match) || !is_array($match)) continue;
+            $qonto_id = trim((string) sanitizeVal((string) $qonto_id, 'alphanohtml'));
+            $type = sanitizeVal((string) ($match['type'] ?? ''), 'alpha');
+            $doc_id = (int) ($match['doc_id'] ?? 0);
 
             $selected_trx = $api->getTransaction($qonto_id);
             if ($selected_trx) {
@@ -370,10 +429,16 @@ class ReconciliationController
             return $this->accountError;
         }
 
-        $qonto_id = ($this->data['qonto_id'] ?? '');
+        $qonto_id = trim((string) ($this->data['qonto_id'] ?? ''));
+        $sig = is_string($this->data['sig'] ?? null) ? $this->data['sig'] : '';
 
         if (empty($qonto_id)) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
+        }
+
+        if (!$this->verifyTransactionSignature($qonto_id, $sig)) {
+            dol_syslog(__METHOD__ . ": Invalid HMAC signature for Qonto transaction " . $qonto_id . " on bank account " . $this->account->id, LOG_WARNING);
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
         if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
@@ -596,6 +661,7 @@ class ReconciliationController
 
         $transaction_data = [
             'id' => $processed_trx['id'],
+            'sig' => $this->signTransaction((string) $processed_trx['id']),
             'label' => !empty($processed_trx['label']) ? $processed_trx['label'] : '',
             'settled_at' => !empty($processed_trx['settled_at']) ? $processed_trx['settled_at'] : '',
             'date_formatted' => $date_formatted,
@@ -636,11 +702,17 @@ class ReconciliationController
             return $this->accountError;
         }
 
-        $qonto_id = ($this->data['qonto_id'] ?? '');
+        $qonto_id = trim((string) ($this->data['qonto_id'] ?? ''));
+        $sig = is_string($this->data['sig'] ?? null) ? $this->data['sig'] : '';
         $link_docs = $this->data['link_doc'] ?? [];
 
         if (empty($qonto_id) || empty($link_docs) || !is_array($link_docs)) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
+        }
+
+        if (!$this->verifyTransactionSignature($qonto_id, $sig)) {
+            dol_syslog(__METHOD__ . ": Invalid HMAC signature for Qonto transaction " . $qonto_id . " on bank account " . $this->account->id, LOG_WARNING);
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
         if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
@@ -730,12 +802,18 @@ class ReconciliationController
             return $this->accountError;
         }
 
-        $qonto_id = ($this->data['qonto_id'] ?? '');
+        $qonto_id = trim((string) ($this->data['qonto_id'] ?? ''));
+        $sig = is_string($this->data['sig'] ?? null) ? $this->data['sig'] : '';
         $accountancy_code = ($this->data['accountancy_code'] ?? '');
         $attached_file = $this->data['attached_file'] ?? null;
 
         if (empty($qonto_id)) {
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
+        }
+
+        if (!$this->verifyTransactionSignature($qonto_id, $sig)) {
+            dol_syslog(__METHOD__ . ": Invalid HMAC signature for Qonto transaction " . $qonto_id . " on bank account " . $this->account->id, LOG_WARNING);
+            return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
         // Validate attached file upfront if provided (Fail-Fast before creating payment)

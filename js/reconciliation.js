@@ -91,6 +91,7 @@ $(document).ready(function () {
             if (!val) return;
 
             const qontoId = selectEl.attr('data-qonto-id');
+            const trxSig = selectEl.attr('data-trx-sig') || '';
             const selectedOpt = selectEl.find('option:selected');
             const type = selectedOpt.attr('data-type');
             const docId = parseInt(selectedOpt.attr('data-doc-id'), 10) || 0;
@@ -98,6 +99,7 @@ $(document).ready(function () {
             if (qontoId && type && docId > 0) {
                 itemsToLink.push({
                     qonto_id: qontoId,
+                    sig: trxSig,
                     type: type,
                     doc_id: docId
                 });
@@ -127,7 +129,8 @@ $(document).ready(function () {
                 matches: {
                     [item.qonto_id]: {
                         type: item.type,
-                        doc_id: item.doc_id
+                        doc_id: item.doc_id,
+                        sig: item.sig
                     }
                 }
             }).then(function (res) {
@@ -164,6 +167,7 @@ $(document).ready(function () {
     async function loadAdvancedInfo(buttonEl) {
         const $btn = $(buttonEl);
         const qontoId = $btn.attr('data-qonto-id') || '';
+        const trxSig = $btn.attr('data-trx-sig') || '';
         const bankRowid = parseInt($btn.attr('data-bank-rowid') || searchForm.find('[name="bank_rowid"]').val(), 10) || 0;
         const title = $btn.attr('title') || 'Advanced Search';
 
@@ -188,6 +192,7 @@ $(document).ready(function () {
         try {
             const data = await apiCall('getAdvancedInfo', {
                 qonto_id: qontoId,
+                sig: trxSig,
                 bank_rowid: bankRowid
             });
 
@@ -209,6 +214,7 @@ $(document).ready(function () {
         modalForm.find('#advanced_match_loader').show();
 
         const qontoId = modalForm.find('input[name="qonto_id"]').val() || '';
+        const trxSig = modalForm.find('input[name="trx_sig"]').val() || '';
         const bankRowid = parseInt(modalForm.find('input[name="bank_rowid"]').val(), 10) || 0;
         const linkDocs = [];
         const amounts = {};
@@ -226,6 +232,7 @@ $(document).ready(function () {
             const data = await apiCall('batchLinkAdvanced', {
                 bank_rowid: bankRowid,
                 qonto_id: qontoId,
+                sig: trxSig,
                 link_doc: linkDocs,
                 amounts: amounts
             });
@@ -269,12 +276,13 @@ $(document).ready(function () {
     }
 
     // New various payment (createVariousPayment)
-    async function newVariousPayment(qontoId, bankRowid, accountancyCode, attachedFile = null) {
+    async function newVariousPayment(qontoId, bankRowid, accountancyCode, attachedFile = null, trxSig = '') {
         displaySpinner(langProcessBatch);
 
         try {
             const data = await apiCall('createVariousPayment', {
                 qonto_id: qontoId,
+                sig: trxSig,
                 bank_rowid: parseInt(bankRowid, 10) || 0,
                 accountancy_code: accountancyCode || '',
                 attached_file: attachedFile
@@ -488,6 +496,7 @@ $(document).ready(function () {
 
                 // Populate hidden inputs
                 $(clonePending).find('input[name="qonto_id"]').val(trx.id || '');
+                $(clonePending).find('input[name="trx_sig"]').val(trx.sig || '');
                 $(clonePending).find('input[name="bank_rowid"]').val(bankRowid || searchForm.find('[name="bank_rowid"]').val() || '');
                 $(clonePending).find('#qonto_trx_amount').val(trx.amount_abs || 0);
 
@@ -634,6 +643,7 @@ $(document).ready(function () {
                         select.name = 'target_val[' + t.id + ']';
                         select.id = 'form_select_' + sanitizedId;
                         select.setAttribute('data-qonto-id', t.id);
+                        select.setAttribute('data-trx-sig', t.sig || '');
 
                         groupKeys.forEach(function (grp) {
                             const items = (t.matches && t.matches[grp.key]) ? t.matches[grp.key] : [];
@@ -671,6 +681,7 @@ $(document).ready(function () {
             const advMatchBtn = tr.querySelector('.btn-open-advanced-match');
             if (advMatchBtn) {
                 advMatchBtn.setAttribute('data-qonto-id', t.id);
+                advMatchBtn.setAttribute('data-trx-sig', t.sig || '');
                 advMatchBtn.setAttribute('data-bank-rowid', data.bank_rowid || '');
             }
 
@@ -685,6 +696,7 @@ $(document).ready(function () {
                 const odBtn = tr.querySelector('.btn-ask-create-od');
                 if (odBtn) {
                     odBtn.setAttribute('data-qonto-id', t.id);
+                    odBtn.setAttribute('data-trx-sig', t.sig || '');
                     odBtn.setAttribute('data-bank-rowid', data.bank_rowid || '');
                     odBtn.style.display = 'block';
                 }
@@ -780,6 +792,7 @@ $(document).ready(function () {
     $(document).on('click', '.btn-ask-create-od', function (e) {
         e.preventDefault();
         const qontoId = $(this).attr('data-qonto-id');
+        const trxSig = $(this).attr('data-trx-sig') || '';
         const bankRowid = $(this).attr('data-bank-rowid');
 
         // Retrieve data from the table row
@@ -830,7 +843,7 @@ $(document).ready(function () {
                     }
 
                     $thisDialog.dialog("close");
-                    await newVariousPayment(qontoId, bankRowid, accountancyCode, attachedFile);
+                    await newVariousPayment(qontoId, bankRowid, accountancyCode, attachedFile, trxSig);
                 }
             },
             {

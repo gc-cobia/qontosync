@@ -25,15 +25,36 @@ $langs->loadLangs(array("qontosync@qontosync", "einvoicing@einvoicing", "main", 
 $action = GETPOST('action', 'aZ09');
 $view_attachment_id = GETPOST('view_attachment', 'alphanohtml');
 
+$computeAttachmentSig = static function (string $attachmentId) use ($conf, $user): string {
+    $instanceId = !empty($conf->file->instance_unique_id) ? (string) $conf->file->instance_unique_id : '';
+    $attachmentId = trim($attachmentId);
+    if ($instanceId === '' || $attachmentId === '') {
+        return '';
+    }
+    $secret = 'qontosync:supp_att:' . $instanceId;
+    $payload = ((int) $conf->entity) . '|' . ((int) $user->id) . '|' . $attachmentId;
+    return hash_hmac('sha256', $payload, $secret);
+};
+
 if (!empty($view_attachment_id)) {
     if (!$user->hasRight('qontosync', 'supplier_invoices', 'read_pdf')) {
+        accessforbidden();
+    }
+    $providedSig = GETPOST('sig', 'aZ09');
+    $expectedSig = $computeAttachmentSig((string) $view_attachment_id);
+    if ($expectedSig === '' || $providedSig === '' || !hash_equals($expectedSig, $providedSig)) {
+        dol_syslog("QontoSync supplier_invoices.php: Invalid attachment signature for ID " . $view_attachment_id . " by user " . $user->id, LOG_WARNING);
         accessforbidden();
     }
     $qontoApi = new QontoApi();
     $attachment = $qontoApi->getAttachment($view_attachment_id);
     if (!empty($attachment['url'])) {
-        header("Location: " . $attachment['url']);
-        exit;
+        $parsedUrl = parse_url((string) $attachment['url']);
+        if (is_array($parsedUrl) && !empty($parsedUrl['scheme']) && strtolower($parsedUrl['scheme']) === 'https' && !empty($parsedUrl['host'])) {
+            header("Location: " . $attachment['url']);
+            exit;
+        }
+        dol_syslog("QontoSync supplier_invoices.php: Refused non-HTTPS attachment redirect for ID " . $view_attachment_id, LOG_ERR);
     }
     setEventMessages($langs->trans("ErrorFileNotFound"), null, 'errors');
 }
@@ -235,11 +256,14 @@ if (!$eiEnabled) {
             }
 
             if ($user->hasRight('qontosync', 'supplier_invoices', 'read_pdf') && !empty($att_id)) {
-                $url_view = dol_buildpath('/qontosync/supplier_invoices.php', 1) . '?view_attachment=' . urlencode($att_id) . '&token=' . newToken();
-                print '<a href="' . dol_escape_htmltag($url_view) . '" target="_blank" class="button smallpaddingimp">';
-                print '<i class="fas fa-file-pdf marginrightonly"></i>' . $langs->trans("OpenVerb");
-                print '</a>';
-                $hasAction = true;
+                $attSig = $computeAttachmentSig((string) $att_id);
+                if ($attSig !== '') {
+                    $url_view = dol_buildpath('/qontosync/supplier_invoices.php', 1) . '?view_attachment=' . urlencode($att_id) . '&sig=' . urlencode($attSig) . '&token=' . newToken();
+                    print '<a href="' . dol_escape_htmltag($url_view) . '" target="_blank" rel="noopener noreferrer" class="button smallpaddingimp">';
+                    print '<i class="fas fa-file-pdf marginrightonly"></i>' . $langs->trans("OpenVerb");
+                    print '</a>';
+                    $hasAction = true;
+                }
             }
 
             if (!$hasAction) {

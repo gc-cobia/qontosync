@@ -134,6 +134,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 
         <form id="form_advanced_matching" method="post" action="">
             <input type="hidden" name="qonto_id" value="">
+            <input type="hidden" name="trx_sig" value="">
             <input type="hidden" name="bank_rowid" value="">
             <input type="hidden" id="qonto_trx_amount" value="">
 
