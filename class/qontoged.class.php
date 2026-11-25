@@ -22,7 +22,10 @@ if (!trait_exists('QontoAccountTrait')) dol_include_once('/qontosync/class/qonto
  */
 class QontoGed
 {
-	use QontoAccountTrait;
+    use QontoAccountTrait;
+
+    /** @var int Maximum download size in bytes (20 MiB) */
+    const MAX_DOWNLOAD_SIZE = 20971520;
 
     /** @var DoliDB|null */
     private $db;
@@ -34,99 +37,96 @@ class QontoGed
     /**
      * Constructor
      *
-     * @param DoliDB|null $db Database handler
+     * @param DoliDB|null $db          Database handler
+     * @param mixed       $accountOrId Optional Account object or bank account ID
      */
     public function __construct(DoliDB $db, $accountOrId = null)
     {
         $this->db = $db;
-		if ($accountOrId !== null) $this->initAccount($accountOrId);
+        if ($accountOrId !== null) $this->initAccount($accountOrId);
     }
 
     /**
-     * Common cURL method to download a file from a pre-signed URL (either into memory or directly to a file)
+     * Download a file from a pre-signed URL using Dolibarr's getURLContent().
      *
-     * @param string      $url          Target HTTPS URL
-     * @param string|null $destFilePath Optional local file path to write directly to disk (null = return content string)
-     * @param int         $timeout      cURL timeout in seconds
-     * @return string|int|false         Raw file content (when $destFilePath is null) or false on error; 1 (when saved to $destFilePath) or <0 on error
+     * Delegates SSRF protection, protocol restrictions, proxy settings, and redirects to getURLContent(),
+     * while enforcing a fallback maximum download size (20 MiB) when MAIN_SECURITY_MAXFILESIZE_DOWNLOADED is unset.
+     *
+     * @param string $url Target HTTPS URL
+     * @return string|false Raw file content on success, or false on error
      */
-    private function downloadUrl(string $url, ?string $destFilePath = null, int $timeout = 60)
+    private function downloadUrl(string $url)
     {
-        global $conf;
-
+        $this->error = '';
         $url = trim($url);
+
         if ($url === '') {
+            $this->error = 'ErrorBadUrl';
             dol_syslog(__METHOD__ . ': URL is empty', LOG_ERR);
-            return ($destFilePath !== null ? -1 : false);
-        }
-
-        $fp = null;
-        if ($destFilePath !== null) {
-            $fp = fopen($destFilePath, 'w+');
-            if ($fp === false) {
-                dol_syslog(__METHOD__ . ': Unable to open the file for writing: ' . $destFilePath, LOG_ERR);
-                return -1;
-            }
-        }
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Dolibarr QontoSync');
-
-        if (defined('CURLOPT_PROTOCOLS_STR')) {
-            curl_setopt($ch, CURLOPT_PROTOCOLS_STR, 'HTTPS');
-        } else {
-            curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
-        }
-
-        if ($fp !== null) {
-            curl_setopt($ch, CURLOPT_FILE, $fp);
-        } else {
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        }
-
-        $response = curl_exec($ch);
-        if ($response === false) {
-            $curl_err = curl_error($ch);
-            dol_syslog(__METHOD__ . ': cURL error while downloading URL: ' . $curl_err, LOG_ERR);
-            curl_close($ch);
-            if ($fp !== null) {
-                fclose($fp);
-                @unlink($destFilePath);
-                return -1;
-            }
             return false;
         }
 
-        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        if (!function_exists('getURLContent')) require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 
-        if ($fp !== null) {
-            fclose($fp);
-            if ($httpCode === 200) {
-                if (!empty($conf->global->MAIN_UMASK)) {
-                    @chmod($destFilePath, octdec($conf->global->MAIN_UMASK));
+        $hasDolibarrLimit = (getDolGlobalInt('MAIN_SECURITY_MAXFILESIZE_DOWNLOADED') > 0);
+        $sizeLimitExceeded = false;
+        $curlOptions = [];
+
+        if (!$hasDolibarrLimit) {
+            $progressCallback = function ($ch, $downloadTotal, $downloadedBytes, $uploadTotal, $uploadedBytes) use (&$sizeLimitExceeded) {
+                if (($downloadTotal > 0 && $downloadTotal > self::MAX_DOWNLOAD_SIZE) || $downloadedBytes > self::MAX_DOWNLOAD_SIZE) {
+                    $sizeLimitExceeded = true;
+                    return 1;
                 }
-                return 1;
-            }
+                return 0;
+            };
 
-            @unlink($destFilePath);
-            dol_syslog(__METHOD__ . ': Failed to download file to ' . $destFilePath . '. HTTP Code: ' . $httpCode, LOG_ERR);
-            return -1;
+            $curlOptions[CURLOPT_MAXFILESIZE] = self::MAX_DOWNLOAD_SIZE;
+            $curlOptions[CURLOPT_NOPROGRESS] = false;
+            if (defined('CURLOPT_XFERINFOFUNCTION')) {
+                $curlOptions[CURLOPT_XFERINFOFUNCTION] = $progressCallback;
+            } elseif (defined('CURLOPT_PROGRESSFUNCTION')) {
+                $curlOptions[CURLOPT_PROGRESSFUNCTION] = $progressCallback;
+            }
         }
 
-        if ($httpCode !== 200 || $response === '') {
-            dol_syslog(__METHOD__ . ': HTTP error ' . $httpCode . ' while downloading content into memory', LOG_ERR);
+        $result = getURLContent($url, 'GET', '', 1, ['User-Agent: Dolibarr QontoSync'], ['https'], 0, 1, 10, 60, $curlOptions);
+
+        if (!is_array($result) || !empty($result['curl_error_no'])) {
+            $curlErrNo = is_array($result) ? (int) ($result['curl_error_no'] ?? 0) : 0;
+            $curlErrMsg = is_array($result) ? (string) ($result['curl_error_msg'] ?? '') : 'Invalid getURLContent response';
+
+            if ($sizeLimitExceeded || $curlErrNo === 63 || (defined('CURLE_FILESIZE_EXCEEDED') && $curlErrNo === CURLE_FILESIZE_EXCEEDED)) {
+                $this->error = 'ErrorFileSizeTooLarge';
+                dol_syslog(__METHOD__ . ': Download aborted because file exceeded max allowed size', LOG_ERR);
+            } else {
+                $this->error = 'ErrorFileNotFound';
+                dol_syslog(__METHOD__ . ': cURL error while downloading URL (' . $curlErrNo . '): ' . $curlErrMsg, LOG_ERR);
+            }
             return false;
         }
 
-        return $response;
+        $httpCode = (int) ($result['http_code'] ?? 0);
+        if ($httpCode !== 200) {
+            $this->error = 'ErrorFileNotFound';
+            dol_syslog(__METHOD__ . ': HTTP error ' . $httpCode . ' while downloading file', LOG_ERR);
+            return false;
+        }
+
+        $content = (string) ($result['content'] ?? '');
+        if ($content === '') {
+            $this->error = 'ErrorFileNotFound';
+            dol_syslog(__METHOD__ . ': Empty content received while downloading file', LOG_ERR);
+            return false;
+        }
+
+        if (!$hasDolibarrLimit && strlen($content) > self::MAX_DOWNLOAD_SIZE) {
+            $this->error = 'ErrorFileSizeTooLarge';
+            dol_syslog(__METHOD__ . ': Downloaded content exceeded max size of ' . self::MAX_DOWNLOAD_SIZE . ' bytes', LOG_ERR);
+            return false;
+        }
+
+        return $content;
     }
 
     /**
@@ -138,10 +138,10 @@ class QontoGed
      */
     public function downloadAttachment($attachment_id, $api = null)
     {
+        $this->error = '';
+
         if ($api === null) {
-            if (!class_exists('QontoApi')) {
-                dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-            }
+            if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
             $api = new QontoApi();
         }
 
@@ -153,7 +153,7 @@ class QontoGed
 
         dol_syslog(__METHOD__ . ': Downloading attachment content for ID ' . $attachment_id, LOG_DEBUG);
 
-        return $this->downloadUrl($attachment['url'], null, 30);
+        return $this->downloadUrl($attachment['url']);
     }
 
     /**
@@ -226,10 +226,6 @@ class QontoGed
                 $ref_releve = substr($clean_ref, 0, 50);
 
                 $dir_output = $conf->bank->dir_output . '/' . $this->account->id . '/statement/' . $ref_releve;
-                if (!file_exists($dir_output)) {
-                    dol_mkdir($dir_output);
-                }
-
                 $filename = $ref_releve . '.pdf';
                 $dest_file_path = $dir_output . '/' . $filename;
 
@@ -240,16 +236,51 @@ class QontoGed
                     continue;
                 }
 
-                // Secure download via common cURL method
+                // Secure download via getURLContent() with %PDF- verification
                 if (!empty($statement_url)) {
-                    if ($this->downloadUrl($statement_url, $dest_file_path, 60) > 0) {
-                        $result['success_count']++;
-                        $result['valid_refs'][] = $ref_releve;
-                        dol_syslog(__METHOD__ . ': Statement downloaded successfully for period ' . $period_key . ' to ' . $dest_file_path, LOG_INFO);
-                    } else {
+                    $content = $this->downloadUrl($statement_url);
+                    $stmtHost = (string) parse_url($statement_url, PHP_URL_HOST);
+
+                    if ($content === false) {
                         $result['error_count']++;
-                        dol_syslog(__METHOD__ . ': Failed to download statement for period ' . $period_key . ' from ' . $statement_url, LOG_ERR);
+                        dol_syslog(__METHOD__ . ': Failed to download statement for period ' . $period_key . ($stmtHost !== '' ? ' from host ' . $stmtHost : ''), LOG_ERR);
+                        continue;
                     }
+
+                    if (strncmp($content, '%PDF-', 5) !== 0) {
+                        $this->error = 'ErrorInvalidPdfContent';
+                        $result['error_count']++;
+                        dol_syslog(__METHOD__ . ': Statement rejected for period ' . $period_key . ($stmtHost !== '' ? ' from host ' . $stmtHost : '') . ' - invalid PDF signature', LOG_ERR);
+                        continue;
+                    }
+
+                    if (!file_exists($dir_output)) {
+                        dol_mkdir($dir_output);
+                    }
+                    if (!is_dir($dir_output)) {
+                        $this->error = 'ErrorFailToCreateFile';
+                        $result['error_count']++;
+                        dol_syslog(__METHOD__ . ': Unable to create statement directory ' . $dir_output, LOG_ERR);
+                        continue;
+                    }
+
+                    $written = @file_put_contents($dest_file_path, $content, LOCK_EX);
+                    if ($written === false || $written !== strlen($content)) {
+                        @unlink($dest_file_path);
+                        $this->error = 'ErrorFailToCreateFile';
+                        $result['error_count']++;
+                        dol_syslog(__METHOD__ . ': Failed to write downloaded statement to ' . $dest_file_path, LOG_ERR);
+                        continue;
+                    }
+
+                    $umask = function_exists('getDolGlobalString') ? getDolGlobalString('MAIN_UMASK') : (!empty($conf->global->MAIN_UMASK) ? (string) $conf->global->MAIN_UMASK : '');
+                    if ($umask !== '') {
+                        @chmod($dest_file_path, octdec($umask));
+                    }
+
+                    $result['success_count']++;
+                    $result['valid_refs'][] = $ref_releve;
+                    dol_syslog(__METHOD__ . ': Statement downloaded successfully for period ' . $period_key . ' to ' . $dest_file_path, LOG_INFO);
                 }
             }
         }
