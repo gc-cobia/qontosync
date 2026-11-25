@@ -2,10 +2,6 @@
 
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
-    img[src*="object_qonto.svg"] {
-        filter: invert(1);
-    }
-
     .ui-dialog .ui-dialog-title {
         color: #ffffff !important;
     }

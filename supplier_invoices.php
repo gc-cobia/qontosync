@@ -22,11 +22,13 @@ $langs->loadLangs(array("qontosync@qontosync", "einvoicing@einvoicing", "main", 
 $eiEnabled = (bool) getDolGlobalInt('QONTOSYNC_EI_ENABLED');
 $einvoicingModEnabled = isModEnabled('einvoicing');
 
+if (!function_exists('qontosyncVersionedAssets')) dol_include_once('/qontosync/lib/qontosync.lib.php');
+
 // Load javascript files only when e-invoicing is enabled
-$arrayofjs = $eiEnabled ? array('/qontosync/js/supplier_invoices.js') : array();
+$arrayofjs = $eiEnabled ? qontosyncVersionedAssets(array('/qontosync/js/supplier_invoices.js')) : array();
 
 $title = "QontoSync - " . $langs->trans("SupplierInvoices");
-llxHeader('', $title, '', '', 0, 0, $arrayofjs);
+llxHeader(qontosyncCssHeadTag(), $title, '', '', 0, 0, $arrayofjs);
 
 print load_fiche_titre($title, '', 'object_qonto.svg@qontosync');
 

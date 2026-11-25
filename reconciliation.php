@@ -19,16 +19,18 @@ if ($user->socid > 0 || !$user->hasRight('qontosync', 'reconciliation', 'read'))
 
 $langs->loadLangs(array("qontosync@qontosync", "banks", "bills", "trips", "compta", "other"));
 
+if (!function_exists('qontosyncVersionedAssets')) dol_include_once('/qontosync/lib/qontosync.lib.php');
+
 // Load javascript files
-$arrayofjs = array(
+$arrayofjs = qontosyncVersionedAssets(array(
     '/qontosync/js/reconciliation.js',
     '/qontosync/js/hamburger.js',
     '/qontosync/js/batch_matching.js',
     '/qontosync/js/advanced_matching.js',
     '/qontosync/js/fifo.js'
-);
+));
 
-llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
+llxHeader(qontosyncCssHeadTag(), $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
 
 print load_fiche_titre($langs->trans("QontoSync"), '', 'object_qonto.svg@qontosync');
 

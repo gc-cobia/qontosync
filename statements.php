@@ -19,12 +19,14 @@ if ($user->socid > 0 || !$user->hasRight('qontosync', 'statements', 'read')) {
 
 $langs->loadLangs(array("qontosync@qontosync", "banks", "compta", "main"));
 
-// Load javascript files
-$arrayofjs = array(
-    '/qontosync/js/statements.js' 
-);
+if (!function_exists('qontosyncVersionedAssets')) dol_include_once('/qontosync/lib/qontosync.lib.php');
 
-llxHeader('', $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
+// Load javascript files
+$arrayofjs = qontosyncVersionedAssets(array(
+    '/qontosync/js/statements.js'
+));
+
+llxHeader(qontosyncCssHeadTag(), $langs->trans("QontoSync"), '', '', 0, 0, $arrayofjs);
 
 print load_fiche_titre($langs->trans("QontoSync"), '', 'object_qonto.svg@qontosync');
 
