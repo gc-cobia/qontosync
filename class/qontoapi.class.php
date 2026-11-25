@@ -46,21 +46,26 @@ class QontoApi
 	 */
 	public function __construct(string $apiKey = '', string $slug = '', $sandbox = null, string $sandboxToken = '')
 	{
-		global $conf;
-
-		if (!function_exists('dolDecrypt')) require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
+		// Note: We do not call dolDecrypt() manually here. QONTOSYNC_API_KEY (_KEY) and
+		// QONTOSYNC_SANDBOX_TOKEN (_TOKEN) are automatically encrypted at rest by
+		// dolibarr_set_const() and automatically decrypted into $conf->global on boot
+		// by Conf::setValues(), so getDolGlobalString() already returns plaintext
+		// (including for keys previously stored with manual dolEncrypt()).
 		$savedApiKey = getDolGlobalString('QONTOSYNC_API_KEY');
-		$decryptedKey = '';
-		if (!empty($savedApiKey)) {
-		    $decryptedKey = dolDecrypt($savedApiKey, $conf->file->instance_unique_id);
-		    if (empty($decryptedKey)) {
-				dol_syslog(__METHOD__ . ": Unable to decrypt the API key (key is corrupted or instance_unique_id has been modified)", LOG_ERR);
-		    }
+		if (!empty($savedApiKey) && preg_match('/^(dolcrypt|dolobfuscation)[^:]*:/', $savedApiKey)) {
+			dol_syslog(__METHOD__ . ": Unable to decrypt the API key (key is corrupted or instance_unique_id has been modified)", LOG_ERR);
+			$savedApiKey = '';
 		}
-		
-		$apiKeyVal = !empty($apiKey) ? $apiKey : $decryptedKey;
+
+		$savedSandboxToken = getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN');
+		if (!empty($savedSandboxToken) && preg_match('/^(dolcrypt|dolobfuscation)[^:]*:/', $savedSandboxToken)) {
+			dol_syslog(__METHOD__ . ": Unable to decrypt the Sandbox token (token is corrupted or instance_unique_id has been modified)", LOG_ERR);
+			$savedSandboxToken = '';
+		}
+
+		$apiKeyVal = !empty($apiKey) ? $apiKey : $savedApiKey;
 		$slugVal = !empty($slug) ? $slug : getDolGlobalString('QONTOSYNC_SLUG');
-		$sandboxTokenVal = !empty($sandboxToken) ? $sandboxToken : getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN');
+		$sandboxTokenVal = !empty($sandboxToken) ? $sandboxToken : $savedSandboxToken;
 
 		$this->apiKey = trim($apiKeyVal);
 		$this->slug = trim($slugVal);

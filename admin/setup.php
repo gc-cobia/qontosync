@@ -13,7 +13,6 @@ if (! $res && file_exists("../../../../main.inc.php")) $res = @include "../../..
 if (! $res && preg_match('/\/custom\//', $_SERVER["PHP_SELF"])) $res = @include "../../../../main.inc.php";
 
 if (!function_exists('dolibarr_set_const')) require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-if (!function_exists('dolEncrypt')) require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
 if (!function_exists('qontosyncAdminPrepareHead')) dol_include_once('/qontosync/lib/qontosync.lib.php');
 if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
 
@@ -32,10 +31,7 @@ if (GETPOST('test', 'alpha')) { $action = 'test'; }
 $apikey = GETPOST('QONTOSYNC_API_KEY', 'none');
 $slug = GETPOST('QONTOSYNC_SLUG', 'alphanohtml');
 $sandbox = getDolGlobalInt('QONTOSYNC_SANDBOX');
-$sandbox_token = GETPOST('QONTOSYNC_SANDBOX_TOKEN', 'alphanohtml');
-
-$has_apikey = getDolGlobalString('QONTOSYNC_API_KEY');
-$display_apikey = !empty($has_apikey) ? '****************' : '';
+$sandbox_token = GETPOST('QONTOSYNC_SANDBOX_TOKEN', 'none');
 
 // Update constants
 if ($action == 'update') {
@@ -44,16 +40,19 @@ if ($action == 'update') {
 		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
 		$action = '';
 	} else {
-		if ($apikey != '****************') {
-	        $encrypted_apikey = '';
-	        if (!empty($apikey)) {
-	            $encrypted_apikey = dolEncrypt($apikey, $conf->file->instance_unique_id);
-	        }
-		    dolibarr_set_const($db, 'QONTOSYNC_API_KEY', $encrypted_apikey, 'chaine', 0, '', $conf->entity);
-	    }
-	    
+		// Note: We do not call dolEncrypt() manually here. Dolibarr's dolibarr_set_const()
+		// automatically encrypts sensitive constants whose names end with _KEY or _TOKEN
+		// (AES-256-CTR via dolEncrypt()) in llx_const, and Conf::setValues() automatically
+		// decrypts them on boot. Passing plaintext also keeps $conf->global consistent in this request.
+		if ($apikey !== '') {
+			dolibarr_set_const($db, 'QONTOSYNC_API_KEY', $apikey, 'chaine', 0, '', $conf->entity);
+		}
+
 		dolibarr_set_const($db, 'QONTOSYNC_SLUG', $slug, 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($db, 'QONTOSYNC_SANDBOX_TOKEN', $sandbox_token, 'chaine', 0, '', $conf->entity);
+
+		if ($sandbox_token !== '') {
+			dolibarr_set_const($db, 'QONTOSYNC_SANDBOX_TOKEN', $sandbox_token, 'chaine', 0, '', $conf->entity);
+		}
 
 		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
 	}
@@ -66,9 +65,13 @@ if ($action == 'test') {
 		setEventMessages($langs->trans("InvalidToken"), null, 'errors');
 		$action = '';
 	} else {
-		if ($apikey == '****************') {
-	     	$apikey = dolDecrypt(getDolGlobalString('QONTOSYNC_API_KEY'), $conf->file->instance_unique_id);
-	    }
+		// If a secret field was left empty, fall back to the stored value (already decrypted by Dolibarr on load)
+		if ($apikey === '') {
+			$apikey = getDolGlobalString('QONTOSYNC_API_KEY');
+		}
+		if ($sandbox_token === '') {
+			$sandbox_token = getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN');
+		}
 
 		if (empty($apikey) || empty($slug)) {
 			setEventMessages($langs->trans("NoParameters"), null, 'warnings');
@@ -82,6 +85,9 @@ if ($action == 'test') {
 		}
 	}
 }
+
+$apikey_placeholder = (getDolGlobalString('QONTOSYNC_API_KEY') !== '') ? '****************' : '';
+$sandbox_token_placeholder = (getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN') !== '') ? '****************' : '';
 
 $page_name = "QontoSyncSetup";
 llxHeader('', $langs->trans("QontoSyncSetup"));
@@ -120,7 +126,7 @@ print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoAPIKey").'</td>';
-print '<td><input type="password" size="60" name="QONTOSYNC_API_KEY" value="'.$display_apikey.'"></td>';
+print '<td><input type="password" size="60" name="QONTOSYNC_API_KEY" value="" placeholder="'.$apikey_placeholder.'" autocomplete="new-password"></td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
@@ -130,7 +136,7 @@ print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoSandboxToken").'</td>';
-print '<td><input type="text" size="60" name="QONTOSYNC_SANDBOX_TOKEN" value="'.dol_escape_htmltag(getDolGlobalString('QONTOSYNC_SANDBOX_TOKEN')).'"></td>';
+print '<td><input type="password" size="60" name="QONTOSYNC_SANDBOX_TOKEN" value="" placeholder="'.$sandbox_token_placeholder.'" autocomplete="new-password"></td>';
 print '</tr>';
 
 print '</table>';
