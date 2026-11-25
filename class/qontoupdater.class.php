@@ -80,21 +80,28 @@ class QontoUpdater
 		$extrafields->fetch_name_optionals_label($bank->table_element);
 		$bank->fetch_optionals();
 		
+		// Check whether the extrafield row already exists (plain SELECT, no FOR UPDATE)
+		$sql_ef = "SELECT qonto_id FROM " . MAIN_DB_PREFIX . "bank_extrafields WHERE fk_object = " . (int) $bank_line_id;
+		$resql_ef = $this->db->query($sql_ef);
+		if (!$resql_ef) {
+			dol_syslog(__METHOD__ . ": Error reading bank line extrafield: " . $this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		$obj_ef = $this->db->fetch_object($resql_ef);
+		$this->db->free($resql_ef);
+		if ($obj_ef && trim((string) ($obj_ef->qonto_id ?? '')) !== '') {
+			dol_syslog(__METHOD__ . ": Bank line " . $bank_line_id . " is already linked.", LOG_WARNING);
+			return -1;
+		}
+
 		// Assign the Qonto ID to the target extrafield
 		$bank->array_options['options_qonto_id'] = $qonto_id;
 	
-		// Try to update the specific extrafield
-		$res = $bank->updateExtraField('qonto_id');
-		
-		// If the result is 0 (the row does not exist yet in the extrafields table) or < 0 (error)
-		if ($res <= 0) {
-			// Force the creation of the complete row
-			$res = $bank->insertExtraFields();
-			
-			if ($res < 0) {
-				dol_syslog(__METHOD__ . ": Error creating the bank line extrafield: ".$bank->error, LOG_ERR);
-				return -1;
-			}
+		// Update existing row or insert new row (never chain insertExtraFields() after an error < 0)
+		$res = $obj_ef ? $bank->updateExtraField('qonto_id') : $bank->insertExtraFields();
+		if ($res < 0) {
+			dol_syslog(__METHOD__ . ": Error saving the bank line extrafield (" . $this->db->lasterrno() . "): ".$bank->error, LOG_ERR);
+			return -1;
 		}
 		
 		// Update the bank line with the statement reference
@@ -367,8 +374,39 @@ class QontoUpdater
 			return -1;
 		}
 
+		// Sort target IDs in ascending numeric order to prevent deadlocks on multi-document payments
+		ksort($amounts_array, SORT_NUMERIC);
+
 		// Init SQL transaction
 		$this->db->begin();
+
+		// Lock target document row(s) as the very first SQL query after begin() (InnoDB REPEATABLE READ snapshot)
+		$lock_map = array(
+			'bank'    => array('bank',           'fk_account = ' . (int) $this->account->id),
+			'cinv'    => array('facture',        'entity IN (' . getEntity('facture') . ')'),
+			'sinv'    => array('facture_fourn',  'entity IN (' . getEntity('facture_fourn') . ')'),
+			'vat'     => array('tva',            'entity IN (' . getEntity('tva') . ')'),
+			'social'  => array('chargesociales', 'entity IN (' . getEntity('tax') . ')'),
+			'salary'  => array('salary',         'entity IN (' . getEntity('salary') . ')'),
+			'expense' => array('expensereport',  'entity IN (' . getEntity('expensereport') . ')'),
+		);
+		$lock_ids = array_values(array_unique(array_map('intval', array_keys($amounts_array))));
+		if (!isset($lock_map[$type]) || empty($lock_ids) || min($lock_ids) <= 0) {
+			$this->db->rollback();
+			return -1;
+		}
+		$sql_lock = "SELECT rowid FROM " . MAIN_DB_PREFIX . $lock_map[$type][0]
+			. " WHERE rowid IN (" . implode(',', $lock_ids) . ")"
+			. " AND " . $lock_map[$type][1]
+			. " ORDER BY rowid ASC FOR UPDATE";
+		$resql_lock = $this->db->query($sql_lock);
+		if (!$resql_lock || (int) $this->db->num_rows($resql_lock) !== count($lock_ids)) {
+			dol_syslog(__METHOD__ . ": Lock error or missing document on " . $type . " (" . $this->db->lasterrno() . "): " . $this->db->lasterror(), LOG_WARNING);
+			if ($resql_lock) $this->db->free($resql_lock);
+			$this->db->rollback();
+			return -1;
+		}
+		$this->db->free($resql_lock);
 		
 		// Init error counter
 		$error = 0;
@@ -451,6 +489,23 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					if ((int) $line->fk_account !== (int) $this->account->id) {
 						dol_syslog(__METHOD__ . ": Security Alert - Bank line " . $doc_id . " does not belong to authorized bank account " . $this->account->id, LOG_WARNING);
+						$error++;
+						break;
+					}
+
+					// Guard against overwriting an already linked bank line before modifying dates (plain SELECT, no FOR UPDATE)
+					// Also prevents firing Dolibarr triggers (e.g. BANKLINE_MODIFY) unnecessarily before an eventual rollback()
+					$sql_bank_ef = "SELECT qonto_id FROM " . MAIN_DB_PREFIX . "bank_extrafields WHERE fk_object = " . (int) $doc_id;
+					$resql_bank_ef = $this->db->query($sql_bank_ef);
+					if (!$resql_bank_ef) {
+						dol_syslog(__METHOD__ . ": Error reading bank_extrafields for line " . $doc_id . ": " . $this->db->lasterror(), LOG_ERR);
+						$error++;
+						break;
+					}
+					$obj_bank_ef = $this->db->fetch_object($resql_bank_ef);
+					$this->db->free($resql_bank_ef);
+					if ($obj_bank_ef && trim((string) ($obj_bank_ef->qonto_id ?? '')) !== '') {
+						dol_syslog(__METHOD__ . ": Bank line " . $doc_id . " is already linked to Qonto transaction.", LOG_WARNING);
 						$error++;
 						break;
 					}
@@ -953,8 +1008,8 @@ class QontoUpdater
 
                 if ($expense->fetch($doc_id) > 0) {
 
-					// Check if the expense is already marked as paid
-					if ($expense->paye == 1) {
+					// Check if the expense is already marked as paid (ExpenseReport::setPaid sets paid = 1 and status = STATUS_CLOSED)
+					if ($expense->paid == 1 || $expense->status == ExpenseReport::STATUS_CLOSED) {
 						dol_syslog(__METHOD__ . ": Error, the expense report " . $doc_id . " is already marked as paid.", LOG_ERR);
 						$error++;
 						break;
