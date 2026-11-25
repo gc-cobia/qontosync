@@ -52,8 +52,8 @@ class modQontosync extends DolibarrModules
 
 		// Prerequisites
 		$this->phpmin = array(7, 2);
-		$this->need_dolibarr_version = array(21, -3);
-		$this->max_dolibarr_version = array(24, -3);
+		$this->need_dolibarr_version = array(24, -3);
+		$this->max_dolibarr_version = array(25, -3);
 		// Changed to 1 because the module relies on JS (Select2, Modal boxes, UI interactions)
 		$this->need_javascript_ajax = 1;
 
