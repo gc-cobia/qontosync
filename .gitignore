@@ -1,0 +1,7 @@
+# Generated Dolibarr module archives
+dev/*.zip
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
