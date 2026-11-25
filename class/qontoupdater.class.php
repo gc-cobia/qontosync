@@ -1008,9 +1008,9 @@ class QontoUpdater
 
                 if ($expense->fetch($doc_id) > 0) {
 
-					// Check if the expense is already marked as paid (ExpenseReport::setPaid sets paid = 1 and status = STATUS_CLOSED)
-					if ($expense->paid == 1 || $expense->status == ExpenseReport::STATUS_CLOSED) {
-						dol_syslog(__METHOD__ . ": Error, the expense report " . $doc_id . " is already marked as paid.", LOG_ERR);
+					// Check if the expense is already paid or not in APPROVED status (only STATUS_APPROVED can be paid)
+					if ($expense->paid == 1 || (int) $expense->status !== ExpenseReport::STATUS_APPROVED) {
+						dol_syslog(__METHOD__ . ": Error, the expense report " . $doc_id . " is already paid or not approved (paid=" . (int) $expense->paid . ", status=" . (int) $expense->status . ").", LOG_ERR);
 						$error++;
 						break;
 					}
