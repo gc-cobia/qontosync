@@ -467,34 +467,41 @@ class QontoMatching
         // 1. Looking for invoices linked by ref_ext
         $linked = !empty($uuids) ? $repo->getLinkedInvoices($uuids) : [];
 
-        // 2. Preparing tuples for unlinked invoices
-        $criteria = [];
+        // 2. Preparing refs and normalized keys for unlinked invoices
+        $refs = [];
         $mapUuidToKey = [];
 
         foreach ($qontoInvoices as $inv) {
             $uuid = trim((string) ($inv['id'] ?? ''));
-			
+
             if ($uuid === '' || isset($linked[$uuid])) {
                 continue;
             }
 
             $ref = trim((string) ($inv['invoice_number'] ?? ''));
-			$rawTin = $inv['tin_number'] ?? ($inv['seller']['tin'] ?? ($inv['tin'] ?? ''));
+            $rawTin = $inv['tin_number'] ?? ($inv['seller']['tin'] ?? ($inv['tin'] ?? ''));
             $cleanDigits = preg_replace('/\D/', '', (string) $rawTin);
             $siren = dol_substr($cleanDigits, 0, 9);
 
             if ($ref !== '' && dol_strlen($siren) === 9) {
                 $key = dol_strtolower($ref) . '|' . $siren;
                 $mapUuidToKey[$uuid] = $key;
-                $criteria[] = [
-					'ref'	=> $ref,
-					'siren'	=> $siren,
-				];
+                $refs[] = $ref;
             }
         }
 
-        // 3. Looking for existing invoices in database
-        $matchedByPair = !empty($criteria) ? $repo->getMatchedInvoices($criteria) : [];
+        // 3. Looking for existing invoices in database and matching normalized (ref, siren) pairs
+        $matchedByPair = [];
+        if (!empty($refs)) {
+            foreach ($repo->getSupplierInvoicesByRefs($refs) as $row) {
+                $cleanRef = dol_strtolower(trim((string) $row->ref_supplier));
+                $cleanSiren = dol_substr(preg_replace('/\D/', '', (string) $row->siren), 0, 9);
+
+                if ($cleanRef !== '' && dol_strlen($cleanSiren) === 9) {
+                    $matchedByPair[$cleanRef . '|' . $cleanSiren] = (int) $row->rowid;
+                }
+            }
+        }
 
         // 4. Qualification for each invoices
         $result = [];

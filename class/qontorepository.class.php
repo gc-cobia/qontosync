@@ -540,36 +540,33 @@ class QontoRepository
     }
 
     /**
-     * Search for invoices by pairs (ref_supplier, siren)
+     * Fetch supplier invoices matching a list of supplier references
      *
-     * @param array $criteria Data php table of ['ref', 'siren']"
-     * @return array [ref_lowercase|siren => rowid]
+     * @param string[] $refs List of supplier invoice references
+     * @return object[]      Raw database rows (rowid, ref_supplier, siren)
      */
-    public function getMatchedInvoices(array $criteria): array
+    public function getSupplierInvoicesByRefs(array $refs): array
     {
         if (!isModEnabled('fournisseur')) {
             dol_syslog(__METHOD__ . ': Supplier module is not enabled', LOG_ERR);
             return [];
         }
 
-        if (empty($criteria)) {
+        if (empty($refs)) {
             return [];
         }
 
-        $tuples = [];
+        $escapedRefs = [];
 
-        foreach ($criteria as $item) {
-            $ref   = trim((string) ($item['ref'] ?? ''));
-            $siren = trim((string) ($item['siren'] ?? ''));
+        foreach ($refs as $ref) {
+            $clean = dol_strtolower(trim((string) $ref));
 
-            if ($ref === '' || dol_strlen($siren) !== 9) {
-                continue;
+            if ($clean !== '') {
+                $escapedRefs[$clean] = "'" . $this->db->escape($clean) . "'";
             }
-
-            $tuples[] = "('" . $this->db->escape($ref) . "', '" . $this->db->escape($siren) . "')";
         }
 
-        if (empty($tuples)) {
+        if (empty($escapedRefs)) {
             return [];
         }
 
@@ -577,22 +574,19 @@ class QontoRepository
         $sql .= "FROM " . MAIN_DB_PREFIX . "facture_fourn AS f ";
         $sql .= "INNER JOIN " . MAIN_DB_PREFIX . "societe AS s ON f.fk_soc = s.rowid ";
         $sql .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") ";
-        $sql .= "AND (f.ref_supplier, s.siren) IN (" . implode(', ', array_unique($tuples)) . ")";
+        $sql .= "AND LOWER(TRIM(f.ref_supplier)) IN (" . implode(', ', $escapedRefs) . ")";
 
+        $rows = [];
         $resql = $this->db->query($sql);
-
-        $matches = [];
 
         if ($resql) {
             while ($obj = $this->db->fetch_object($resql)) {
-                $cleanRef = dol_strtolower(trim((string) $obj->ref_supplier));
-                $cleanSiren = dol_substr(preg_replace('/\D/', '', (string) $obj->siren), 0, 9);
-                $matches[$cleanRef . '|' . $cleanSiren] = (int) $obj->rowid;
+                $rows[] = clone $obj;
             }
-           $this->db->free($resql);
+            $this->db->free($resql);
         }
 
-        return $matches;
+        return $rows;
     }
 
     /**
