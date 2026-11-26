@@ -16,6 +16,7 @@ if (!function_exists('dolibarr_set_const')) require_once DOL_DOCUMENT_ROOT.'/cor
 if (!function_exists('qontosyncAdminPrepareHead')) dol_include_once('/qontosync/lib/qontosync.lib.php');
 if (!class_exists('Form')) require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
+if (!function_exists('colorValidateHex')) require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 
 $langs->loadLangs(array("admin", "qontosync@qontosync"));
 
@@ -38,8 +39,10 @@ $tolerance_days = GETPOST('QONTOSYNC_TOLERANCE_DAYS', 'int');
 $max_months = GETPOST('QONTOSYNC_MAX_MONTHS', 'int');
 $statement_format = GETPOST('QONTOSYNC_STATEMENT_FORMAT', 'alphanohtml');
 
-$badge_color = GETPOST('QONTOSYNC_BADGE_COLOR', 'none');
-$badge_color_dark = GETPOST('QONTOSYNC_BADGE_COLOR_DARK', 'none');
+$raw_badge_color = GETPOST('QONTOSYNC_BADGE_COLOR', 'alphanohtml');
+$badge_color = colorValidateHex($raw_badge_color) ? $raw_badge_color : '#1e40af';
+$raw_badge_color_dark = GETPOST('QONTOSYNC_BADGE_COLOR_DARK', 'alphanohtml');
+$badge_color_dark = colorValidateHex($raw_badge_color_dark) ? $raw_badge_color_dark : '#1e3a8a';
 
 // Update constants
 if ($action == 'update') {
@@ -147,13 +150,15 @@ print '<tr class="liste_titre"><td colspan="2">'.$langs->trans("QontoView").'</t
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoReferenceBadgeColor").'</td>';
-$val_badge_color = getDolGlobalString('QONTOSYNC_BADGE_COLOR') !== '' ? getDolGlobalString('QONTOSYNC_BADGE_COLOR') : '#1e40af';
+$raw_val_badge_color = getDolGlobalString('QONTOSYNC_BADGE_COLOR');
+$val_badge_color = colorValidateHex($raw_val_badge_color) ? $raw_val_badge_color : '#1e40af';
 print '<td><input type="color" name="QONTOSYNC_BADGE_COLOR" value="'.dol_escape_htmltag($val_badge_color).'"></td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("QontoReferenceBadgeColor").' (' . $langs->trans("QontoDarkThemeMode") . ')</td>';
-$val_badge_color_dark = getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK') !== '' ? getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK') : '#1e3a8a';
+$raw_val_badge_color_dark = getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK');
+$val_badge_color_dark = colorValidateHex($raw_val_badge_color_dark) ? $raw_val_badge_color_dark : '#1e3a8a';
 print '<td><input type="color" name="QONTOSYNC_BADGE_COLOR_DARK" value="'.dol_escape_htmltag($val_badge_color_dark).'"></td>';
 print '</tr>';
 

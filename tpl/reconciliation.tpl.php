@@ -86,27 +86,36 @@ $style_select = "width: {$fixed_width}; max-width: {$fixed_width}; box-sizing: b
     </div>
 </div>
 
+<?php
+if (!function_exists('colorValidateHex')) require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
+$badge_color_light = getDolGlobalString('QONTOSYNC_BADGE_COLOR');
+$badge_color_dark  = getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK');
+$has_light_color = colorValidateHex($badge_color_light);
+$has_dark_color  = colorValidateHex($badge_color_dark);
+?>
+<?php if ($has_light_color || $has_dark_color): ?>
 <style>
-<?php if (!empty(getDolGlobalString('QONTOSYNC_BADGE_COLOR'))): ?>
+<?php if ($has_light_color): ?>
 @media (prefers-color-scheme: light) {
     #qontosync_results_container .qonto-badge-info,
     #qontosync_advanced_wrapper .qonto-badge-info {
-        background-color: <?php print dol_escape_htmltag(getDolGlobalString('QONTOSYNC_BADGE_COLOR')); ?> !important;
-        border-color: <?php print dol_escape_htmltag(getDolGlobalString('QONTOSYNC_BADGE_COLOR')); ?> !important;
+        background-color: <?php print dol_escape_htmltag($badge_color_light); ?> !important;
+        border-color: <?php print dol_escape_htmltag($badge_color_light); ?> !important;
     }
 }
 <?php endif; ?>
 
-<?php if (!empty(getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK'))): ?>
+<?php if ($has_dark_color): ?>
 @media (prefers-color-scheme: dark) {
     #qontosync_results_container .qonto-badge-info,
     #qontosync_advanced_wrapper .qonto-badge-info {
-        background-color: <?php print dol_escape_htmltag(getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK')); ?> !important;
-        border-color: <?php print dol_escape_htmltag(getDolGlobalString('QONTOSYNC_BADGE_COLOR_DARK')); ?> !important;
+        background-color: <?php print dol_escape_htmltag($badge_color_dark); ?> !important;
+        border-color: <?php print dol_escape_htmltag($badge_color_dark); ?> !important;
     }
 }
 <?php endif; ?>
 </style>
+<?php endif; ?>
 
 <!-- Translation dictionary for JS template rendering -->
 <div id="qonto-js-translations" style="display: none;"
