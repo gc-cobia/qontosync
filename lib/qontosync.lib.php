@@ -11,13 +11,6 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     exit('Access Forbidden');
 }
 
-/*
- * QontoSync dolibarr module 
- * @file       lib/qontosync.lib.php
- * @author     Gaëtan COURTOIS
- * @license    GPLv3
- */
-
 function qontosyncAdminPrepareHead()
 {
     global $langs;
