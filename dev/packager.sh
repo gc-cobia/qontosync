@@ -54,6 +54,7 @@ cp -r "$SRC_DIR" "$TARGET_DIR"
 # 5. Nettoyage des fichiers de développement dans la copie temporaire
 echo "🧹 Suppression des fichiers parasites..."
 rm -rf "$TARGET_DIR/.git"
+rm -rf "$TARGET_DIR/.agents"
 rm -f "$TARGET_DIR/.gitignore"
 rm -rf "$TARGET_DIR/dev"
 rm -f "$TARGET_DIR/module_${MODULE_NAME}-"*.zip
