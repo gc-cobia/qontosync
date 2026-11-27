@@ -81,7 +81,7 @@ class QontoUpdater
 		$bank->fetch_optionals();
 		
 		// Check whether the extrafield row already exists (plain SELECT, no FOR UPDATE)
-		$sql_ef = "SELECT qonto_id FROM " . MAIN_DB_PREFIX . "bank_extrafields WHERE fk_object = " . (int) $bank_line_id;
+		$sql_ef = "SELECT qonto_id FROM " . $this->db->prefix() . "bank_extrafields WHERE fk_object = " . (int) $bank_line_id;
 		$resql_ef = $this->db->query($sql_ef);
 		if (!$resql_ef) {
 			dol_syslog(__METHOD__ . ": Error reading bank line extrafield: " . $this->db->lasterror(), LOG_ERR);
@@ -149,7 +149,7 @@ class QontoUpdater
 
 		// Try to update the specific extrafieldm
 		// Direct SQL to force NULL and bypass Dolibarr's ORM empty string conversion which breaks UNIQUE constraint)
-		$sql = "UPDATE " . MAIN_DB_PREFIX . "bank_extrafields SET qonto_id = NULL WHERE fk_object = " . (int) $bank_line_id;
+		$sql = "UPDATE " . $this->db->prefix() . "bank_extrafields SET qonto_id = NULL WHERE fk_object = " . (int) $bank_line_id;
 		$resql = $this->db->query($sql);
 		
 		if (!$resql) {
@@ -407,7 +407,7 @@ class QontoUpdater
 			$this->db->rollback();
 			return -1;
 		}
-		$sql_lock = "SELECT rowid FROM " . MAIN_DB_PREFIX . $lock_map[$type][0]
+		$sql_lock = "SELECT rowid FROM " . $this->db->prefix() . $lock_map[$type][0]
 			. " WHERE rowid IN (" . implode(',', $lock_ids) . ")"
 			. " AND " . $lock_map[$type][1]
 			. " ORDER BY rowid ASC FOR UPDATE";
@@ -507,7 +507,7 @@ class QontoUpdater
 
 					// Guard against overwriting an already linked bank line before modifying dates (plain SELECT, no FOR UPDATE)
 					// Also prevents firing Dolibarr triggers (e.g. BANKLINE_MODIFY) unnecessarily before an eventual rollback()
-					$sql_bank_ef = "SELECT qonto_id FROM " . MAIN_DB_PREFIX . "bank_extrafields WHERE fk_object = " . (int) $doc_id;
+					$sql_bank_ef = "SELECT qonto_id FROM " . $this->db->prefix() . "bank_extrafields WHERE fk_object = " . (int) $doc_id;
 					$resql_bank_ef = $this->db->query($sql_bank_ef);
 					if (!$resql_bank_ef) {
 						dol_syslog(__METHOD__ . ": Error reading bank_extrafields for line " . $doc_id . ": " . $this->db->lasterror(), LOG_ERR);
@@ -871,7 +871,7 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($vat->entity) ? $vat->entity : null;
 					if ($doc_entity === null) {
-						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "tva WHERE rowid = " . (int) $doc_id);
+						$resql = $this->db->query("SELECT entity FROM " . $this->db->prefix() . "tva WHERE rowid = " . (int) $doc_id);
 						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
 					}
 					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $doc_entity, explode(',', getEntity('tva'))))) {
@@ -924,7 +924,7 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($charge->entity) ? $charge->entity : null;
 					if ($doc_entity === null) {
-						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "chargesociales WHERE rowid = " . (int) $doc_id);
+						$resql = $this->db->query("SELECT entity FROM " . $this->db->prefix() . "chargesociales WHERE rowid = " . (int) $doc_id);
 						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
 					}
 					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $doc_entity, explode(',', getEntity('tax'))))) {
@@ -974,7 +974,7 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($salary->entity) ? $salary->entity : null;
 					if ($doc_entity === null) {
-						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "salary WHERE rowid = " . (int) $doc_id);
+						$resql = $this->db->query("SELECT entity FROM " . $this->db->prefix() . "salary WHERE rowid = " . (int) $doc_id);
 						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
 					}
 					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $doc_entity, explode(',', getEntity('salary'))))) {
@@ -1030,7 +1030,7 @@ class QontoUpdater
 					// Multi-Company Security (IDOR)
 					$doc_entity = isset($expense->entity) ? $expense->entity : null;
 					if ($doc_entity === null) {
-						$resql = $this->db->query("SELECT entity FROM " . MAIN_DB_PREFIX . "expensereport WHERE rowid = " . (int) $doc_id);
+						$resql = $this->db->query("SELECT entity FROM " . $this->db->prefix() . "expensereport WHERE rowid = " . (int) $doc_id);
 						if ($resql && $obj = $this->db->fetch_object($resql)) $doc_entity = $obj->entity;
 					}
 					if ($doc_entity !== null && $doc_entity != $conf->entity && (!function_exists('getEntity') || !in_array((string) $doc_entity, explode(',', getEntity('expensereport'))))) {
@@ -1153,7 +1153,7 @@ class QontoUpdater
                                         $mc_code_db = $this->db->escape($inv_to_close->multicurrency_code);
                                     }
                                     
-                                    $sql_mc = "UPDATE " . MAIN_DB_PREFIX . $table_pf . " ";
+                                    $sql_mc = "UPDATE " . $this->db->prefix() . $table_pf . " ";
                                     $sql_mc .= "SET multicurrency_amount = " . (float)price2num($mc_amount, 'MT') . ", ";
                                     $sql_mc .= "    multicurrency_code = '" . $mc_code_db . "', ";
                                     $sql_mc .= "    multicurrency_tx = " . $mc_tx_db . " ";
@@ -1188,7 +1188,7 @@ class QontoUpdater
 									$final_parent_mc_amount = ($type === 'sinv') ? -$qonto_local_amount : $qonto_local_amount;
 
 									$table_parent = ($type === 'cinv') ? 'paiement' : 'paiementfourn';
-									$sql_parent = "UPDATE " . MAIN_DB_PREFIX . $table_parent . " ";
+									$sql_parent = "UPDATE " . $this->db->prefix() . $table_parent . " ";
 									$sql_parent .= "SET multicurrency_amount = " . (float)price2num($final_parent_mc_amount, 'MT') . " ";
 									$sql_parent .= "WHERE rowid = " . (int)$payment->id;
 

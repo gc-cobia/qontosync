@@ -76,11 +76,11 @@ class QontoRepository
             // If multicurrency is enabled
             if (isModEnabled('multicurrency')) {
                 $sql_c_inv .= ", f.multicurrency_code, f.multicurrency_tx, f.multicurrency_total_ttc, ";
-                $sql_c_inv .= "(SELECT SUM(multicurrency_amount) FROM " . MAIN_DB_PREFIX . "paiement_facture WHERE fk_facture = f.rowid) as already_paid_mc ";
+                $sql_c_inv .= "(SELECT SUM(multicurrency_amount) FROM " . $this->db->prefix() . "paiement_facture WHERE fk_facture = f.rowid) as already_paid_mc ";
             }
 
-			$sql_c_inv .= "FROM " . MAIN_DB_PREFIX . "facture as f ";
-			$sql_c_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
+			$sql_c_inv .= "FROM " . $this->db->prefix() . "facture as f ";
+			$sql_c_inv .= "LEFT JOIN " . $this->db->prefix() . "societe as s ON f.fk_soc = s.rowid ";
 			$sql_c_inv .= "WHERE f.entity IN (" . getEntity('facture') . ") AND f.fk_statut = 1 AND f.paye = 0 ";
 			$sql_c_inv .= "AND f.datef >= '" . $date_limit . "'";
 
@@ -134,11 +134,11 @@ class QontoRepository
             // If multicurrency is enabled
             if (isModEnabled('multicurrency')) {
                 $sql_s_inv .= ", f.multicurrency_code, f.multicurrency_tx, f.multicurrency_total_ttc, ";
-                $sql_s_inv .= "(SELECT SUM(multicurrency_amount) FROM " . MAIN_DB_PREFIX . "paiementfourn_facturefourn WHERE fk_facturefourn = f.rowid) as already_paid_mc ";
+                $sql_s_inv .= "(SELECT SUM(multicurrency_amount) FROM " . $this->db->prefix() . "paiementfourn_facturefourn WHERE fk_facturefourn = f.rowid) as already_paid_mc ";
             }
 
-			$sql_s_inv .= "FROM " . MAIN_DB_PREFIX . "facture_fourn as f ";
-			$sql_s_inv .= "LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_soc = s.rowid ";
+			$sql_s_inv .= "FROM " . $this->db->prefix() . "facture_fourn as f ";
+			$sql_s_inv .= "LEFT JOIN " . $this->db->prefix() . "societe as s ON f.fk_soc = s.rowid ";
 			$sql_s_inv .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") AND f.fk_statut = 1 AND f.paye = 0 ";
 			$sql_s_inv .= "AND f.datef >= '" . $date_limit . "'";
 
@@ -187,7 +187,7 @@ class QontoRepository
 
 		// 3. Fetch unpaid VAT declarations
 		if (isModEnabled('tax') && ($type === 'all' || $type === 'vat')) {
-			$sql_vat = "SELECT rowid, label, amount, datev FROM " . MAIN_DB_PREFIX . "tva WHERE entity IN (" . getEntity('tva') . ") AND paye = 0";
+			$sql_vat = "SELECT rowid, label, amount, datev FROM " . $this->db->prefix() . "tva WHERE entity IN (" . getEntity('tva') . ") AND paye = 0";
 
 			$resql_vat = $this->db->query($sql_vat);
 			if ($resql_vat) {
@@ -206,7 +206,7 @@ class QontoRepository
 
         // 4. Fetch unpaid Social/Tax Charges
         if (isModEnabled('tax') && ($type === 'all' || $type === 'social')) {
-            $sql_soc = "SELECT rowid, libelle as label, amount, date_ech FROM " . MAIN_DB_PREFIX . "chargesociales WHERE entity IN (" . getEntity('tax') . ") AND paye = 0 AND date_ech >= '" . $date_limit . "'";
+            $sql_soc = "SELECT rowid, libelle as label, amount, date_ech FROM " . $this->db->prefix() . "chargesociales WHERE entity IN (" . getEntity('tax') . ") AND paye = 0 AND date_ech >= '" . $date_limit . "'";
             $resql_soc = $this->db->query($sql_soc);
             if ($resql_soc) {
                 while ($obj_soc = $this->db->fetch_object($resql_soc)) {
@@ -225,8 +225,8 @@ class QontoRepository
         if (isModEnabled('salaries') && ($type === 'all' || $type === 'salary')) {
             // Get datesp (start) and dateep (end)
             $sql_sal = "SELECT s.rowid, s.label, s.amount, s.datesp, s.dateep, u.lastname, u.firstname ";
-            $sql_sal .= "FROM " . MAIN_DB_PREFIX . "salary as s ";
-            $sql_sal .= "LEFT JOIN " . MAIN_DB_PREFIX . "user as u ON s.fk_user = u.rowid ";
+            $sql_sal .= "FROM " . $this->db->prefix() . "salary as s ";
+            $sql_sal .= "LEFT JOIN " . $this->db->prefix() . "user as u ON s.fk_user = u.rowid ";
             $sql_sal .= "WHERE s.entity IN (" . getEntity('salary') . ") AND s.paye = 0 AND s.dateep >= '" . $date_limit . "'";
             
             $resql_sal = $this->db->query($sql_sal);
@@ -264,7 +264,7 @@ class QontoRepository
         // 6. Fetch unpaid Expense Reports
         if (isModEnabled('expensereport') && ($type === 'all' || $type === 'expense')) {
             $sql_exp = "SELECT rowid, ref as label, total_ttc as amount, date_debut ";
-            $sql_exp .= "FROM " . MAIN_DB_PREFIX . "expensereport ";
+            $sql_exp .= "FROM " . $this->db->prefix() . "expensereport ";
             $sql_exp .= "WHERE entity IN (" . getEntity('expensereport') . ") AND fk_statut = 5 AND date_debut >= '" . $date_limit . "'";
             
             $resql_exp = $this->db->query($sql_exp);
@@ -294,8 +294,8 @@ class QontoRepository
         $unlinked_bank_lines = [];
 
         $sql_bank = "SELECT b.rowid, b.amount, b.label, b.datev ";
-        $sql_bank .= "FROM " . MAIN_DB_PREFIX . "bank as b ";
-        $sql_bank .= "LEFT JOIN " . MAIN_DB_PREFIX . "bank_extrafields as ef ON ef.fk_object = b.rowid ";
+        $sql_bank .= "FROM " . $this->db->prefix() . "bank as b ";
+        $sql_bank .= "LEFT JOIN " . $this->db->prefix() . "bank_extrafields as ef ON ef.fk_object = b.rowid ";
         $sql_bank .= "WHERE b.fk_account = " . (int) $this->account->id . " ";
         $sql_bank .= "AND (ef.qonto_id IS NULL OR ef.qonto_id = '')";
         
@@ -324,8 +324,8 @@ class QontoRepository
         }
 
         $sql = "SELECT ef.qonto_id, ef.fk_object ";
-        $sql .= "FROM " . MAIN_DB_PREFIX . "bank_extrafields as ef ";
-        $sql .= "JOIN " . MAIN_DB_PREFIX . "bank as b ON ef.fk_object = b.rowid ";
+        $sql .= "FROM " . $this->db->prefix() . "bank_extrafields as ef ";
+        $sql .= "JOIN " . $this->db->prefix() . "bank as b ON ef.fk_object = b.rowid ";
         $sql .= "WHERE b.fk_account = " . (int) $this->account->id . " ";
         
         if ($qonto_id !== null) {
@@ -366,7 +366,7 @@ class QontoRepository
         $details = [];
         
         // Searches for payments associated with this bank line
-        $sql = "SELECT url_id, type FROM " . MAIN_DB_PREFIX . "bank_url WHERE fk_bank = " . (int) $bank_line_id;
+        $sql = "SELECT url_id, type FROM " . $this->db->prefix() . "bank_url WHERE fk_bank = " . (int) $bank_line_id;
         $res = $this->db->query($sql);
         
         if ($res) {
@@ -374,8 +374,8 @@ class QontoRepository
                 // Trace the payment back to the corresponding documents
                 if ($obj->type == 'payment') {
                     $sql2 = "SELECT f.rowid, f.ref, pf.amount, 'cinv' as doc_type, pf.fk_paiement as payment_id 
-                             FROM " . MAIN_DB_PREFIX . "paiement_facture as pf 
-                             JOIN " . MAIN_DB_PREFIX . "facture as f ON pf.fk_facture = f.rowid 
+                             FROM " . $this->db->prefix() . "paiement_facture as pf 
+                             JOIN " . $this->db->prefix() . "facture as f ON pf.fk_facture = f.rowid 
                              WHERE pf.fk_paiement = " . (int)$obj->url_id;
                              
                     $res2 = $this->db->query($sql2);
@@ -387,8 +387,8 @@ class QontoRepository
                     }
                 } elseif ($obj->type == 'payment_supplier') {
                     $sql2 = "SELECT f.rowid, f.ref, f.ref_supplier, pf.amount, 'sinv' as doc_type, pf.fk_paiementfourn as payment_id 
-                             FROM " . MAIN_DB_PREFIX . "paiementfourn_facturefourn as pf 
-                             JOIN " . MAIN_DB_PREFIX . "facture_fourn as f ON pf.fk_facturefourn = f.rowid 
+                             FROM " . $this->db->prefix() . "paiementfourn_facturefourn as pf 
+                             JOIN " . $this->db->prefix() . "facture_fourn as f ON pf.fk_facturefourn = f.rowid 
                              WHERE pf.fk_paiementfourn = " . (int)$obj->url_id;
                              
                     $res2 = $this->db->query($sql2);
@@ -400,8 +400,8 @@ class QontoRepository
                     }
                 } elseif ($obj->type == 'payment_vat') {
                     $sql2 = "SELECT t.rowid, t.label as ref, pv.amount, 'vat' as doc_type, pv.rowid as payment_id 
-                             FROM " . MAIN_DB_PREFIX . "payment_vat as pv 
-                             JOIN " . MAIN_DB_PREFIX . "tva as t ON pv.fk_tva = t.rowid 
+                             FROM " . $this->db->prefix() . "payment_vat as pv 
+                             JOIN " . $this->db->prefix() . "tva as t ON pv.fk_tva = t.rowid 
                              WHERE pv.rowid = " . (int)$obj->url_id;
                              
                     $res2 = $this->db->query($sql2);
@@ -413,8 +413,8 @@ class QontoRepository
                     }
                 } elseif ($obj->type == 'payment_sc') {
                     $sql2 = "SELECT c.rowid, c.ref, pc.amount, 'social' as doc_type, pc.rowid as payment_id 
-                             FROM " . MAIN_DB_PREFIX . "paiementcharge as pc 
-                             JOIN " . MAIN_DB_PREFIX . "chargesociales as c ON pc.fk_charge = c.rowid 
+                             FROM " . $this->db->prefix() . "paiementcharge as pc 
+                             JOIN " . $this->db->prefix() . "chargesociales as c ON pc.fk_charge = c.rowid 
                              WHERE pc.rowid = " . (int)$obj->url_id;
                              
                     $res2 = $this->db->query($sql2);
@@ -426,8 +426,8 @@ class QontoRepository
                     }
                 } elseif ($obj->type == 'payment_expensereport') {
                     $sql2 = "SELECT e.rowid, e.ref, pe.amount, 'expense' as doc_type, pe.rowid as payment_id 
-                             FROM " . MAIN_DB_PREFIX . "payment_expensereport as pe 
-                             JOIN " . MAIN_DB_PREFIX . "expensereport as e ON pe.fk_expensereport = e.rowid 
+                             FROM " . $this->db->prefix() . "payment_expensereport as pe 
+                             JOIN " . $this->db->prefix() . "expensereport as e ON pe.fk_expensereport = e.rowid 
                              WHERE pe.rowid = " . (int)$obj->url_id;
                              
                     $res2 = $this->db->query($sql2);
@@ -439,8 +439,8 @@ class QontoRepository
                     }
                 } elseif ($obj->type == 'payment_salary') {
                     $sql2 = "SELECT s.rowid, s.label as ref, ps.amount, 'salary' as doc_type, ps.rowid as payment_id 
-                             FROM " . MAIN_DB_PREFIX . "payment_salary as ps 
-                             JOIN " . MAIN_DB_PREFIX . "salary as s ON ps.fk_salary = s.rowid 
+                             FROM " . $this->db->prefix() . "payment_salary as ps 
+                             JOIN " . $this->db->prefix() . "salary as s ON ps.fk_salary = s.rowid 
                              WHERE ps.rowid = " . (int)$obj->url_id;
                              
                     $res2 = $this->db->query($sql2);
@@ -457,7 +457,7 @@ class QontoRepository
         
         // Looking for Miscellaneous Payments (Direct link via fk_bank)
         $sql_var = "SELECT rowid as payment_id, label as ref, amount, 'various' as doc_type 
-                    FROM " . MAIN_DB_PREFIX . "payment_various 
+                    FROM " . $this->db->prefix() . "payment_various 
                     WHERE fk_bank = " . (int) $bank_line_id;
         $res_var = $this->db->query($sql_var);
         
@@ -525,7 +525,7 @@ class QontoRepository
         $field = ($type === 'cinv') ? 'fk_facture' : 'fk_facturefourn';
 
         $sql = "SELECT SUM(multicurrency_amount) as amount_paid_devise ";
-        $sql .= "FROM " . MAIN_DB_PREFIX . $table . " ";
+        $sql .= "FROM " . $this->db->prefix() . $table . " ";
         $sql .= "WHERE " . $field . " = " . (int)$doc_id;
 
         $resql = $this->db->query($sql);
@@ -571,8 +571,8 @@ class QontoRepository
         }
 
         $sql  = "SELECT f.rowid, f.ref_supplier, s.siren ";
-        $sql .= "FROM " . MAIN_DB_PREFIX . "facture_fourn AS f ";
-        $sql .= "INNER JOIN " . MAIN_DB_PREFIX . "societe AS s ON f.fk_soc = s.rowid ";
+        $sql .= "FROM " . $this->db->prefix() . "facture_fourn AS f ";
+        $sql .= "INNER JOIN " . $this->db->prefix() . "societe AS s ON f.fk_soc = s.rowid ";
         $sql .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") ";
         $sql .= "AND LOWER(TRIM(f.ref_supplier)) IN (" . implode(', ', $escapedRefs) . ")";
 
@@ -621,7 +621,7 @@ class QontoRepository
         }
 
         $sql  = "SELECT f.rowid, f.ref_ext ";
-        $sql .= "FROM " . MAIN_DB_PREFIX . "facture_fourn AS f ";
+        $sql .= "FROM " . $this->db->prefix() . "facture_fourn AS f ";
         $sql .= "WHERE f.entity IN (" . getEntity('facture_fourn') . ") ";
         $sql .= "AND f.ref_ext IN (" . implode(', ', array_unique($escaped)) . ")";
 

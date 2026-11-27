@@ -309,7 +309,7 @@ class modQontosync extends DolibarrModules
 		global $conf;
 
 		$sql = array(
-			"DELETE FROM ".MAIN_DB_PREFIX."rights_def WHERE module = '".$this->db->escape($this->rights_class)."' AND entity = ".((int) $conf->entity)
+			"DELETE FROM ".$this->db->prefix()."rights_def WHERE module = '".$this->db->escape($this->rights_class)."' AND entity = ".((int) $conf->entity)
 		);
 		return $this->_remove($sql, $options);
 	}
