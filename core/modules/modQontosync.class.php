@@ -220,7 +220,7 @@ class modQontosync extends DolibarrModules
             'url'       => '/qontosync/index.php',
             'langs'     => 'qontosync@qontosync',           
             'position'  => 2000,                            
-            'enabled'   => '$conf->qontosync->enabled',     
+            'enabled'   => "isModEnabled('qontosync')",     
             'perms'     => '$user->hasRight(\'qontosync\', \'reconciliation\', \'read\') || $user->hasRight(\'qontosync\', \'statements\', \'read\') || (getDolGlobalInt(\'QONTOSYNC_EI_ENABLED\') && $user->hasRight(\'qontosync\', \'supplier_invoices\', \'read\'))',
             'target'    => '',
             'user'      => 2,                               
@@ -237,7 +237,7 @@ class modQontosync extends DolibarrModules
             'url'       => '/qontosync/reconciliation.php',
             'langs'     => 'banks',
             'position'  => 2001,
-            'enabled'   => '$conf->qontosync->enabled',
+            'enabled'   => "isModEnabled('qontosync')",
             'perms'     => '$user->hasRight(\'qontosync\', \'reconciliation\', \'read\')',
             'target'    => '',
             'user'      => 2,
@@ -253,7 +253,7 @@ class modQontosync extends DolibarrModules
             'url'       => '/qontosync/statements.php',
             'langs'     => 'banks',
             'position'  => 2002,
-            'enabled'   => '$conf->qontosync->enabled',
+            'enabled'   => "isModEnabled('qontosync')",
             'perms'     => '$user->hasRight(\'qontosync\', \'statements\', \'read\')',
             'target'    => '',
             'user'      => 2,
@@ -269,7 +269,7 @@ class modQontosync extends DolibarrModules
             'url'       => '/qontosync/supplier_invoices.php',
             'langs'     => 'qontosync@qontosync',
             'position'  => 2003,
-            'enabled'   => '$conf->qontosync->enabled && getDolGlobalInt(\'QONTOSYNC_EI_ENABLED\')',
+            'enabled'   => "isModEnabled('qontosync') && getDolGlobalInt('QONTOSYNC_EI_ENABLED')",
             'perms'     => '$user->hasRight(\'qontosync\', \'supplier_invoices\', \'read\')',
             'target'    => '',
             'user'      => 2,
@@ -293,7 +293,7 @@ class modQontosync extends DolibarrModules
 		$extrafields = new ExtraFields($this->db);
 
 		// Extrafield bank
-		$result = $extrafields->addExtraField('qonto_id', 'Qonto Transaction ID', 'varchar', 100, 255, 'bank', 1, 0, '', '', 1, '', '5', 'Qonto Transaction ID to avoid duplicates', '', 0, 'qontosync', '$conf->qontosync->enabled');
+		$result = $extrafields->addExtraField('qonto_id', 'Qonto Transaction ID', 'varchar', 100, 255, 'bank', 1, 0, '', '', 1, '', '5', 'Qonto Transaction ID to avoid duplicates', '', 0, 'qontosync', "isModEnabled('qontosync')");
 		$sql = array();
 		return $this->_init($sql, $options);
 	}
