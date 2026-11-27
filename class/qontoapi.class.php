@@ -191,6 +191,10 @@ class QontoApi
 			$parameters['iban'] = str_replace(' ', '', $parameters['iban']);
 		}
 
+		if (!isset($parameters['per_page'])) {
+			$parameters['per_page'] = 100;
+		}
+
 		$base_endpoint = "/v2/transactions";
 		$base_endpoint .= "?" . http_build_query($parameters);
 

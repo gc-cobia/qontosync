@@ -99,6 +99,10 @@ if (class_exists($className)) {
             $reponse = ['http_code' => 404, 'error' => "ACTION_NOT_FOUND"];
         }
     } catch (\Throwable $e) {
+        $rollbackGuard = 0;
+        while (!empty($db->transaction_opened) && $rollbackGuard++ < 20) {
+            $db->rollback();
+        }
         dol_syslog("QontoSync Router Error: " . $e->getMessage(), LOG_ERR);
         $reponse = ['http_code' => 500, 'error' => "INTERNAL_SERVER_ERROR"];
     }

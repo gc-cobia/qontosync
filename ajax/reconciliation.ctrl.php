@@ -12,6 +12,7 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 }
 
 if (!trait_exists('QontoAccountTrait')) dol_include_once('/qontosync/class/qontoaccount.trait.php');
+if (!class_exists('QontoToken')) dol_include_once('/qontosync/class/qontotoken.class.php', 'QontoToken');
  
 /**
  * Controller for bank reconciliation AJAX actions.
@@ -49,46 +50,122 @@ class ReconciliationController
     }
 
     /**
-     * Generate a stateless HMAC-SHA256 signature binding a Qonto transaction ID
-     * to the current Dolibarr entity and authorized bank account.
+     * Extract the minimal set of raw Qonto transaction fields needed by downstream
+     * actions and QontoUpdater, keeping amounts unsigned positive like raw API responses.
      *
-     * @param  string $qontoId Qonto transaction ID
-     * @return string          Hexadecimal HMAC signature, or empty string if context is invalid
+     * @param  array $rawTrx Raw Qonto transaction array
+     * @return array         Minimal transaction payload
      */
-    private function signTransaction(string $qontoId): string
+    private function extractMinimalTransaction(array $rawTrx): array
     {
-        global $conf;
+        $opType = isset($rawTrx['operation_type']) ? (string) $rawTrx['operation_type'] : '';
 
-        $instanceId = !empty($conf->file->instance_unique_id) ? (string) $conf->file->instance_unique_id : '';
-        $qontoId = trim($qontoId);
+        $minimal = [
+            'id'             => (string) ($rawTrx['id'] ?? ''),
+            'amount'         => isset($rawTrx['amount']) ? abs((float) $rawTrx['amount']) : 0.0,
+            'side'           => isset($rawTrx['side']) ? (string) $rawTrx['side'] : '',
+            'currency'       => isset($rawTrx['currency']) ? (string) $rawTrx['currency'] : '',
+            'local_amount'   => isset($rawTrx['local_amount']) ? abs((float) $rawTrx['local_amount']) : 0.0,
+            'local_currency' => isset($rawTrx['local_currency']) ? (string) $rawTrx['local_currency'] : '',
+            'settled_at'     => isset($rawTrx['settled_at']) ? (string) $rawTrx['settled_at'] : '',
+            'emitted_at'     => isset($rawTrx['emitted_at']) ? (string) $rawTrx['emitted_at'] : '',
+            'operation_type' => $opType,
+            'label'          => isset($rawTrx['label']) ? (string) $rawTrx['label'] : '',
+            'reference'      => isset($rawTrx['reference']) ? (string) $rawTrx['reference'] : '',
+        ];
 
-        if ($instanceId === '' || $qontoId === '' || empty($this->account) || $this->account->id <= 0) {
+        if ($opType !== '' && !empty($rawTrx[$opType]['counterparty_bank_identifier'])) {
+            $minimal[$opType] = [
+                'counterparty_bank_identifier' => (string) $rawTrx[$opType]['counterparty_bank_identifier'],
+            ];
+        }
+
+        if (!empty($rawTrx['check']['check_number'])) {
+            $minimal['check'] = array_merge(
+                $minimal['check'] ?? [],
+                ['check_number' => (string) $rawTrx['check']['check_number']]
+            );
+        }
+
+        if (!empty($rawTrx['direct_debit_collection']['unique_mandate_reference'])) {
+            $minimal['direct_debit_collection'] = array_merge(
+                $minimal['direct_debit_collection'] ?? [],
+                ['unique_mandate_reference' => (string) $rawTrx['direct_debit_collection']['unique_mandate_reference']]
+            );
+        }
+
+        return $minimal;
+    }
+
+    /**
+     * Generate a stateless HMAC-SHA256 signed token containing the minimal Qonto
+     * transaction payload, bound to the current Dolibarr entity and bank account.
+     *
+     * @param  array  $rawTrx Raw Qonto transaction array
+     * @return string         Signed token (<base64url>.<hmac>), or empty string if invalid
+     */
+    private function signTransaction(array $rawTrx): string
+    {
+        $qontoId = trim((string) ($rawTrx['id'] ?? ''));
+        if ($qontoId === '' || empty($this->account) || $this->account->id <= 0) {
             return '';
         }
 
-        return hash_hmac(
-            'sha256',
-            ((int) $conf->entity) . '|' . ((int) $this->account->id) . '|' . $qontoId,
-            'qontosync:trx:' . $instanceId
+        return QontoToken::signPayload(
+            'trx_v2',
+            (string) ((int) $this->account->id),
+            $qontoId,
+            $this->extractMinimalTransaction($rawTrx)
         );
     }
 
     /**
-     * Verify a transaction HMAC signature in constant time.
+     * Verify a transaction HMAC token in constant time before decoding its payload.
      *
-     * @param  string $qontoId Qonto transaction ID
-     * @param  string $sig     Client-supplied HMAC signature
-     * @return bool            True if valid, false otherwise
+     * @param  string     $qontoId Qonto transaction ID
+     * @param  string     $token   Client-supplied signed transaction token
+     * @return array|null          ['payload' => array, 'expired' => bool] if authentic, null otherwise
      */
-    private function verifyTransactionSignature(string $qontoId, string $sig): bool
+    private function verifyTransactionToken(string $qontoId, string $token): ?array
     {
-        $qontoId = trim($qontoId);
-        if ($qontoId === '' || $sig === '') {
-            return false;
+        if (empty($this->account) || $this->account->id <= 0) {
+            return null;
         }
 
-        $expected = $this->signTransaction($qontoId);
-        return $expected !== '' && hash_equals($expected, $sig);
+        return QontoToken::verifyPayload(
+            'trx_v2',
+            (string) ((int) $this->account->id),
+            $qontoId,
+            $token
+        );
+    }
+
+    /**
+     * Resolve transaction data from a verified payload, falling back to Qonto API
+     * only if the embedded payload TTL has expired.
+     *
+     * @param  array         $verifiedResult Result returned by verifyTransactionToken()
+     * @param  QontoApi|null $api            Lazy-initialized QontoApi reference
+     * @return array|null                    Transaction array ready for controller/updater, or null on error
+     */
+    private function resolveVerifiedTransaction(array $verifiedResult, ?QontoApi &$api = null): ?array
+    {
+        $payload = (isset($verifiedResult['payload']) && is_array($verifiedResult['payload'])) ? $verifiedResult['payload'] : null;
+        if (empty($payload)) {
+            return null;
+        }
+
+        if (empty($verifiedResult['expired'])) {
+            return $payload;
+        }
+
+        if ($api === null) {
+            if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
+            $api = new QontoApi();
+        }
+
+        $fresh = $api->getTransaction((string) ($payload['id'] ?? ''));
+        return (is_array($fresh) && !empty($fresh)) ? $fresh : null;
     }
     
     /**
@@ -135,6 +212,14 @@ class ReconciliationController
             return ['http_code' => 404, 'error' => 'NO_TRANSACTIONS_FOUND'];
         }
 
+        // Index raw transactions (unsigned amounts) before QontoMatching::fetchTransactions() mutates debit signs
+        $raw_by_id = [];
+        foreach ($transactions as $rt) {
+            if (!empty($rt['id'])) {
+                $raw_by_id[(string) $rt['id']] = $rt;
+            }
+        }
+
         // Load documents fetching Qonto transactions
         if (!class_exists('QontoMatching')) dol_include_once('/qontosync/class/qontomatching.class.php', 'QontoMatching');
         $qontoMatching = new QontoMatching($this->db, $this->account);
@@ -150,7 +235,7 @@ class ReconciliationController
 
             $trx_item = [
                 'id' => $q_id,
-                'sig' => $this->signTransaction((string) $q_id),
+                'sig' => isset($raw_by_id[(string) $q_id]) ? $this->signTransaction($raw_by_id[(string) $q_id]) : '',
                 'label' => $t['label'],
                 'reference' => !empty($t['reference']) ? $t['reference'] : '',
                 'settled_at' => $t['settled_at'],
@@ -313,24 +398,26 @@ class ReconciliationController
             return ['http_code' => 400, 'error' => 'NO_TRANSACTION_TO_LINK'];
         }
 
-        // Verify all HMAC transaction signatures before fetching from Qonto API
+        // Verify all HMAC transaction tokens before processing any database updates
+        $verified_map = [];
         foreach ($matches as $qonto_id => $match) {
             if (empty($match) || !is_array($match)) {
                 continue;
             }
             $clean_qonto_id = trim((string) sanitizeVal((string) $qonto_id, 'alphanohtml'));
             $sig = (isset($match['sig']) && is_string($match['sig'])) ? $match['sig'] : '';
-            if (!$this->verifyTransactionSignature($clean_qonto_id, $sig)) {
+            $verified = $this->verifyTransactionToken($clean_qonto_id, $sig);
+            if ($verified === null) {
                 dol_syslog(__METHOD__ . ": Invalid HMAC signature for Qonto transaction " . $clean_qonto_id . " on bank account " . $this->account->id, LOG_WARNING);
                 return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
             }
+            $verified_map[$clean_qonto_id] = $verified;
         }
 
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-        $api = new QontoApi();
+        $api = null;
 
         if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php', 'QontoUpdater');
-        $qontoUpdater = new QontoUpdater($this->db, $this->account, $api);
+        $qontoUpdater = new QontoUpdater($this->db, $this->account);
         
         $success_count = 0;
         $error_count = 0;
@@ -344,7 +431,7 @@ class ReconciliationController
             $type = sanitizeVal((string) ($match['type'] ?? ''), 'alpha');
             $doc_id = (int) ($match['doc_id'] ?? 0);
 
-            $selected_trx = $api->getTransaction($qonto_id);
+            $selected_trx = isset($verified_map[$qonto_id]) ? $this->resolveVerifiedTransaction($verified_map[$qonto_id], $api) : null;
             if ($selected_trx) {
                 $amount = (float) $selected_trx['amount'];
                 
@@ -436,15 +523,14 @@ class ReconciliationController
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
-        if (!$this->verifyTransactionSignature($qonto_id, $sig)) {
+        $verified = $this->verifyTransactionToken($qonto_id, $sig);
+        if ($verified === null) {
             dol_syslog(__METHOD__ . ": Invalid HMAC signature for Qonto transaction " . $qonto_id . " on bank account " . $this->account->id, LOG_WARNING);
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-        $api = new QontoApi();
-
-        $raw_trx = $api->getTransaction($qonto_id);
+        $api = null;
+        $raw_trx = $this->resolveVerifiedTransaction($verified, $api);
         if (empty($raw_trx)) {
             return ['http_code' => 404, 'error' => 'TRANSACTION_NOT_FOUND'];
         }
@@ -661,7 +747,7 @@ class ReconciliationController
 
         $transaction_data = [
             'id' => $processed_trx['id'],
-            'sig' => $this->signTransaction((string) $processed_trx['id']),
+            'sig' => $this->signTransaction($raw_trx),
             'label' => !empty($processed_trx['label']) ? $processed_trx['label'] : '',
             'settled_at' => !empty($processed_trx['settled_at']) ? $processed_trx['settled_at'] : '',
             'date_formatted' => $date_formatted,
@@ -710,22 +796,21 @@ class ReconciliationController
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
-        if (!$this->verifyTransactionSignature($qonto_id, $sig)) {
+        $verified = $this->verifyTransactionToken($qonto_id, $sig);
+        if ($verified === null) {
             dol_syslog(__METHOD__ . ": Invalid HMAC signature for Qonto transaction " . $qonto_id . " on bank account " . $this->account->id, LOG_WARNING);
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php');
-        $api = new QontoApi();
-
-        if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
-        $qontoUpdater = new QontoUpdater($this->db, $this->account);
-    
-        $selected_trx = $api->getTransaction($qonto_id);
+        $api = null;
+        $selected_trx = $this->resolveVerifiedTransaction($verified, $api);
 
         if (empty($selected_trx)) {
             return ['http_code' => 400, 'error' => 'NO_TRANSACTION_FOUND'];
         }
+
+        if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php');
+        $qontoUpdater = new QontoUpdater($this->db, $this->account, $api);
 
         $amount = abs((float) $selected_trx['amount']);
         if (isset($selected_trx['side']) && $selected_trx['side'] == 'debit') {
@@ -811,7 +896,8 @@ class ReconciliationController
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
-        if (!$this->verifyTransactionSignature($qonto_id, $sig)) {
+        $verified = $this->verifyTransactionToken($qonto_id, $sig);
+        if ($verified === null) {
             dol_syslog(__METHOD__ . ": Invalid HMAC signature for Qonto transaction " . $qonto_id . " on bank account " . $this->account->id, LOG_WARNING);
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
@@ -834,10 +920,8 @@ class ReconciliationController
             }
         }
 
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-        $api = new QontoApi();
-
-        $selected_trx = $api->getTransaction($qonto_id);
+        $api = null;
+        $selected_trx = $this->resolveVerifiedTransaction($verified, $api);
         if (empty($selected_trx)) {
             return ['http_code' => 400, 'error' => 'NO_TRANSACTION_FOUND'];
         }

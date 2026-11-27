@@ -123,33 +123,41 @@ $(document).ready(function () {
             spinnerText.text(langProcessBatch + ' (0/' + total + ')');
         }
 
-        const promises = itemsToLink.map(function (item) {
-            return apiCall('batchLink', {
-                bank_rowid: bankRowid,
-                matches: {
-                    [item.qonto_id]: {
-                        type: item.type,
-                        doc_id: item.doc_id,
-                        sig: item.sig
-                    }
-                }
-            }).then(function (res) {
-                if (res && !res.error && res.success_count > 0) {
-                    successCount++;
+        const CHUNK_SIZE = 5;
+
+        for (let i = 0; i < total; i += CHUNK_SIZE) {
+            const chunk = itemsToLink.slice(i, i + CHUNK_SIZE);
+            const chunkMatches = {};
+
+            chunk.forEach(function (item) {
+                chunkMatches[item.qonto_id] = {
+                    type: item.type,
+                    doc_id: item.doc_id,
+                    sig: item.sig
+                };
+            });
+
+            try {
+                const res = await apiCall('batchLink', {
+                    bank_rowid: bankRowid,
+                    matches: chunkMatches
+                });
+
+                if (res && !res.error) {
+                    successCount += parseInt(res.success_count, 10) || 0;
+                    errorCount += parseInt(res.error_count, 10) || 0;
                 } else {
-                    errorCount++;
+                    errorCount += chunk.length;
                 }
-            }).catch(function () {
-                errorCount++;
-            }).finally(function () {
-                completedCount++;
+            } catch (err) {
+                errorCount += chunk.length;
+            } finally {
+                completedCount += chunk.length;
                 if (spinnerText.length > 0) {
                     spinnerText.text(langProcessBatch + ' (' + completedCount + '/' + total + ')');
                 }
-            });
-        });
-
-        await Promise.all(promises);
+            }
+        }
 
         const translationsElem = document.getElementById('qonto-js-translations');
         const batchPattern = (translationsElem && translationsElem.dataset.successBatchCompleted) ? translationsElem.dataset.successBatchCompleted : '%s transaction(s) linked, %s failed.';
