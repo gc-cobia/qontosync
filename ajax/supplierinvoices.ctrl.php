@@ -11,6 +11,8 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
     exit('Access Forbidden');
 }
 
+if (!class_exists('QontoToken')) dol_include_once('/qontosync/class/qontotoken.class.php', 'QontoToken');
+
 /**
  * Controller for Qonto supplier invoices AJAX actions.
  */
@@ -44,46 +46,68 @@ class SupplierInvoicesController
     }
 
     /**
-     * Generate a stateless HMAC-SHA256 signature binding a Qonto supplier invoice ID
-     * to the current Dolibarr entity and user.
+     * Extract the minimal set of raw Qonto supplier invoice fields needed by
+     * QontoEInvoicing::importSupplierInvoice().
      *
-     * @param  string $qontoId Qonto supplier invoice UUID
-     * @return string          Hexadecimal HMAC signature, or empty string if context is invalid
+     * @param  array $rawInv Raw Qonto supplier invoice array
+     * @return array         Minimal supplier invoice payload
      */
-    private function signInvoice(string $qontoId): string
+    private function extractMinimalInvoice(array $rawInv): array
     {
-        global $conf, $user;
+        return [
+            'id'                    => trim((string) ($rawInv['id'] ?? '')),
+            'attachment_id'         => !empty($rawInv['attachment_id']) ? trim((string) $rawInv['attachment_id']) : '',
+            'display_attachment_id' => !empty($rawInv['display_attachment_id']) ? trim((string) $rawInv['display_attachment_id']) : '',
+            'invoice_number'        => isset($rawInv['invoice_number']) ? (string) $rawInv['invoice_number'] : '',
+            'reference'             => isset($rawInv['reference']) ? (string) $rawInv['reference'] : '',
+        ];
+    }
 
-        $instanceId = !empty($conf->file->instance_unique_id) ? (string) $conf->file->instance_unique_id : '';
-        $qontoId = trim($qontoId);
+    /**
+     * Generate a stateless HMAC-SHA256 signed token containing the minimal Qonto
+     * supplier invoice payload, bound to the current Dolibarr entity and user.
+     *
+     * @param  array  $rawInv Raw Qonto supplier invoice array
+     * @return string         Signed token (<base64url>.<hmac>), or empty string if invalid
+     */
+    private function signInvoice(array $rawInv): string
+    {
+        global $user;
 
-        if ($instanceId === '' || $qontoId === '') {
+        $qontoId = trim((string) ($rawInv['id'] ?? ''));
+        if ($qontoId === '' || empty($user->id) || (int) $user->id <= 0) {
             return '';
         }
 
-        return hash_hmac(
-            'sha256',
-            ((int) $conf->entity) . '|' . ((int) $user->id) . '|' . $qontoId,
-            'qontosync:supp_inv:' . $instanceId
+        return QontoToken::signPayload(
+            'supp_inv_v2',
+            (string) ((int) $user->id),
+            $qontoId,
+            $this->extractMinimalInvoice($rawInv)
         );
     }
 
     /**
-     * Verify a supplier invoice HMAC signature in constant time.
+     * Verify a supplier invoice HMAC token in constant time before decoding its payload.
      *
-     * @param  string $qontoId Qonto supplier invoice UUID
-     * @param  string $sig     Client-supplied HMAC signature
-     * @return bool            True if valid, false otherwise
+     * @param  string     $qontoId Qonto supplier invoice UUID
+     * @param  string     $token   Client-supplied signed token
+     * @return array|null          ['payload' => array, 'expired' => bool] if authentic, null otherwise
      */
-    private function verifyInvoiceSignature(string $qontoId, string $sig): bool
+    private function verifyInvoiceToken(string $qontoId, string $token): ?array
     {
-        $qontoId = trim($qontoId);
-        if ($qontoId === '' || $sig === '') {
-            return false;
+        global $user;
+
+        if (empty($user->id) || (int) $user->id <= 0) {
+            return null;
         }
 
-        $expected = $this->signInvoice($qontoId);
-        return $expected !== '' && hash_equals($expected, $sig);
+        return QontoToken::verifyPayload(
+            'supp_inv_v2',
+            (string) ((int) $user->id),
+            $qontoId,
+            $token
+        );
     }
 
     /**
@@ -95,20 +119,13 @@ class SupplierInvoicesController
      */
     private function signAttachment(string $attachmentId): string
     {
-        global $conf, $user;
+        global $user;
 
-        $instanceId = !empty($conf->file->instance_unique_id) ? (string) $conf->file->instance_unique_id : '';
-        $attachmentId = trim($attachmentId);
-
-        if ($instanceId === '' || $attachmentId === '') {
+        if (empty($user->id) || (int) $user->id <= 0) {
             return '';
         }
 
-        return hash_hmac(
-            'sha256',
-            ((int) $conf->entity) . '|' . ((int) $user->id) . '|' . $attachmentId,
-            'qontosync:supp_att:' . $instanceId
-        );
+        return QontoToken::signId('supp_att', (string) ((int) $user->id), $attachmentId);
     }
 
     /**
@@ -120,13 +137,13 @@ class SupplierInvoicesController
      */
     private function verifyAttachmentSignature(string $attachmentId, string $sig): bool
     {
-        $attachmentId = trim($attachmentId);
-        if ($attachmentId === '' || $sig === '') {
+        global $user;
+
+        if (empty($user->id) || (int) $user->id <= 0) {
             return false;
         }
 
-        $expected = $this->signAttachment($attachmentId);
-        return $expected !== '' && hash_equals($expected, $sig);
+        return QontoToken::verifyId('supp_att', (string) ((int) $user->id), $attachmentId, $sig);
     }
 
     /**
@@ -200,14 +217,15 @@ class SupplierInvoicesController
                 $nbToProcess++;
             }
 
-            $invoiceSig = $this->signInvoice($qontoId);
-            $canImportRow = ($canImport && $matchStatus !== 'linked' && $attId !== '' && $einvoicingModEnabled && $qontoId !== '' && $invoiceSig !== '');
+            $canImportBase = ($canImport && $matchStatus !== 'linked' && $attId !== '' && $einvoicingModEnabled && $qontoId !== '');
+            $invoiceSig = $canImportBase ? $this->signInvoice($inv) : '';
+            $canImportRow = ($canImportBase && $invoiceSig !== '');
             $attSig = ($canReadPdf && $attId !== '') ? $this->signAttachment($attId) : '';
             $canReadPdfRow = ($canReadPdf && $attId !== '' && $attSig !== '');
 
             $formattedInvoices[] = [
                 'id' => $qontoId,
-                'sig' => $invoiceSig,
+                'sig' => $canImportRow ? $invoiceSig : '',
                 'date_formatted' => $dateFormatted,
                 'ref' => $ref,
                 'supplier' => $supplier,
@@ -259,7 +277,8 @@ class SupplierInvoicesController
             return ['http_code' => 400, 'error' => 'INVALID_PARAMETERS'];
         }
 
-        if (!$this->verifyInvoiceSignature($qontoId, $sig)) {
+        $verified = $this->verifyInvoiceToken($qontoId, $sig);
+        if ($verified === null) {
             dol_syslog(__METHOD__ . ': Invalid HMAC signature for Qonto supplier invoice ' . $qontoId . ' by user ' . $user->id, LOG_WARNING);
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
@@ -275,29 +294,49 @@ class SupplierInvoicesController
             ];
         }
 
-        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-        $api = new QontoApi();
-
-        $rawInvoices = $api->getSupplierInvoices();
-
-        if ($rawInvoices === false) {
+        // Fast DB guard against duplicate import / token replay before any external HTTP call
+        if (!class_exists('QontoRepository')) dol_include_once('/qontosync/class/qontorepository.class.php', 'QontoRepository');
+        $repo = new QontoRepository($this->db);
+        $alreadyLinked = $repo->getLinkedInvoices([$qontoId]);
+        if (!empty($alreadyLinked[$qontoId])) {
+            $existingFacId = (int) $alreadyLinked[$qontoId];
             return [
-                'http_code' => 500,
-                'error' => 'ERROR_FETCHING_SUPPLIER_INVOICES',
-                'error_detail' => !empty($api->error) ? $langs->transnoentities($api->error) : '',
+                'http_code' => 200,
+                'fac_id' => $existingFacId,
+                'created' => false,
+                'dolibarr_url' => DOL_URL_ROOT . '/fourn/facture/card.php?facid=' . $existingFacId,
+                'message' => $langs->transnoentities('QontoEInvoicingInvoiceLinked', $existingFacId),
+                'warnings' => [],
             ];
         }
 
-        $targetInvoice = null;
-        foreach ($rawInvoices as $inv) {
-            if (isset($inv['id']) && (string) $inv['id'] === $qontoId) {
-                $targetInvoice = $inv;
-                break;
-            }
-        }
+        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
+        $api = new QontoApi();
 
-        if ($targetInvoice === null) {
-            return ['http_code' => 404, 'error' => 'INVOICE_NOT_FOUND'];
+        $targetInvoice = null;
+        if (empty($verified['expired']) && !empty($verified['payload']) && is_array($verified['payload'])) {
+            $targetInvoice = $verified['payload'];
+        } else {
+            $rawInvoices = $api->getSupplierInvoices();
+
+            if ($rawInvoices === false) {
+                return [
+                    'http_code' => 500,
+                    'error' => 'ERROR_FETCHING_SUPPLIER_INVOICES',
+                    'error_detail' => !empty($api->error) ? $langs->transnoentities($api->error) : '',
+                ];
+            }
+
+            foreach ($rawInvoices as $inv) {
+                if (isset($inv['id']) && (string) $inv['id'] === $qontoId) {
+                    $targetInvoice = $inv;
+                    break;
+                }
+            }
+
+            if ($targetInvoice === null) {
+                return ['http_code' => 404, 'error' => 'INVOICE_NOT_FOUND'];
+            }
         }
 
         try {

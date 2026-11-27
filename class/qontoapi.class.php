@@ -377,6 +377,10 @@ class QontoApi
 	 */
 	public function getSupplierInvoices(array $parameters = [])
 	{
+		if (!isset($parameters['per_page'])) {
+			$parameters['per_page'] = 100;
+		}
+
 		$base_endpoint = "/v2/supplier_invoices";
 		$base_endpoint .= "?" . http_build_query($parameters);
 
