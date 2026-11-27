@@ -13,3 +13,7 @@ dev/dolibarr/
 dev/einvoicing/
 dev/.tmp-*
 
+# Python cache
+__pycache__/
+*.py[cod]
+
