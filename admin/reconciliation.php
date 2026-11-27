@@ -64,6 +64,24 @@ if ($action == 'update') {
 		dolibarr_set_const($db, 'QONTOSYNC_BADGE_COLOR_DARK', $badge_color_dark, 'chaine', 0, '', $conf->entity);
 
 		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
+
+		$statement_regex = getDolGlobalString('BANK_STATEMENT_REGEX_RULE');
+		if ($statement_regex !== '') {
+			if (!function_exists('dol_sanitizeFileName')) {
+				require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+			}
+			$format_to_check = ($statement_format !== '') ? $statement_format : '{Y}-{m}';
+			$sample_time = dol_now();
+			$raw_sample = preg_replace_callback('/\{([^}]+)\}/', function ($matches) use ($sample_time) {
+				return date($matches[1], $sample_time);
+			}, $format_to_check);
+			$sample_ref = dol_substr(dol_sanitizeFileName($raw_sample), 0, 50);
+
+			if (@preg_match('/' . $statement_regex . '/', $sample_ref) !== 1) {
+				$langs->load("errors");
+				setEventMessages($langs->trans("ErrorBankStatementNameMustFollowRegex", dol_escape_htmltag($statement_regex)) . ' (' . dol_escape_htmltag($sample_ref) . ')', null, 'warnings');
+			}
+		}
 	}
 }
 

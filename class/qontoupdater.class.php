@@ -123,8 +123,6 @@ class QontoUpdater
 	 */
 	public function unlinkTransaction($bank_line_id): int
 	{
-		global $user;
-
 		if (empty($bank_line_id)) {
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
 			return -1;
@@ -147,24 +145,25 @@ class QontoUpdater
 
 		$this->db->begin();
 
-		// Try to update the specific extrafieldm
-		// Direct SQL to force NULL and bypass Dolibarr's ORM empty string conversion which breaks UNIQUE constraint)
+		// Try to update the specific extrafield
+		// Direct SQL to force NULL and bypass Dolibarr's ORM empty string conversion which breaks UNIQUE constraint
 		$sql = "UPDATE " . $this->db->prefix() . "bank_extrafields SET qonto_id = NULL WHERE fk_object = " . (int) $bank_line_id;
 		$resql = $this->db->query($sql);
 		
 		if (!$resql) {
 			$this->db->rollback();
-			dol_syslog(__METHOD__ . ": Error updating the bank line extrafield: ".$bank->error, LOG_ERR);
+			dol_syslog(__METHOD__ . ": Error updating the bank line extrafield: " . $this->db->lasterror(), LOG_ERR);
 			return -1;
 		}
 		
-		// Update the bank line to remove the statement reference
-		$bank->num_releve = '';
-		$res = $bank->update_conciliation($user, null, 0);
+		// Direct SQL to reset reconciliation and force num_releve = NULL
+		// Bypasses AccountLine::update_conciliation() which enforces BANK_STATEMENT_REGEX_RULE even when unconciliating ($conciliated = 0)
+		$sql_bank = "UPDATE " . $this->db->prefix() . "bank SET rappro = 0, num_releve = NULL WHERE rowid = " . (int) $bank_line_id . " AND fk_account = " . (int) $this->account->id;
+		$resql_bank = $this->db->query($sql_bank);
 		
-		if ($res < 0) {
+		if (!$resql_bank) {
 			$this->db->rollback();
-			dol_syslog(__METHOD__ . ": Error updating the bank line statement: ".$bank->error, LOG_ERR);
+			dol_syslog(__METHOD__ . ": Error updating the bank line statement: " . $this->db->lasterror(), LOG_ERR);
 			return -1;
 		}
 	
