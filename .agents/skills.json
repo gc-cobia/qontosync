@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "path": "dev/dolibarr/.agents/skills",
+      "exclude": [
+        "skill-doli-github",
+        "skill-doli-upmerge",
+        "skill-doli-website-edit"
+      ]
+    }
+  ]
+}
