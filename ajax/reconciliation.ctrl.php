@@ -816,6 +816,11 @@ class ReconciliationController
             return ['http_code' => 403, 'error' => 'PERMISSION_DENIED'];
         }
 
+        if (isModEnabled('accounting') && empty($accountancy_code)) {
+            dol_syslog(__METHOD__ . ": Accountancy code is empty", LOG_ERR);
+            return ['http_code' => 400, 'error' => 'FAILED_TO_CREATE_PAYMENT'];
+        }
+
         // Validate attached file upfront if provided (Fail-Fast before creating payment)
         $has_attachment = (!empty($attached_file) && is_array($attached_file) && (!empty($attached_file['filename']) || !empty($attached_file['content'])));
         $qontoGed = null;
@@ -829,13 +834,21 @@ class ReconciliationController
             }
         }
 
+        if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
+        $api = new QontoApi();
+
+        $selected_trx = $api->getTransaction($qonto_id);
+        if (empty($selected_trx)) {
+            return ['http_code' => 400, 'error' => 'NO_TRANSACTION_FOUND'];
+        }
+
         if (!class_exists('QontoUpdater')) dol_include_once('/qontosync/class/qontoupdater.class.php', 'QontoUpdater');
-        $qontoUpdater = new QontoUpdater($this->db, $this->account);
+        $qontoUpdater = new QontoUpdater($this->db, $this->account, $api);
 
         $this->db->begin();
 
         // Step 1: Create the various payment (kept inside outer transaction for atomic rollback)
-        $payment_id = $qontoUpdater->createVariousPayment($qonto_id, $accountancy_code);
+        $payment_id = $qontoUpdater->createVariousPayment($selected_trx, $accountancy_code);
         if ($payment_id <= 0) {
             $this->db->rollback();
             return ['http_code' => 400, 'error' => 'FAILED_TO_CREATE_PAYMENT'];

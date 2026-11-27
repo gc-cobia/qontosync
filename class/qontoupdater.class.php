@@ -176,13 +176,21 @@ class QontoUpdater
 	/**
 	 * Create a Various Payment (Opération Diverse) and link it to a Qonto transaction
 	 *
-	 * @param string $qonto_id
-	 * @param string $accountancy_code
-	 * @return int Payment ID (> 0) on success, -1 on error
+	 * @param array|string $qonto_data       Qonto transaction data (array) OR Qonto transaction ID (string)
+	 * @param string       $accountancy_code Accountancy code when accounting module is enabled
+	 * @return int                           Payment ID (> 0) on success, -1 on error
 	 */
-	public function createVariousPayment(string $qonto_id, string $accountancy_code = '')
+	public function createVariousPayment($qonto_data, string $accountancy_code = '')
 	{
 		global $user;
+
+		if (is_array($qonto_data)) {
+			$qonto_id = trim((string) ($qonto_data['id'] ?? ''));
+		} elseif (is_string($qonto_data)) {
+			$qonto_id = trim($qonto_data);
+		} else {
+			$qonto_id = '';
+		}
 
 		if (empty($qonto_id)) {
 			dol_syslog(__METHOD__ . ": Error on input parameters", LOG_ERR);
@@ -208,16 +216,20 @@ class QontoUpdater
 			return -1;
 		}
 
-		if ($this->api === null) {
-			if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
-			$this->api = new QontoApi();
-		}
+		// Resolve transaction data (fast track if pre-fetched, smart track otherwise)
+		if (is_array($qonto_data)) {
+			$qonto_trx = $qonto_data;
+		} else {
+			if ($this->api === null) {
+				if (!class_exists('QontoApi')) dol_include_once('/qontosync/class/qontoapi.class.php', 'QontoApi');
+				$this->api = new QontoApi();
+			}
 
-		// Fetch transaction details
-		$qonto_trx = $this->api->getTransaction($qonto_id);
-		if (empty($qonto_trx)) {
-			dol_syslog(__METHOD__ . ": Cannot fetch Qonto transaction details for ID: " . $qonto_id, LOG_ERR);
-			return -1;
+			$qonto_trx = $this->api->getTransaction($qonto_id);
+			if (empty($qonto_trx)) {
+				dol_syslog(__METHOD__ . ": Cannot fetch Qonto transaction details for ID: " . $qonto_id, LOG_ERR);
+				return -1;
+			}
 		}
 
 		// Prepare payment object
